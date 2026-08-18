@@ -1,0 +1,362 @@
+{
+  "_comment": "Terminologi KSSR Sains Tahun 6. Partial locale — any key omitted here falls back to en.json automatically, so this file can be filled in incrementally without breaking the game. Please have a teacher verify before classroom use.",
+  "lang": "Bahasa Melayu",
+  "langShort": "BM",
+  "ui": {
+    "title": "Panik Pengawetan!",
+    "subtitle": "Sains Tahun 6 · Unit 8",
+    "play": "Main",
+    "continue": "Teruskan",
+    "score": "Skor",
+    "combo": "Kombo",
+    "level": "Tahap",
+    "stage": "Peringkat",
+    "time": "Masa",
+    "preserved": "Diawet",
+    "goal": "Matlamat Hari Ini",
+    "factBook": "Buku Fakta",
+    "pause": "Jeda",
+    "resume": "Sambung",
+    "restart": "Mula semula",
+    "quit": "Keluar ke menu",
+    "settings": "Tetapan",
+    "sound": "Bunyi",
+    "music": "Muzik",
+    "reducedMotion": "Kurangkan animasi",
+    "language": "Bahasa",
+    "loading": "Menyiapkan dapur…",
+    "tapToStart": "Sentuh untuk mula",
+    "microbeMeter": "Meter Mikroorganisma",
+    "microbeMeterHint": "Guna kaedah yang betul untuk menghalang mikroorganisma!",
+    "spoilage": "Kerosakan",
+    "orders": "Pesanan",
+    "next": "Seterusnya",
+    "back": "Kembali",
+    "close": "Tutup",
+    "skip": "Langkau",
+    "stars": "Bintang",
+    "accuracy": "Ketepatan",
+    "bestCombo": "Kombo terbaik",
+    "retry": "Cuba lagi",
+    "nextStage": "Peringkat seterusnya",
+    "stageComplete": "Peringkat selesai!",
+    "stageFailed": "Terlalu banyak makanan rosak!",
+    "dragHint": "Seret makanan ke stesen yang betul",
+    "whyItWorks": "Bagaimana ia berfungsi!",
+    "quizTitle": "Masa kuiz!",
+    "correct": "Betul!",
+    "wrong": "Belum tepat",
+    "spoilt": "Rosak!",
+    "wrongStation": "Kaedah salah!",
+    "perfect": "Sempurna!",
+    "methodBadges": "Lencana Kaedah",
+    "preservationMemory": "Nota Pengawetan",
+    "recallPrompt": "Mesin ini kaedah apa?",
+    "howToPlay": "Cara bermain",
+    "learned": "Anda telah belajar",
+    "factBookLocked": "Buku Fakta ditutup pada peringkat ini — cuba ingat!"
+  },
+  "station": {
+    "drying": {
+      "hang": "Gantung pada cangkuk",
+      "sweep": "Sapu matahari melaluinya"
+    },
+    "freezing": {
+      "open": "Buka pintu",
+      "close": "Tutup pintu",
+      "dial": "Tetapkan suhu"
+    },
+    "vacuum": {
+      "bag": "Masukkan ke dalam beg",
+      "pump": "Tahan untuk keluarkan udara",
+      "seal": "Kedapkan beg"
+    },
+    "pickling": {
+      "drop": "Masukkan ke dalam balang",
+      "choose": "Tuang salah satu",
+      "pour": "Tahan untuk menuang",
+      "twist": "Pasang penutup"
+    },
+    "salting": {
+      "scoop": "Cedok garam",
+      "spread": "Sapu garam ke seluruhnya"
+    },
+    "pasteurising": {
+      "choose": "Pilih program",
+      "heat": "Tahan untuk memanaskan",
+      "cool": "Sejukkan sekarang!"
+    }
+  },
+  "stages": {
+    "learn": {
+      "name": "Belajar",
+      "tagline": "Dua kaedah. Ambil masa anda.",
+      "brief": "Makanan rosak kerana mikroorganisma tumbuh padanya. Hantar setiap makanan ke stesen yang menghalangnya."
+    },
+    "practice": {
+      "name": "Latihan",
+      "tagline": "Empat stesen. Kurang panduan.",
+      "brief": "Dua stesen lagi dibuka, dan kabinet sejuk kini ada dua tetapan. Makanan tidak lagi memberitahu kaedahnya — lihat jenis makanan itu."
+    },
+    "panic": {
+      "name": "Panik",
+      "tagline": "Enam stesen. Cepat!",
+      "brief": "Semua stesen beroperasi dan makanan rosak lebih cepat."
+    },
+    "recall": {
+      "name": "Ingat",
+      "tagline": "Label ditanggalkan, kedudukan bertukar.",
+      "brief": "Label stesen sudah tiada dan mesin telah berpindah. Kenali setiap satu melalui cara ia berfungsi."
+    },
+    "why": {
+      "name": "Sebabnya",
+      "tagline": "Terangkan sainsnya.",
+      "brief": "Selepas setiap pengawetan, anda mesti nyatakan apa yang diubah oleh kaedah itu."
+    },
+    "mastery": {
+      "name": "Mahir",
+      "tagline": "Semuanya bergerak.",
+      "brief": "Stesen bertukar tempat. Anda mesti benar-benar tahu kaedahnya."
+    }
+  },
+  "mechanisms": {
+    "removes_water": {
+      "short": "Menyingkirkan air",
+      "long": "Air disingkirkan, jadi mikroorganisma tidak dapat tumbuh dengan mudah."
+    },
+    "removes_air": {
+      "short": "Menyingkirkan udara",
+      "long": "Udara disingkirkan, jadi mikroorganisma tidak dapat membiak dengan mudah."
+    },
+    "low_temperature": {
+      "short": "Suhu rendah",
+      "long": "Suhu rendah melambatkan pertumbuhan mikroorganisma."
+    },
+    "high_temperature": {
+      "short": "Suhu tinggi",
+      "long": "Suhu tinggi membunuh mikroorganisma."
+    },
+    "changes_environment": {
+      "short": "Cuka, gula atau garam",
+      "long": "Keasidan tinggi atau kepekatan gula atau garam yang tinggi menghalang pertumbuhan mikroorganisma."
+    },
+    "seals_surface": {
+      "short": "Menyalut permukaan",
+      "long": "Permukaan disalut supaya mikroorganisma tidak dapat tumbuh."
+    },
+    "heat_then_cool": {
+      "short": "Panaskan, sejukkan cepat",
+      "long": "Haba membunuh mikroorganisma, kemudian makanan disejukkan serta-merta pada 4°C."
+    }
+  },
+  "methods": {
+    "drying": {
+      "name": "Pengeringan",
+      "verb": "Keringkan",
+      "mechanismShort": "Menyingkirkan air",
+      "explain": "Pengeringan menyingkirkan air daripada makanan. Mikroorganisma tidak dapat hidup atau menjadi tidak aktif apabila tiada air.",
+      "exam": "Pengeringan mengawet makanan dengan menyingkirkan air, jadi mikroorganisma tidak dapat tumbuh dengan mudah.",
+      "hint": "Gantung dan biarkan matahari menyingkirkan air.",
+      "instruction": "Gantung makanan pada cangkuk, kemudian sapu matahari melaluinya.",
+      "recallClue": "Matahari dan udara, air hilang",
+      "detail": "Makanan boleh dikeringkan di bawah matahari atau di dalam ketuhar."
+    },
+    "freezing": {
+      "name": "Penyejukbekuan",
+      "stationName": "Penyejukbekuan & Penyejukan",
+      "verb": "Sejuk beku",
+      "mechanismShort": "Suhu rendah",
+      "explain": "Makanan disimpan pada 0°C dan ke bawah. Suhu rendah menjadikan mikroorganisma kurang aktif dan melambatkan pertumbuhannya.",
+      "exam": "Penyejukbekuan dan penyejukan mengawet makanan kerana suhu rendah melambatkan pertumbuhan mikroorganisma.",
+      "hint": "Masukkan dan tetapkan pada 0°C atau ke bawah.",
+      "instruction": "Buka pintu, masukkan makanan, tutup, kemudian putar tombol suhu.",
+      "recallClue": "Udara sejuk, ais pada pintu",
+      "detail": "Penyejukbekuan menyimpan makanan pada 0°C dan ke bawah. Contoh: ayam, daging, udang, sotong.",
+      "range": "0°C dan ke bawah",
+      "dialWrong": "Suhu itu tidak sesuai untuk makanan ini.",
+      "dialCorrection": "{food} memerlukan {range}."
+    },
+    "cooling": {
+      "name": "Penyejukan",
+      "verb": "Sejukkan",
+      "mechanismShort": "Suhu rendah",
+      "explain": "Makanan disimpan pada suhu rendah, sekitar 4°C. Suhu rendah menjadikan mikroorganisma kurang aktif dan melambatkan pertumbuhannya.",
+      "exam": "Penyejukbekuan dan penyejukan mengawet makanan kerana suhu rendah melambatkan pertumbuhan mikroorganisma.",
+      "hint": "Masukkan dan tetapkan pada sekitar 4°C.",
+      "instruction": "Buka pintu, masukkan makanan, tutup, kemudian tetapkan tombol pada 4°C.",
+      "recallClue": "Udara sejuk, ais pada pintu",
+      "detail": "Penyejukan menyimpan makanan pada suhu rendah, sekitar 4°C. Contoh: buah, sayur, susu.",
+      "range": "sekitar 4°C",
+      "dialWrong": "Suhu itu tidak sesuai untuk makanan ini.",
+      "dialCorrection": "{food} memerlukan {range}."
+    },
+    "vacuum": {
+      "name": "Pembungkusan Vakum",
+      "verb": "Bungkus",
+      "mechanismShort": "Menyingkirkan udara",
+      "explain": "Pembungkusan vakum menyingkirkan udara daripada pembungkusan makanan. Mikroorganisma tidak dapat membiak tanpa udara.",
+      "exam": "Pembungkusan vakum mengawet makanan dengan menyingkirkan udara supaya mikroorganisma tidak dapat membiak.",
+      "hint": "Masukkan ke dalam beg, kemudian keluarkan semua udara.",
+      "instruction": "Tekan dan tahan pam sehingga tolok udara mencapai sifar, kemudian kedapkan.",
+      "recallClue": "Beg yang mengecut ketat",
+      "detail": "Beg dikedapkan supaya udara tidak dapat masuk semula."
+    },
+    "pickling": {
+      "name": "Penjerukan",
+      "verb": "Jeruk",
+      "mechanismShort": "Cuka, gula atau garam",
+      "explain": "Keasidan tinggi atau kepekatan gula atau garam yang tinggi menghalang pertumbuhan mikroorganisma.",
+      "exam": "Penjerukan mengawet makanan kerana cuka, gula atau garam menghalang pertumbuhan mikroorganisma.",
+      "hint": "Masukkan ke dalam balang, kemudian tuang larutan.",
+      "instruction": "Masukkan makanan, senget botol untuk mengisi balang, kemudian pusing penutup.",
+      "recallClue": "Balang yang dipenuhi cecair",
+      "detail": "Penjerukan ialah merendam makanan dalam cuka, larutan gula atau larutan garam.",
+      "chooseSolution": "Tuang salah satu",
+      "solutions": {
+        "vinegar": "Cuka",
+        "sugar_solution": "Larutan gula",
+        "salt_solution": "Larutan garam"
+      },
+      "anySolutionOk": "Ketiga-tiganya betul — cuka, larutan gula dan larutan garam semuanya menghalang mikroorganisma."
+    },
+    "salting": {
+      "name": "Pengasinan",
+      "verb": "Garamkan",
+      "mechanismShort": "Menyingkirkan lembapan",
+      "explain": "Garam menyingkirkan lembapan daripada makanan dan menghalang pertumbuhan mikroorganisma.",
+      "exam": "Pengasinan mengawet makanan dengan menyingkirkan lembapan daripada makanan.",
+      "hint": "Tutup dengan garam yang banyak.",
+      "instruction": "Cedok garam, kemudian sapu ke seluruh makanan sehingga tertutup.",
+      "recallClue": "Timbunan garam disapu",
+      "detail": "Pengasinan ialah menutup makanan dengan garam dalam kuantiti yang banyak.",
+      "coverage": "Liputan"
+    },
+    "pasteurising": {
+      "name": "Pempasteuran",
+      "verb": "Pasteur",
+      "mechanismShort": "Panaskan, kemudian sejukkan cepat",
+      "explain": "Pempasteuran menggunakan haba untuk membunuh mikroorganisma tanpa mengubah rasa atau nilai pemakanan makanan.",
+      "exam": "Pempasteuran mengawet makanan dengan memanaskannya untuk membunuh mikroorganisma dan kemudian menyejukkannya dengan cepat.",
+      "hint": "Panaskan, kemudian sejukkan serta-merta.",
+      "instruction": "Tahan HABA sehingga program selesai, kemudian tekan SEJUK serta-merta.",
+      "recallClue": "Satu paip panas dan satu paip sejuk",
+      "detail": "Panaskan pada 63°C selama 30 minit, atau 72°C selama 15 saat. Kemudian sejukkan serta-merta pada 4°C.",
+      "programmes": {
+        "p63": "63°C selama 30 minit",
+        "p72": "72°C selama 15 saat"
+      },
+      "chooseProgramme": "Pilih satu program",
+      "coolNow": "Sejukkan sekarang!",
+      "coolTooLate": "Terlalu lambat — ia mesti disejukkan serta-merta.",
+      "eitherProgrammeOk": "Kedua-dua program betul — 63°C selama 30 minit, atau 72°C selama 15 saat."
+    },
+    "boiling": {
+      "name": "Pendidihan",
+      "mechanismShort": "Suhu tinggi",
+      "explain": "Pendidihan menggunakan suhu tinggi untuk membunuh mikroorganisma seperti bakteria dan kulat.",
+      "exam": "Pendidihan mengawet makanan kerana suhu tinggi membunuh mikroorganisma.",
+      "detail": "Contoh: rendang, jem."
+    },
+    "waxing": {
+      "name": "Penyalutan Lilin",
+      "mechanismShort": "Menyalut permukaan",
+      "explain": "Penyalutan lilin ialah menyalut buah dan sayur dengan lilin cecair supaya mikroorganisma tidak tumbuh di permukaan.",
+      "exam": "Penyalutan lilin mengawet makanan dengan menyalut permukaan dan menghalang pertumbuhan mikroorganisma.",
+      "detail": "Contoh: epal, oren, tomato."
+    },
+    "smoking": {
+      "name": "Penyalaian",
+      "mechanismShort": "Mengeringkan dengan asap",
+      "explain": "Penyalaian mengeringkan makanan menggunakan asap. Kaedah ini mengambil masa yang lama.",
+      "exam": "Penyalaian mengawet makanan dengan mengeringkan makanan dan mengurangkan lembapan.",
+      "detail": "Contoh: ikan, daging, pisang."
+    },
+    "canning": {
+      "name": "Pengetinan dan Pembotolan",
+      "mechanismShort": "Membunuh dan mengedap",
+      "explain": "Memasak makanan pada suhu tinggi untuk membunuh mikroorganisma dan menyimpannya dalam tin atau botol kedap udara.",
+      "exam": "Pengetinan dan pembotolan mengawet makanan dengan membunuh mikroorganisma dan mengedapkan makanan dalam bekas kedap udara.",
+      "detail": "Contoh: daging, buah, sayur."
+    }
+  },
+  "foods": {
+    "fish": "Ikan",
+    "prawns": "Udang",
+    "squid": "Sotong",
+    "chicken": "Ayam",
+    "meat": "Daging",
+    "sausages": "Sosej",
+    "mushrooms": "Cendawan",
+    "fruits": "Buah-buahan",
+    "vegetables": "Sayur-sayuran",
+    "eggs": "Telur",
+    "milk": "Susu",
+    "fruit_juice": "Jus Buah",
+    "rendang": "Rendang",
+    "jam": "Jem",
+    "apples": "Epal",
+    "oranges": "Oren",
+    "tomatoes": "Tomato",
+    "bananas": "Pisang"
+  },
+  "quiz": {
+    "whyMethod": "Mengapa {method} mengawet makanan?",
+    "whatChanges": "Apakah yang diubah oleh {method}?",
+    "whichMethod": "Kaedah pengawetan manakah yang baru kita guna?",
+    "whichMethodForFood": "Kaedah manakah yang mengawet {food}?",
+    "microbeQ": "Apa yang berlaku kepada mikroorganisma?",
+    "microbeA": {
+      "removes_water": "Tidak dapat tumbuh tanpa air",
+      "removes_air": "Tidak dapat membiak tanpa udara",
+      "low_temperature": "Menjadi kurang aktif dan tumbuh perlahan",
+      "high_temperature": "Dibunuh oleh haba",
+      "changes_environment": "Tidak dapat tumbuh dalam cuka, gula atau garam",
+      "heat_then_cool": "Dibunuh oleh haba, kemudian dihalang oleh sejuk"
+    }
+  },
+  "spoilage": {
+    "title": "Kerosakan Makanan",
+    "what": "Kerosakan makanan bermaksud makanan telah menjadi buruk dan tidak selamat dimakan.",
+    "why": "Kerosakan makanan berlaku disebabkan tindakan mikroorganisma.",
+    "grow": "Bakteria dan kulat mudah tumbuh pada makanan yang lembap, terdedah kepada udara, atau tidak disimpan dengan betul.",
+    "unsafe": "Makanan rosak tidak selamat dimakan.",
+    "signs": [
+      "Berbau busuk",
+      "Rasa tidak enak",
+      "Bertukar warna",
+      "Bertukar tekstur",
+      "Berkulat"
+    ],
+    "senses": {
+      "sight": "Makanan berkulat, bertukar warna",
+      "smell": "Makanan berbau busuk",
+      "taste": "Makanan berasa tidak enak",
+      "touch": "Tekstur berubah, menjadi berlendir atau lembik"
+    }
+  },
+  "microbes": {
+    "strong": "Kuat — kerosakan cepat!",
+    "weakening": "Melemah — semakin perlahan",
+    "weak": "Lemah — hampir habis",
+    "safe": "Selamat — makanan telah diawet!",
+    "bacteria": "Bakteria",
+    "fungi": "Kulat"
+  },
+  "importance": {
+    "title": "Kepentingan pengawetan makanan",
+    "items": [
+      "Menjadikan makanan tahan lebih lama",
+      "Membolehkan makanan dimakan sepanjang tahun",
+      "Memudahkan penyimpanan dan pengangkutan",
+      "Mengelakkan pembaziran makanan",
+      "Memastikan bekalan makanan semasa bencana"
+    ]
+  },
+  "a11y": {
+    "foodItem": "{food}, kerosakan {percent} peratus",
+    "stationButton": "Stesen {method}",
+    "pickUp": "Ambil",
+    "dropAt": "Letak di {method}",
+    "keyboardHelp": "Guna Tab untuk pilih makanan, kemudian kekunci nombor 1 hingga 6 untuk hantar ke stesen."
+  }
+}
