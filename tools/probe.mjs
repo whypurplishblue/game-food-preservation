@@ -22,7 +22,8 @@ await sleep(1500);
 
 await p.click('[data-act="play"]').catch(() => {});
 await sleep(300);
-await p.evaluate(() => { window.__pp.game.screens.close(); window.__pp.game.startStage(3); });
+// Stage 8 puts every machine on the counter, including the two new ones.
+await p.evaluate(() => { window.__pp.game.screens.close(); window.__pp.game.startStage(8); });
 await sleep(300);
 await p.click('.pp-brief [data-act="go"]').catch(() => {});
 await sleep(200);
@@ -33,6 +34,8 @@ async function panelKind() {
     const el = document.querySelector('.pp-panel');
     if (!el || el.hidden) return null;
     if (el.querySelector('.pp-choice')) return 'choice';
+    if (el.querySelector('.pp-pad--rhythm')) return 'rhythm';
+    if (el.querySelector('.pp-pad--twist')) return 'twist';
     if (el.querySelector('.pp-dial')) return 'dial';
     if (el.querySelector('.pp-pad--sweep')) return 'sweep';
     if (el.querySelector('.pp-pad--scrub')) return 'scrub';
@@ -91,6 +94,26 @@ async function runStation(stationId, foodFilter, dial = 'right') {
         }
         await p.mouse.up();
       }
+    } else if (kind === 'rhythm') {
+      // Press only while the marker is in the zone, driven from inside the page:
+      // a beat window is far shorter than a harness round-trip.
+      await p.evaluate(() => new Promise((done) => {
+        const pad = document.querySelector('.pp-pad--rhythm');
+        if (!pad) return done();
+        const iv = setInterval(() => {
+          if (!document.querySelector('.pp-pad--rhythm')) { clearInterval(iv); return done(); }
+          if (pad.classList.contains('is-open')) document.querySelector('.pp-btn--beat')?.click();
+        }, 40);
+        setTimeout(() => { clearInterval(iv); done(); }, 15000);
+      }));
+    } else if (kind === 'twist') {
+      // Keyboard turn — the same path a keyboard-only child takes.
+      await p.focus('.pp-pad--twist').catch(() => {});
+      for (let k = 0; k < 16; k++) {
+        if (await p.evaluate(() => !document.querySelector('.pp-pad--twist'))) break;
+        await p.keyboard.press('ArrowRight');
+        await sleep(30);
+      }
     } else if (kind === 'dial') {
       await p.focus('.pp-panel .pp-dial').catch(() => {});
       const target = dial === 'wrong' ? 12 : (start.method === 'cooling' ? 4 : -18);
@@ -134,6 +157,7 @@ async function runStation(stationId, foodFilter, dial = 'right') {
 const CASES = [
   ['DryingRack', null], ['Freezer', 'chicken'], ['Freezer', 'milk'],
   ['VacuumSealer', null], ['PicklingJar', null], ['SaltTable', null], ['Pasteuriser', null],
+  ['Smokehouse', 'fish'], ['Cannery', 'vegetables'],
 ];
 for (const [sid, food] of CASES) {
   const r = await runStation(sid, food);

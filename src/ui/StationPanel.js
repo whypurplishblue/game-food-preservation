@@ -115,6 +115,7 @@ export class StationPanel {
     const builder = {
       tap: this._tap, hold: this._hold, sweep: this._sweep,
       scrub: this._scrub, dial: this._dial, choice: this._choice,
+      twist: this._twist, rhythm: this._rhythm,
     }[step.kind] || this._tap;
     builder.call(this, stage, step);
   }
@@ -285,6 +286,157 @@ export class StationPanel {
       pad.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       pad.removeEventListener('keydown', kd);
+    };
+  }
+
+  // ----------------------------------------------------------------- TWIST
+  /**
+   * Turn a lid round and round until it is sealed. `turns` full rotations.
+   *
+   * Deliberately NOT the dial: the dial is a value you choose and confirm, this
+   * is effort you keep applying, and it stops when the thing is shut. §5J's
+   * airtight seal is half of what canning does, so it gets its own gesture
+   * rather than another button that says "seal".
+   */
+  _twist(stage, step) {
+    const a = this.active;
+    const pad = document.createElement('div');
+    pad.className = 'pp-pad pp-pad--twist';
+    pad.setAttribute('tabindex', '0');
+    pad.innerHTML = `<div class="pp-twist"><div class="pp-twist__knob"><i></i></div></div>
+      <div class="pp-meter"><i></i><b>0%</b></div>
+      <div class="pp-pad__hint">${t(step.hintKey || 'station.canning.twistHint')}</div>`;
+    stage.appendChild(pad);
+    const disc = pad.querySelector('.pp-twist');
+    const knob = pad.querySelector('.pp-twist__knob');
+    const meterFill = pad.querySelector('.pp-meter i');
+    const meterTxt = pad.querySelector('.pp-meter b');
+
+    const need = (step.turns || 2) * Math.PI * 2;
+    let turned = 0, lastA = null, dragging = false;
+
+    const update = () => {
+      const p = clamp(turned / need, 0, 1);
+      knob.style.transform = `rotate(${turned * 57.2958}deg)`;
+      meterFill.style.transform = `scaleX(${p})`;
+      meterTxt.textContent = `${Math.round(p * 100)}%`;
+      a.onProgress?.(a.index, p);
+      if (p >= 1) this._nextStep(true);
+    };
+    const angleAt = (e) => {
+      const r = disc.getBoundingClientRect();
+      return Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2));
+    };
+    const move = (e) => {
+      if (!dragging) return;
+      const ang = angleAt(e);
+      if (lastA !== null) {
+        // Shortest signed step, so crossing the ±PI seam does not jump a turn.
+        let d = ang - lastA;
+        if (d > Math.PI) d -= Math.PI * 2;
+        if (d < -Math.PI) d += Math.PI * 2;
+        turned += Math.abs(d);
+        update();
+      }
+      lastA = ang;
+    };
+    const down = (e) => { dragging = true; pad.setPointerCapture?.(e.pointerId); lastA = angleAt(e); };
+    const up = () => { dragging = false; lastA = null; };
+    pad.addEventListener('pointerdown', down);
+    pad.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    const kd = (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === ' ') {
+        e.preventDefault(); turned += Math.PI / 3; update();
+      }
+    };
+    pad.addEventListener('keydown', kd);
+    pad.focus({ preventScroll: true });
+    update();
+
+    this._cleanup = () => {
+      pad.removeEventListener('pointerdown', down);
+      pad.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      pad.removeEventListener('keydown', kd);
+    };
+  }
+
+  // ---------------------------------------------------------------- RHYTHM
+  /**
+   * Work the bellows: press in time with the sweeping marker, `beats` times.
+   *
+   * §5H says smoking "takes a long time", and a hold bar would say that in the
+   * dullest possible way. Keeping a fire alive is a repeated act of attention,
+   * so the child has to come back to it beat after beat. Missing costs nothing
+   * but time — the point is duration and rhythm, not precision under threat.
+   */
+  _rhythm(stage, step) {
+    const a = this.active;
+    const need = step.beats || 5;
+    const period = step.periodMs || 950;
+
+    const pad = document.createElement('div');
+    pad.className = 'pp-pad pp-pad--rhythm';
+    pad.innerHTML = `<div class="pp-rhythm">
+        <div class="pp-rhythm__zone"></div>
+        <div class="pp-rhythm__marker"></div>
+      </div>
+      <button class="pp-btn pp-btn--beat" type="button">
+        <span class="pp-btn__icon" data-icon="${step.icon || 'bellows'}"></span>
+        <span>${t(step.textKey)}</span></button>
+      <div class="pp-beats"></div>`;
+    stage.appendChild(pad);
+    const marker = pad.querySelector('.pp-rhythm__marker');
+    const btn = pad.querySelector('.pp-btn--beat');
+    const beatsRow = pad.querySelector('.pp-beats');
+    for (let i = 0; i < need; i++) beatsRow.appendChild(document.createElement('span'));
+    const pips = [...beatsRow.children];
+    btn.focus({ preventScroll: true });
+
+    let hits = 0, t0 = performance.now(), lastHit = -1;
+    const phase = () => ((performance.now() - t0) % period) / period;
+
+    const tick = () => {
+      // Marker sweeps left-right and back; the zone sits in the middle.
+      const ph = phase();
+      const x = ph < 0.5 ? ph * 2 : (1 - ph) * 2;
+      marker.style.left = `${x * 100}%`;
+      pad.classList.toggle('is-open', Math.abs(x - 0.5) < 0.16);
+      a.onProgress?.(a.index, hits / need);
+    };
+    clearInterval(this._timer);
+    this._timer = setInterval(tick, 16);
+
+    const beat = () => {
+      const ph = phase();
+      const x = ph < 0.5 ? ph * 2 : (1 - ph) * 2;
+      const good = Math.abs(x - 0.5) < 0.16;
+      const now = performance.now();
+      if (now - lastHit < 200) return;            // ignore a mashed double-press
+      lastHit = now;
+      if (!good) {
+        a.quality = Math.max(0.5, a.quality - 0.06);
+        pad.classList.add('is-miss');
+        setTimeout(() => pad.classList.remove('is-miss'), 180);
+        return;
+      }
+      pips[hits]?.classList.add('is-on');
+      hits++;
+      pad.classList.add('is-hit');
+      setTimeout(() => pad.classList.remove('is-hit'), 140);
+      if (hits >= need) {
+        clearInterval(this._timer); this._timer = null;
+        this._nextStep(true);
+      }
+    };
+    btn.addEventListener('click', beat);
+    const kd = (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); beat(); } };
+    btn.addEventListener('keydown', kd);
+    this._cleanup = () => {
+      if (this._timer) { clearInterval(this._timer); this._timer = null; }
+      btn.removeEventListener('click', beat);
+      btn.removeEventListener('keydown', kd);
     };
   }
 

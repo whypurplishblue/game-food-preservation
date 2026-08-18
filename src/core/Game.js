@@ -15,7 +15,7 @@ import {
 import { t, methodName, foodName, mechShort, methodMechShort } from '../content/i18n.js';
 import { makeQuestion } from '../content/quiz.js';
 import { PALETTE } from '../world/Palette.js';
-import { STATION_SLOTS, PREP_CENTRE, PREP_RADIUS } from '../world/Kitchen.js';
+import { slotsFor, PREP_CENTRE, PREP_RADIUS } from '../world/Kitchen.js';
 import { Food } from '../world/Food.js';
 import { DryingRack } from '../world/stations/DryingRack.js';
 import { Freezer } from '../world/stations/Freezer.js';
@@ -23,6 +23,8 @@ import { VacuumSealer } from '../world/stations/VacuumSealer.js';
 import { PicklingJar } from '../world/stations/PicklingJar.js';
 import { SaltTable } from '../world/stations/SaltTable.js';
 import { Pasteuriser } from '../world/stations/Pasteuriser.js';
+import { Smokehouse } from '../world/stations/Smokehouse.js';
+import { Cannery } from '../world/stations/Cannery.js';
 import { sfx, audio } from './Audio.js';
 
 /**
@@ -33,6 +35,7 @@ import { assets } from '../world/AssetRegistry.js';
 
 const STATION_CLASSES = {
   DryingRack, Freezer, VacuumSealer, PicklingJar, SaltTable, Pasteuriser,
+  Smokehouse, Cannery,
 };
 
 const SAVE_KEY = 'pp.progress.v1';
@@ -149,18 +152,6 @@ export class Game {
       onPlay: () => this.startStage(1),
       onContinue: () => this.startStage(this.savedStage),
       onFactBook: () => this.openFactBook(() => this.showMenu()),
-      onCredits: () => this.openCredits(() => this.showMenu()),
-    });
-  }
-
-  openCredits(back) {
-    const wasPlaying = this.mode === 'playing';
-    if (wasPlaying) this.mode = 'paused';
-    this.input.setEnabled(false);
-    this.screens.credits(() => {
-      if (back) back();
-      else if (wasPlaying) { this.screens.close(); this.mode = 'playing'; this.input.setEnabled(true); }
-      else this.showMenu();
     });
   }
 
@@ -208,7 +199,6 @@ export class Game {
       onRestart: () => { this._pausedPanel = null; this.screens.close(); this.startStage(this.stageId); },
       onMenu: () => { this._pausedPanel = null; this.screens.close(); this.showMenu(); },
       onFactBook: () => this.openFactBook(() => this.pause()),
-      onCredits: () => this.openCredits(() => this.pause()),
     });
   }
 
@@ -258,7 +248,7 @@ export class Game {
   _setupStations() {
     // Methods map onto STATIONS, and two methods can share one (Freezer).
     const stationIds = stationsFor(this.stage.methods);
-    const slots = STATION_SLOTS.slice(0, stationIds.length);
+    const slots = slotsFor(stationIds.length);
     this._activeSlots = slots;
     this.kitchen.setActiveSlots(stationIds.length);
     // Frame only as wide as the stations actually in play.
@@ -290,7 +280,7 @@ export class Game {
 
   _reshuffleStations() {
     const stationIds = stationsFor(this.stage.methods);
-    const slots = this._activeSlots || STATION_SLOTS.slice(0, stationIds.length);
+    const slots = this._activeSlots || slotsFor(stationIds.length);
     this._shuffled(stationIds).forEach((id, i) => {
       const s = this.stations.get(id);
       if (s && !s.busy && slots[i]) s.placeAt(slots[i]);

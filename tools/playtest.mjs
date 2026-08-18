@@ -41,6 +41,8 @@ async function completePanel() {
       const el = document.querySelector('.pp-panel');
       if (!el || el.hidden) return null;
       if (el.querySelector('.pp-choice')) return 'choice';
+      if (el.querySelector('.pp-pad--rhythm')) return 'rhythm';
+      if (el.querySelector('.pp-pad--twist')) return 'twist';
       if (el.querySelector('.pp-dial')) return 'dial';
       if (el.querySelector('.pp-pad--sweep')) return 'sweep';
       if (el.querySelector('.pp-scrub__surface')) return 'scrub';
@@ -69,6 +71,23 @@ async function completePanel() {
           if (await p.evaluate(() => !document.querySelector('.pp-panel .pp-btn--hold'))) break;
         }
         await p.mouse.up();
+      }
+    } else if (kind === 'rhythm') {
+      await p.evaluate(() => new Promise((done) => {
+        const pad = document.querySelector('.pp-pad--rhythm');
+        if (!pad) return done();
+        const iv = setInterval(() => {
+          if (!document.querySelector('.pp-pad--rhythm')) { clearInterval(iv); return done(); }
+          if (pad.classList.contains('is-open')) document.querySelector('.pp-btn--beat')?.click();
+        }, 40);
+        setTimeout(() => { clearInterval(iv); done(); }, 15000);
+      }));
+    } else if (kind === 'twist') {
+      await p.focus('.pp-pad--twist').catch(() => {});
+      for (let k = 0; k < 16; k++) {
+        if (await p.evaluate(() => !document.querySelector('.pp-pad--twist'))) break;
+        await p.keyboard.press('ArrowRight');
+        await sleep(30);
       }
     } else if (kind === 'dial') {
       // Read the band the game itself is asking for, then turn to it.

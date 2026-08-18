@@ -15,9 +15,6 @@
     "preserved": "Preserved",
     "goal": "Today's Goal",
     "factBook": "Fact Book",
-    "credits": "Credits",
-    "creditsIntro": "This game uses 3D models made by other artists, shared under Creative Commons licenses.",
-    "creditsBy": "by {author}",
     "pause": "Pause",
     "resume": "Resume",
     "restart": "Restart",
@@ -89,6 +86,16 @@
       "choose": "Choose a programme",
       "heat": "Hold to heat",
       "cool": "Cool it now!"
+    },
+    "smoking": {
+      "hang": "Hang it in the smokehouse",
+      "bellows": "Work the bellows"
+    },
+    "canning": {
+      "fill": "Put it in the can",
+      "heat": "Hold to cook it hot",
+      "seal": "Seal the can",
+      "twistHint": "Turn the lid until it is airtight"
     }
   },
   "stages": {
@@ -121,6 +128,16 @@
       "name": "Mastery",
       "tagline": "Everything moves.",
       "brief": "The stations have swapped places. Nothing is where you left it — you have to know the methods themselves."
+    },
+    "newmachines": {
+      "name": "Two More Machines",
+      "tagline": "The smokehouse and the cannery",
+      "brief": "Smoking dries food with smoke — the same reason drying works. Canning kills microorganisms with heat, then seals the food in. Keep the fire going, and turn the lid until it is airtight."
+    },
+    "wholekitchen": {
+      "name": "The Whole Kitchen",
+      "tagline": "Every machine. No labels. A question every time.",
+      "brief": "Eight machines, no name plates, and they move while you work. You know all of this now — show it."
     }
   },
   "mechanisms": {
@@ -315,7 +332,8 @@
       "low_temperature": "They become less active and grow slowly",
       "high_temperature": "They are killed by the heat",
       "changes_environment": "They cannot grow in vinegar, sugar or salt",
-      "heat_then_cool": "They are killed by the heat, then kept out by the cold"
+      "heat_then_cool": "They are killed by the heat, then kept out by the cold",
+      "seals_surface": "They cannot grow on a coated surface"
     }
   },
   "spoilage": {

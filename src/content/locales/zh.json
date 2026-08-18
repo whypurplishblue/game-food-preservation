@@ -15,9 +15,6 @@
     "preserved": "已保存",
     "goal": "今日目标",
     "factBook": "知识本",
-    "credits": "鸣谢",
-    "creditsIntro": "本游戏使用了其他艺术家制作、以知识共享（Creative Commons）许可协议分享的 3D 模型。",
-    "creditsBy": "作者：{author}",
     "pause": "暂停",
     "resume": "继续",
     "restart": "重新开始",
@@ -88,6 +85,16 @@
       "choose": "选择程序",
       "heat": "按住加热",
       "cool": "马上冷却！"
+    },
+    "smoking": {
+      "hang": "把食物挂进烟熏房",
+      "bellows": "拉动风箱"
+    },
+    "canning": {
+      "fill": "把食物放进罐里",
+      "heat": "按住加热",
+      "seal": "密封罐子",
+      "twistHint": "转动盖子直到密封"
     }
   },
   "stages": {
@@ -120,6 +127,16 @@
       "name": "精通",
       "tagline": "全部都会移动。",
       "brief": "各站互换了位置。位置记忆没用了——你必须真正记住方法。"
+    },
+    "newmachines": {
+      "name": "两台新机器",
+      "tagline": "烟熏房与罐装机",
+      "brief": "烟熏用烟把食物弄干，原理和烘干一样。罐装先用高温杀死微生物，再把食物密封起来。让火保持燃烧，然后把盖子转紧。"
+    },
+    "wholekitchen": {
+      "name": "整间厨房",
+      "tagline": "所有机器。没有名牌。每次都有问题。",
+      "brief": "八台机器，没有名牌，而且会移动。这些你都学过了——现在证明给我看。"
     }
   },
   "mechanisms": {
@@ -314,7 +331,8 @@
       "low_temperature": "活动减弱，生长缓慢",
       "high_temperature": "被高温杀死",
       "changes_environment": "在醋、糖或盐中无法生长",
-      "heat_then_cool": "被高温杀死，再靠低温阻止"
+      "heat_then_cool": "被高温杀死，再靠低温阻止",
+      "seals_surface": "表面被覆盖，它们无法生长"
     }
   },
   "spoilage": {

@@ -38,9 +38,8 @@ foods, every exam sentence word for word, the spoilage signs, the senses table,
 the importance list, the temperature bands, and the §10 Chinese glossary against
 the `zh` locale. If it disagrees, the notes win.
 
-The notes list ten methods. Six are playable stations; the other four (boiling,
-waxing, smoking, canning and bottling) are in the Fact Book so the unit is
-covered end to end.
+The notes list eleven methods. **Nine are playable stations**; boiling and
+waxing are Fact Book entries, so the unit is covered end to end either way.
 
 ### Two food lists per method
 
@@ -106,7 +105,7 @@ speed, quiz frequency, targets and every hint flag without touching code:
 
 ---
 
-## The six interactions
+## The nine interactions
 
 Each station is a different motor action, because the hand remembers what the
 head is still learning. None of them reduce to the same button.
@@ -119,6 +118,14 @@ head is still learning. None of them reduce to the same button.
 | **Pickling** | drop in, **choose** a solution, pour, seal | all three solutions are correct, and the game says so |
 | **Salting** | scoop, then **scrub** to full coverage | "a large quantity of salt" has to be worked for |
 | **Pasteurising** | choose a programme, **hold** to heat, **cool in time** | a countdown makes "cooled immediately" a felt rule |
+| **Smoking** | hang it, then **work the bellows** in rhythm, five beats | §5H's "takes a long time" becomes repeated attention, not a longer bar |
+| **Canning** | fill, **hold** to cook, then **twist** the lid airtight | §5J names two actions, so the interaction is two actions |
+
+Smoking sits next to drying on purpose: same mechanism, different machine,
+different gesture. A child who says "they both take the water out" has
+understood mechanism rather than memorised a list. Canning sits next to vacuum
+packing for the same reason in reverse — one seals air out, the other takes it
+away.
 
 The controls are DOM widgets docked under the 3D machine. That is deliberate:
 raycast gestures onto 3D parts shift with the camera, are smaller than a
@@ -137,6 +144,13 @@ Progressive removal of scaffolding, in this order:
 4. **Recall** — labels off, positions re-dealt, Fact Book closed. A process clue replaces the name.
 5. **Why It Works** — a question after *every* preservation. No clue on the machine: the answer must not be on screen.
 6. **Mastery** — positions re-deal mid-stage, recognition questions removed entirely.
+7. **Two More Machines** — the smokehouse and the cannery arrive, labels back on,
+   each paired against the method it is easiest to confuse with.
+8. **The Whole Kitchen** — all nine methods, eight machines, no labels, positions
+   re-dealt mid-stage, a question after every single preservation.
+
+The arc widens with the count: six machines keep the original layout exactly,
+seven and eight lay out a wider arc and the counters travel with them.
 
 Loopholes that are explicitly closed:
 
@@ -295,6 +309,13 @@ saves at this size, and the game has to work offline.
 - **Eight foods are still procedural.** Four are modelled. Meat is the weakest
   of the rest — a pink disc on a white rim reads as a fried egg — and the carrot
   in `vegetables` hides behind the broccoli at the play angle.
+- **Six foods from the notes have no model** and so never reach the counter:
+  rendang and jam (§5A), bananas (§5H), apples, oranges and tomatoes (§5G). They
+  are listed in `REFERENCE_ONLY_FOODS`, still print in the Fact Book and still
+  appear in the quiz bank. Modelling them is what boiling and waxing would need
+  to become stations — low priority, and twelve foods is already a lot to tell
+  apart at counter size. `tools/blender/build_foods.py` has a bananas builder
+  ready if that changes.
 - **Chinese and Malay need a teacher's eye.** The terminology comes from §10 of
   the notes and standard KSSR usage, but the gameplay chrome around it is a
   translation, not a review.
