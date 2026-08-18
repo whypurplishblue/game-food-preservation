@@ -15,9 +15,6 @@
     "preserved": "Diawet",
     "goal": "Matlamat Hari Ini",
     "factBook": "Buku Fakta",
-    "credits": "Penghargaan",
-    "creditsIntro": "Permainan ini menggunakan model 3D yang dicipta oleh artis lain, dikongsi di bawah lesen Creative Commons.",
-    "creditsBy": "oleh {author}",
     "pause": "Jeda",
     "resume": "Sambung",
     "restart": "Mula semula",
@@ -88,6 +85,16 @@
       "choose": "Pilih program",
       "heat": "Tahan untuk memanaskan",
       "cool": "Sejukkan sekarang!"
+    },
+    "smoking": {
+      "hang": "Gantung dalam rumah asap",
+      "bellows": "Kembang hembus api"
+    },
+    "canning": {
+      "fill": "Masukkan ke dalam tin",
+      "heat": "Tahan untuk memanaskan",
+      "seal": "Kedapkan tin",
+      "twistHint": "Pusing penutup sehingga kedap udara"
     }
   },
   "stages": {
@@ -120,6 +127,16 @@
       "name": "Mahir",
       "tagline": "Semuanya bergerak.",
       "brief": "Stesen bertukar tempat. Anda mesti benar-benar tahu kaedahnya."
+    },
+    "newmachines": {
+      "name": "Dua Mesin Baharu",
+      "tagline": "Rumah asap dan mesin pengetinan",
+      "brief": "Pengasapan mengeringkan makanan dengan asap — sebab yang sama seperti pengeringan. Pengetinan membunuh mikroorganisma dengan haba, kemudian mengedap makanan. Pastikan api menyala, dan pusing penutup sehingga kedap udara."
+    },
+    "wholekitchen": {
+      "name": "Seluruh Dapur",
+      "tagline": "Semua mesin. Tiada label. Soalan setiap kali.",
+      "brief": "Lapan mesin, tiada papan nama, dan ia berpindah semasa anda bekerja. Anda sudah tahu semuanya — tunjukkan."
     }
   },
   "mechanisms": {
@@ -314,7 +331,8 @@
       "low_temperature": "Menjadi kurang aktif dan tumbuh perlahan",
       "high_temperature": "Dibunuh oleh haba",
       "changes_environment": "Tidak dapat tumbuh dalam cuka, gula atau garam",
-      "heat_then_cool": "Dibunuh oleh haba, kemudian dihalang oleh sejuk"
+      "heat_then_cool": "Dibunuh oleh haba, kemudian dihalang oleh sejuk",
+      "seals_surface": "Ia tidak boleh tumbuh pada permukaan bersalut"
     }
   },
   "spoilage": {

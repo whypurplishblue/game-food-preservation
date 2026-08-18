@@ -38,6 +38,13 @@ import math
 import os
 from mathutils import Vector
 
+# Foods NOT to rebuild, because the repo's version is better than this script's.
+# prawns.glb is a credited CC-BY model (see public/assets/models/credits.txt)
+# that was downloaded, resized and committed by hand — and a previous run of
+# this script silently overwrote it. Anything listed here is left alone unless
+# PP_FOOD_ONLY names it explicitly.
+SKIP = {"prawns"}
+
 HERE = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
 OUT_DIR = os.environ.get("PP_FOOD_OUT_DIR") or os.path.normpath(
     os.path.join(HERE, "..", "..", "public", "assets", "models", "foods"))
@@ -70,6 +77,10 @@ PALETTE = {
     "chicken":     rgb(0xC9852A),
     "chicken_top": rgb(0xE0A03A),
     "bone":        rgb(0xF3F1EC),
+    "banana":      rgb(0xF3C63F),
+    "banana_deep": rgb(0xD9A62E),
+    "banana_tip":  rgb(0x6B4A22),
+    "banana_stem": rgb(0x8A6A3A),
     "eye_white":   rgb(0xFFFFFF),
     "eye_black":   rgb(0x14141A),
 }
@@ -404,11 +415,40 @@ def build_chicken():
     return join("chicken", parts)
 
 
+def build_bananas():
+    """
+    A hand of three bananas on a stem — §5H's third example.
+
+    One banana alone reads as a comma at counter size; three fanned from a
+    common stem gives the shape its own outline, and the brown tips are what
+    stop it looking like a pepper.
+    """
+    parts = []
+    for i, (yaw, tilt, ln) in enumerate(((-0.30, 0.05, 1.05), (0.0, 0.0, 1.15), (0.30, -0.05, 1.00))):
+        b = cylinder(f"banana{i}", 0.135, 0.115, ln, (0, i * 0.055 - 0.055, 0),
+                     rot=(0, math.radians(90), yaw), material="banana", verts=8)
+        taper(b, curve([(0.0, 0.35), (0.22, 0.95), (0.78, 0.95), (1.0, 0.30)]))
+        bend(b, 0.26 + tilt, axis=0, up=2)
+        # A darker ridge along the underside: bananas are not round.
+        paint_below(b, "banana_deep", -0.05)
+        parts.append(b)
+        # Brown tip at the flower end.
+        parts.append(ico(f"tip{i}", 0.055, (-ln * 0.5 + 0.02, i * 0.055 - 0.055, 0.07),
+                         scale=(1.3, 1.0, 1.0), material="banana_tip", subdiv=1))
+
+    # Common stem at the stalk end, which is what makes it a hand and not three
+    # loose bananas.
+    parts.append(cylinder("stem", 0.10, 0.075, 0.30, (0.60, 0, 0.06),
+                          rot=(0, math.radians(90), 0), material="banana_stem", verts=7))
+    return join("bananas", parts)
+
+
 BUILDERS = {
     "fish":    (build_fish, 1.62),
     "prawns":  (build_prawns, 1.34),
     "squid":   (build_squid, 1.46),
     "chicken": (build_chicken, 1.18),
+    "bananas": (build_bananas, 1.30),
 }
 
 
@@ -473,8 +513,14 @@ def main():
     print("\n" + "=" * 64)
     print("Preservation Panic - building food assets")
     print("=" * 64)
+    only = {n for n in (os.environ.get("PP_FOOD_ONLY") or "").split(",") if n}
     total_t = total_kb = 0
     for name, (builder, target) in BUILDERS.items():
+        if only and name not in only:
+            continue
+        if not only and name in SKIP:
+            print("  %-10s skipped (hand-curated; PP_FOOD_ONLY=%s to force)" % (name, name))
+            continue
         clear_scene()
         builder()
         tris, kb = export_food(name, target)

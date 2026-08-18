@@ -332,6 +332,55 @@ html, body {
 .pp-meter i { display: block; height: 100%; transform-origin: left; transform: scaleX(0); background: linear-gradient(90deg, #ff8a65, #ef5350); transition: transform .12s ease; }
 .pp-meter b { position: absolute; inset: 0; display: grid; place-content: center; font-size: 13px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
 
+/* twist — the canning seal. A knob you keep turning, not a value you pick. */
+.pp-pad--twist { display: grid; gap: 10px; justify-items: center; touch-action: none; }
+.pp-twist {
+  position: relative; width: 132px; height: 132px; border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #eceff1, #90a4ae);
+  box-shadow: inset 0 0 0 6px rgba(255,255,255,.75), 0 6px 0 rgba(0,0,0,.22);
+  display: grid; place-content: center; cursor: grab; touch-action: none;
+}
+.pp-twist:active { cursor: grabbing; }
+.pp-twist__knob {
+  width: 96px; height: 96px; border-radius: 50%;
+  background: conic-gradient(from 0deg, #b0bec5 0 12%, #78909c 12% 25%, #b0bec5 25% 37%,
+              #78909c 37% 50%, #b0bec5 50% 62%, #78909c 62% 75%, #b0bec5 75% 87%, #78909c 87% 100%);
+  box-shadow: inset 0 0 0 4px rgba(255,255,255,.5);
+  display: grid; place-content: center;
+}
+.pp-twist__knob i {
+  width: 8px; height: 34px; border-radius: 6px; background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.4); transform: translateY(-22px);
+}
+
+/* rhythm — the smokehouse bellows. Press in time, over and over. */
+.pp-pad--rhythm { display: grid; gap: 12px; justify-items: center; }
+.pp-rhythm {
+  position: relative; width: 100%; height: 30px; border-radius: 99px;
+  background: rgba(43,29,51,.18); overflow: hidden;
+  box-shadow: inset 0 3px 8px rgba(0,0,0,.2);
+}
+.pp-rhythm__zone {
+  position: absolute; left: 34%; width: 32%; top: 0; bottom: 0;
+  background: linear-gradient(180deg, rgba(129,199,132,.55), rgba(76,175,80,.75));
+  border-left: 3px solid rgba(255,255,255,.8); border-right: 3px solid rgba(255,255,255,.8);
+}
+.pp-rhythm__marker {
+  position: absolute; top: 2px; bottom: 2px; width: 12px; margin-left: -6px; border-radius: 99px;
+  background: #fff8e1; box-shadow: 0 0 12px rgba(255,213,79,.9);
+}
+.pp-pad--rhythm.is-open .pp-rhythm__marker { background: #fff; box-shadow: 0 0 18px rgba(255,255,255,1); }
+.pp-pad--rhythm.is-hit .pp-rhythm { box-shadow: inset 0 0 0 3px rgba(129,199,132,.9); }
+.pp-pad--rhythm.is-miss .pp-rhythm { box-shadow: inset 0 0 0 3px rgba(239,83,80,.9); }
+.pp-btn--beat { min-width: 220px; }
+.pp-beats { display: flex; gap: 8px; }
+.pp-beats span {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: rgba(43,29,51,.2); box-shadow: inset 0 2px 4px rgba(0,0,0,.25);
+  transition: background .15s ease, transform .15s ease;
+}
+.pp-beats span.is-on { background: linear-gradient(180deg, #ffd54f, #ff8f00); transform: scale(1.15); }
+
 /* dial */
 .pp-dial { display: grid; gap: 10px; justify-items: center; }
 .pp-dial:focus-visible { outline: 4px solid #4fc3f7; outline-offset: 6px; border-radius: 50%; }
@@ -479,14 +528,6 @@ html, body {
 }
 .pp-lang.is-on { background: var(--ui-cream); color: var(--ui-ink); }
 .pp-title__hint { margin: 4px 0 0; color: rgba(255,246,230,.62); font-size: 13px; max-width: 44ch; }
-.pp-title__credits {
-  margin-top: 4px; background: none; border: none; color: rgba(255,246,230,.5);
-  font-family: var(--font); font-size: 12px; font-weight: 700; text-decoration: underline;
-  cursor: pointer; padding: 6px 10px; min-height: 32px;
-}
-.pp-title__credits:hover { color: rgba(255,246,230,.85); }
-.pp-pause .pp-title__credits { color: rgba(43,29,51,.45); }
-.pp-pause .pp-title__credits:hover { color: rgba(43,29,51,.8); }
 
 .pp-brief, .pp-result, .pp-pause {
   width: min(620px, 94vw); text-align: center;
@@ -573,19 +614,6 @@ html, body {
 .pp-fact__senses tr:last-child td { border-bottom: 0; }
 .pp-fact__warn { color: #c62828; font-weight: 800; }
 .pp-fact__intro ol { margin: 0; padding-left: 22px; font-size: 14.5px; line-height: 1.7; }
-
-/* credits */
-.pp-credits { width: min(600px, 96vw); }
-.pp-credits__intro { margin: 0 0 16px; font-size: 14.5px; line-height: 1.5; color: var(--ui-ink-soft); }
-.pp-credits__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.pp-credits__item {
-  display: grid; gap: 3px; background: rgba(255,255,255,.66);
-  border-radius: var(--r-md); padding: 12px 16px;
-}
-.pp-credits__item b { font-size: 15px; }
-.pp-credits__item a { color: #1976d2; }
-.pp-credits__item span { font-size: 13px; color: var(--ui-ink-soft); font-weight: 700; }
-.pp-credits__license { font-size: 12px; font-weight: 700; justify-self: start; }
 
 /* =========================================================== responsive == */
 @media (max-width: 900px) {

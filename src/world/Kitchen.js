@@ -27,15 +27,26 @@ import { plastic, metal, matte, glass, roundedBox, cyl, sphere, torus, mesh, blo
  * ABOVE the table rather than behind it. All six stay on screen at full size.
  */
 const ARC = { radiusX: 8.8, radiusZ: 5.6, centreZ: -1.8, spreadDeg: 78 };
+export const MAX_SLOTS = 8;
 
-const SLOT_ANGLES = (() => {
-  const n = 6, out = [];
-  for (let i = 0; i < n; i++) {
-    // -spread .. +spread, evenly spaced
-    out.push((-1 + (2 * i) / (n - 1)) * ARC.spreadDeg * Math.PI / 180);
-  }
-  return out;
-})();
+/**
+ * The arc grows with the number of machines on it. Six was the whole game until
+ * the smokehouse and the cannery arrived; squeezing eight into the six-station
+ * arc put them shoulder to shoulder, and the outer pair then clipped the frame.
+ * Pushing the radius and the spread out per extra machine keeps the spacing and
+ * lets Stage3D's dolly solve for the wider shot.
+ */
+function arcFor(n) {
+  const extra = Math.max(0, n - 6);
+  return {
+    radiusX: ARC.radiusX + extra * 0.62,
+    radiusZ: ARC.radiusZ + extra * 0.20,
+    spreadDeg: ARC.spreadDeg + extra * 7.5,
+  };
+}
+
+const anglesFor = (n, spreadDeg) =>
+  [...Array(n)].map((_, i) => (-1 + (2 * i) / (n - 1)) * spreadDeg * Math.PI / 180);
 
 /**
  * Presentation order. A partial set (2 or 4 stations in the early stages) takes
@@ -44,22 +55,48 @@ const SLOT_ANGLES = (() => {
  */
 const SLOT_ORDER = [1, 4, 2, 3, 0, 5];
 
-export const STATION_SLOTS = SLOT_ORDER.map((arcIndex, i) => {
-  const t = SLOT_ANGLES[arcIndex];
-  return {
-    index: i,
-    arcIndex,
-    side: Math.sign(t) || 1,
-    position: new THREE.Vector3(
-      Math.sin(t) * ARC.radiusX,
-      1.66,
-      ARC.centreZ - Math.cos(t) * ARC.radiusZ
-    ),
-    // Turn toward the centre of the arc, but only partly: a machine turned fully
-    // inward hides the front face where all the readable detail lives.
-    rotationY: -t * 0.45,
-  };
-});
+/** Centre outwards, alternating sides — used when the arc is not the classic six. */
+function centreOut(n) {
+  const out = [];
+  let l = Math.floor((n - 1) / 2), r = l + 1;
+  while (out.length < n) {
+    if (l >= 0) out.push(l--);
+    if (out.length < n && r < n) out.push(r++);
+  }
+  return out;
+}
+
+/**
+ * Placements for exactly `count` machines.
+ *
+ * Six or fewer keeps the original six-point arc and takes SLOT_ORDER's first N,
+ * so every existing stage is pixel-identical to before. Seven or eight lay out
+ * a wider arc of their own.
+ */
+export function slotsFor(count) {
+  const n = Math.max(6, Math.min(MAX_SLOTS, count));
+  const A = arcFor(n);
+  const angles = anglesFor(n, A.spreadDeg);
+  const order = n === 6 ? SLOT_ORDER : centreOut(n);
+  return order.slice(0, count).map((arcIndex, i) => {
+    const t = angles[arcIndex];
+    return {
+      index: i,
+      arcIndex,
+      side: Math.sign(t) || 1,
+      position: new THREE.Vector3(
+        Math.sin(t) * A.radiusX,
+        1.66,
+        ARC.centreZ - Math.cos(t) * A.radiusZ
+      ),
+      // Turn toward the centre of the arc, but only partly: a machine turned
+      // fully inward hides the front face where all the readable detail lives.
+      rotationY: -t * 0.45,
+    };
+  });
+}
+
+export const STATION_SLOTS = slotsFor(6);
 
 export const PREP_CENTRE = new THREE.Vector3(0, 1.5, 1.1);
 export const PREP_RADIUS = 3.05;
@@ -204,7 +241,8 @@ export class Kitchen {
     const toeMat = matte(0x5c3620, 0.8);
     const doorMat = matte(0x94592d, 0.76);
 
-    for (const slot of STATION_SLOTS) {
+    // Built for the maximum, positioned per stage by setActiveSlots().
+    for (const slot of slotsFor(MAX_SLOTS)) {
       const g = new THREE.Group();
       g.position.set(slot.position.x, 0, slot.position.z);
       g.rotation.y = slot.rotationY;
@@ -245,10 +283,21 @@ export class Kitchen {
     }
   }
 
-  /** Show only the islands whose slots this stage actually uses. */
+  /**
+   * Show the islands this stage uses, and move them onto the arc that this many
+   * machines get. The arc widens past six, so the counters have to travel with
+   * the machines or a Stage 8 freezer stands on nothing.
+   */
   setActiveSlots(count) {
     if (!this.islands) return;
-    this.islands.forEach((g, i) => { g.visible = i < count; });
+    const slots = slotsFor(count);
+    this.islands.forEach((g, i) => {
+      g.visible = i < count;
+      if (i < count) {
+        g.position.set(slots[i].position.x, 0, slots[i].position.z);
+        g.rotation.y = slots[i].rotationY;
+      }
+    });
   }
 
   // ------------------------------------------------------------- prep table

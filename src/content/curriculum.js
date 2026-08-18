@@ -163,6 +163,38 @@ export const METHODS = {
     chill: { targetC: 4, windowMs: 3200 },
   },
 
+  /**
+   * §5H — smoking. Its mechanism is REMOVES_WATER, the same as drying, and that
+   * is exactly why it is worth playing: two different machines, two different
+   * actions, one shared reason. A child who can say "smoking and drying both
+   * take the water away" has understood mechanism rather than memorised a list.
+   */
+  smoking: {
+    id: 'smoking', playable: true, station: 'Smokehouse', sourceRef: '§5H',
+    mechanism: MECHANISM.REMOVES_WATER, changes: 'moisture',
+    microbeEffect: 'shrivel',
+    colour: 0x8d6e63, accent: 0xbcaaa4, icon: 'smoke',
+    foods: ['fish', 'meat', 'bananas'],
+    alsoWorks: ['chicken', 'sausages', 'squid'],
+    interaction: 'hang-and-smoke',
+    /** "This method takes a long time" — the bellows keep the fire going. */
+    beats: 5,
+  },
+  /**
+   * §5J — canning and bottling. Two actions in one method, and the notes say
+   * both: cook at high temperature to kill, then seal in an airtight container.
+   * The interaction has to be both, or it teaches half of it.
+   */
+  canning: {
+    id: 'canning', playable: true, station: 'Cannery', sourceRef: '§5J',
+    mechanism: MECHANISM.HIGH_TEMPERATURE, changes: 'temperature + sealing',
+    microbeEffect: 'pop',
+    colour: 0x78909c, accent: 0xb0bec5, icon: 'can',
+    foods: ['meat', 'fruits', 'vegetables'],
+    alsoWorks: ['fish', 'mushrooms'],
+    interaction: 'fill-heat-seal',
+  },
+
   // ------------------------------------------------ fact-book only (not yet playable)
   boiling: {
     id: 'boiling', playable: false, sourceRef: '§5A',
@@ -173,16 +205,6 @@ export const METHODS = {
     id: 'waxing', playable: false, sourceRef: '§5G',
     mechanism: MECHANISM.SEALS_SURFACE, changes: 'surface',
     colour: 0xd4e157, foods: ['apples', 'oranges', 'tomatoes'],
-  },
-  smoking: {
-    id: 'smoking', playable: false, sourceRef: '§5H',
-    mechanism: MECHANISM.REMOVES_WATER, changes: 'moisture',
-    colour: 0x8d6e63, foods: ['fish', 'meat', 'bananas'],
-  },
-  canning: {
-    id: 'canning', playable: false, sourceRef: '§5J',
-    mechanism: MECHANISM.HIGH_TEMPERATURE, changes: 'temperature + sealing',
-    colour: 0x78909c, foods: ['meat', 'fruits', 'vegetables'],
   },
 };
 
@@ -221,6 +243,8 @@ export const MECHANISM_OPTIONS = [
 ];
 
 const ALL_SIX = ['drying', 'freezing', 'cooling', 'vacuum', 'pickling', 'salting', 'pasteurising'];
+/** Everything §5 makes playable: the six machines plus the smokehouse and the cannery. */
+const EVERYTHING = [...ALL_SIX, 'smoking', 'canning'];
 
 /**
  * Six stages, per the brief. Difficulty is data, not code.
@@ -288,6 +312,33 @@ export const STAGES = [
     quizChance: 1.0, targetPreserved: 14,
     shufflePositions: true, reshuffleMidStage: true, allowFactBook: false,
   },
+  /**
+   * Stage 7 — the two new machines, taught by CONTRAST rather than by label.
+   * Smoking sits next to drying because they share a mechanism, and canning
+   * next to vacuum packing because one seals air out and the other takes it
+   * away. Labels come back on: a machine nobody has ever seen cannot be
+   * recalled, only guessed at.
+   */
+  {
+    id: 7, key: 'newmachines',
+    methods: ['drying', 'smoking', 'vacuum', 'canning', 'freezing', 'cooling'],
+    showStationLabels: true, showMethodHintOnFood: false,
+    spoilRateMul: 0.85, spawnIntervalMs: 4600, maxActiveFoods: 3,
+    quizChance: 0.5, targetPreserved: 10,
+    shufflePositions: false, reshuffleMidStage: false, allowFactBook: true,
+  },
+  /**
+   * Stage 8 — the whole kitchen. Eight machines, no labels, positions re-dealt
+   * mid-stage, a question after every single preservation.
+   */
+  {
+    id: 8, key: 'wholekitchen',
+    methods: EVERYTHING,
+    showStationLabels: false, showMethodHintOnFood: false,
+    spoilRateMul: 1.25, spawnIntervalMs: 3400, maxActiveFoods: 5,
+    quizChance: 1.0, targetPreserved: 14,
+    shufflePositions: true, reshuffleMidStage: true, allowFactBook: false,
+  },
 ];
 
 export const SCORING = {
@@ -305,6 +356,20 @@ export const SCORING = {
   alsoWorksFactor: 0.5,
   starThresholds: [0.55, 0.75, 0.92], // fraction of achievable score
 };
+
+/**
+ * Foods the notes name as examples but the game does not put on the counter.
+ *
+ * The Fact Book still prints them and the quiz bank still asks about them, so
+ * §5 is covered in full — they just have no model and never spawn. Twelve foods
+ * is already a lot to tell apart at counter size, and every extra one dilutes
+ * the set without teaching anything the others do not.
+ */
+export const REFERENCE_ONLY_FOODS = [
+  'rendang', 'jam',                      // §5A boiling
+  'bananas',                             // §5H smoking
+  'apples', 'oranges', 'tomatoes',       // §5G waxing
+];
 
 /**
  * TWO LISTS PER METHOD, and the difference matters.
@@ -336,7 +401,9 @@ export function isTaughtPairing(methodId, foodId) {
 /** Derived: food -> every method the notes teach for it. Built once, frozen. */
 export function deriveFoodMethods() {
   const map = {};
-  for (const id of Object.keys(FOODS)) map[id] = [];
+  // Reference-only foods get an entry too: without one, a quiz question about
+  // bananas would treat smoking as an available distractor for itself.
+  for (const id of [...Object.keys(FOODS), ...REFERENCE_ONLY_FOODS]) map[id] = [];
   for (const m of Object.values(METHODS)) {
     if (!m.playable) continue;
     for (const f of m.foods) if (map[f]) map[f].push(m.id);
@@ -389,7 +456,9 @@ export function validateCurriculum() {
   for (const m of Object.values(METHODS)) {
     if (!m.playable) continue;
     for (const f of [...m.foods, ...(m.alsoWorks || [])]) {
-      if (!FOODS[f]) problems.push(`METHODS.${m.id} lists unknown food "${f}"`);
+      if (!FOODS[f] && !REFERENCE_ONLY_FOODS.includes(f)) {
+        problems.push(`METHODS.${m.id} lists unknown food "${f}"`);
+      }
     }
     for (const f of m.alsoWorks || []) {
       if (m.foods.includes(f)) problems.push(`METHODS.${m.id}: "${f}" is in both foods and alsoWorks`);
