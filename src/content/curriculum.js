@@ -47,6 +47,7 @@ export const METHODS = {
     accent: 0xffd54f,
     icon: 'sun',
     foods: ['fish', 'prawns', 'squid', 'fruits'],
+    alsoWorks: ['meat', 'mushrooms', 'vegetables'],
     interaction: 'hang-and-sun',
   },
   /**
@@ -67,6 +68,7 @@ export const METHODS = {
     accent: 0x81d4fa,
     icon: 'snowflake',
     foods: ['chicken', 'meat', 'prawns', 'squid'],
+    alsoWorks: ['fish', 'sausages'],
     interaction: 'dial-temperature',
     targetC: -18,
     acceptC: [-30, 0],          // "0°C and below"
@@ -83,6 +85,7 @@ export const METHODS = {
     accent: 0xb2ebf2,
     icon: 'snowflake',
     foods: ['fruits', 'vegetables', 'milk'],
+    alsoWorks: ['eggs', 'fruit_juice'],
     interaction: 'dial-temperature',
     targetC: 4,
     acceptC: [1, 7],            // "around 4°C"
@@ -99,6 +102,7 @@ export const METHODS = {
     accent: 0xce93d8,
     icon: 'vacuum',
     foods: ['meat', 'sausages', 'mushrooms'],
+    alsoWorks: ['fish', 'chicken', 'vegetables'],
     interaction: 'hold-to-evacuate',
   },
   pickling: {
@@ -113,6 +117,7 @@ export const METHODS = {
     accent: 0xa5d6a7,
     icon: 'jar',
     foods: ['fruits', 'vegetables'],
+    alsoWorks: ['eggs'],
     interaction: 'pour-and-seal',
     /** All three are correct per §5C — the player picks any one. */
     solutions: ['vinegar', 'sugar_solution', 'salt_solution'],
@@ -129,6 +134,7 @@ export const METHODS = {
     accent: 0xff8a80,
     icon: 'salt',
     foods: ['fish', 'eggs', 'vegetables'],
+    alsoWorks: ['meat'],
     interaction: 'scoop-and-spread',
   },
   pasteurising: {
@@ -146,6 +152,7 @@ export const METHODS = {
     accent: 0xb3e5fc,
     icon: 'thermometer',
     foods: ['milk', 'fruit_juice'],
+    alsoWorks: [],
     interaction: 'heat-then-chill',
     /** Both programmes are given in §5I; either is correct. */
     programmes: [
@@ -292,10 +299,41 @@ export const SCORING = {
   comboMax: 8,
   spoiledPenalty: -75,
   wrongStationPenalty: -50,
+  // A pairing that works in a kitchen but is not the notes' example still
+  // scores — half — because it is not wrong. The gap in points is what keeps
+  // the exam answer worth aiming for.
+  alsoWorksFactor: 0.5,
   starThresholds: [0.55, 0.75, 0.92], // fraction of achievable score
 };
 
-/** Derived: food -> every method the notes allow for it. Built once, frozen. */
+/**
+ * TWO LISTS PER METHOD, and the difference matters.
+ *
+ *   foods      the notes' own examples. These are the exam answers: they are
+ *              what the Fact Book prints, what the quiz treats as correct, and
+ *              what earns full marks.
+ *   alsoWorks  pairings that are true in a kitchen but are not this method's
+ *              example in Unit 8 — sausages in the freezer, meat on the drying
+ *              rack. The game accepts them, because telling a child that a true
+ *              thing is false to protect a worksheet is the wrong trade. It
+ *              scores them lower and names the notes' method, so the exam
+ *              answer is still the one being rehearsed.
+ *
+ * A food may never appear in two methods that share a station (freezing and
+ * cooling), in either list — the station could not then decide which method to
+ * report. validateCurriculum() enforces that.
+ */
+export function acceptsFood(methodId, foodId) {
+  const m = METHODS[methodId];
+  return !!m && (m.foods.includes(foodId) || (m.alsoWorks || []).includes(foodId));
+}
+
+/** True when this pairing is one of the notes' own examples. */
+export function isTaughtPairing(methodId, foodId) {
+  return !!METHODS[methodId]?.foods.includes(foodId);
+}
+
+/** Derived: food -> every method the notes teach for it. Built once, frozen. */
 export function deriveFoodMethods() {
   const map = {};
   for (const id of Object.keys(FOODS)) map[id] = [];
@@ -340,7 +378,7 @@ export function stationsFor(methodIds) {
 export function methodAtStation(stationId, foodId, allowed = null) {
   for (const id of STATION_METHODS[stationId] || []) {
     if (allowed && !allowed.includes(id)) continue;
-    if (METHODS[id].foods.includes(foodId)) return id;
+    if (acceptsFood(id, foodId)) return id;
   }
   return null;
 }
@@ -350,8 +388,11 @@ export function validateCurriculum() {
   const problems = [];
   for (const m of Object.values(METHODS)) {
     if (!m.playable) continue;
-    for (const f of m.foods) {
+    for (const f of [...m.foods, ...(m.alsoWorks || [])]) {
       if (!FOODS[f]) problems.push(`METHODS.${m.id} lists unknown food "${f}"`);
+    }
+    for (const f of m.alsoWorks || []) {
+      if (m.foods.includes(f)) problems.push(`METHODS.${m.id}: "${f}" is in both foods and alsoWorks`);
     }
   }
   for (const f of Object.values(FOODS)) {
@@ -366,7 +407,7 @@ export function validateCurriculum() {
   for (const [stationId, ids] of Object.entries(STATION_METHODS)) {
     const seen = new Map();
     for (const id of ids) {
-      for (const f of METHODS[id].foods) {
+      for (const f of [...METHODS[id].foods, ...(METHODS[id].alsoWorks || [])]) {
         if (seen.has(f)) problems.push(`${stationId}: "${f}" is claimed by both ${seen.get(f)} and ${id}`);
         seen.set(f, id);
       }

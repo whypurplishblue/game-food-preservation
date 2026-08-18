@@ -15,9 +15,6 @@
     "preserved": "Preserved",
     "goal": "Today's Goal",
     "factBook": "Fact Book",
-    "credits": "Credits",
-    "creditsIntro": "This game uses 3D models made by other artists, shared under Creative Commons licenses.",
-    "creditsBy": "by {author}",
     "pause": "Pause",
     "resume": "Resume",
     "restart": "Restart",
@@ -57,8 +54,7 @@
     "recallPrompt": "Which method is this machine?",
     "howToPlay": "How to play",
     "learned": "You learned",
-    "factBookLocked": "The Fact Book is closed in this stage — try to remember!",
-    "alsoWorksNote": "That works in a real kitchen! In Unit 8, {food} is the {method} example."
+    "factBookLocked": "The Fact Book is closed in this stage — try to remember!"
   },
   "station": {
     "drying": {

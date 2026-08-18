@@ -136,8 +136,21 @@ const STAGE_MIX = {
   6: { method: 0.0, mechanism: 0.35, food: 0.35, microbe: 0.30 },
 };
 
-export function makeQuestion({ methodId, foodId, stageId = 3, rnd = Math.random }) {
-  const mix = STAGE_MIX[stageId] || STAGE_MIX[3];
+/**
+ * @param {boolean} afterMistake suppress the "which method did we just use?"
+ *   type. Asking it after a wrong drop is incoherent — no method was used — and
+ *   it wasted the single most teachable moment in the run on a nonsense
+ *   question. After a mistake the food-association type is asked instead, which
+ *   is exactly the thing the child just got wrong.
+ */
+export function makeQuestion({ methodId, foodId, stageId = 3, rnd = Math.random, afterMistake = false }) {
+  let mix = STAGE_MIX[stageId] || STAGE_MIX[3];
+  if (afterMistake) {
+    const { method, ...rest } = mix;
+    const bump = foodId ? { ...rest, food: (rest.food || 0) + method } : rest;
+    const total = Object.values(bump).reduce((a, b) => a + b, 0) || 1;
+    mix = Object.fromEntries(Object.entries(bump).map(([k, v]) => [k, v / total]));
+  }
   let roll = rnd();
   for (const [type, weight] of Object.entries(mix)) {
     roll -= weight;

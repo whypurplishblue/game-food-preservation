@@ -9,7 +9,7 @@
  */
 import * as THREE from 'three';
 import {
-  STAGES, METHODS, FOODS, SCORING, isTaughtPairing,
+  STAGES, METHODS, FOODS, SCORING,
   STATION_METHODS, stationsFor, methodAtStation,
 } from '../content/curriculum.js';
 import { t, methodName, foodName, mechShort, methodMechShort } from '../content/i18n.js';
@@ -149,18 +149,6 @@ export class Game {
       onPlay: () => this.startStage(1),
       onContinue: () => this.startStage(this.savedStage),
       onFactBook: () => this.openFactBook(() => this.showMenu()),
-      onCredits: () => this.openCredits(() => this.showMenu()),
-    });
-  }
-
-  openCredits(back) {
-    const wasPlaying = this.mode === 'playing';
-    if (wasPlaying) this.mode = 'paused';
-    this.input.setEnabled(false);
-    this.screens.credits(() => {
-      if (back) back();
-      else if (wasPlaying) { this.screens.close(); this.mode = 'playing'; this.input.setEnabled(true); }
-      else this.showMenu();
     });
   }
 
@@ -186,29 +174,14 @@ export class Game {
     if (this.mode !== 'playing') return;
     this.mode = 'paused';
     this.input.setEnabled(false);
-    // Put the station interaction down rather than destroying it: pausing
-    // mid-interaction used to leave the food inside a busy machine with no
-    // controls at all, which ends the run.
-    this._pausedPanel = this.panel.snapshot();
     this.panel.stop();
     this.screens.pause({
       settings: this.settings,
       onSetting: (k, v) => this.setSetting(k, v),
-      onResume: () => {
-        this.screens.close();
-        this.mode = 'playing';
-        if (this._pausedPanel) {
-          // Back to the step it was on, with the machine still mid-animation.
-          this.panel.start(this._pausedPanel);
-          this._pausedPanel = null;
-        } else {
-          this.input.setEnabled(true);
-        }
-      },
-      onRestart: () => { this._pausedPanel = null; this.screens.close(); this.startStage(this.stageId); },
-      onMenu: () => { this._pausedPanel = null; this.screens.close(); this.showMenu(); },
+      onResume: () => { this.screens.close(); this.mode = 'playing'; this.input.setEnabled(true); },
+      onRestart: () => { this.screens.close(); this.startStage(this.stageId); },
+      onMenu: () => { this.screens.close(); this.showMenu(); },
       onFactBook: () => this.openFactBook(() => this.pause()),
-      onCredits: () => this.openCredits(() => this.pause()),
     });
   }
 
@@ -400,11 +373,7 @@ export class Game {
       // A mistake is the highest-value moment to ask a question — the child is
       // already attending to the thing they got wrong.
       if (Math.random() < 0.35 && this.stage.quizChance > 0) {
-        setTimeout(() => {
-          if (this.mode !== 'playing') return;
-          // Ask about THIS food, not about a method that was never used.
-          this._askQuiz(FOODS[food.foodId]?.primary || this._weakestMethod(), food.foodId, true);
-        }, 900);
+        setTimeout(() => { if (this.mode === 'playing') this._askQuiz(this._weakestMethod(), food.foodId); }, 900);
       }
       return;
     }
@@ -456,13 +425,8 @@ export class Game {
       speed: 4.5, size: 0.19, life: 1.25,
     });
 
-    // Real-life-correct but not the notes' example: accepted, scored at half,
-    // and named. Marking a true pairing wrong teaches a child to distrust what
-    // they know; saying nothing lets the exam answer slip.
-    const taught = isTaughtPairing(methodId, food.foodId);
     this._bumpCombo();
-    const base = (SCORING.base + (quality > 0.95 ? SCORING.perfectInteractionBonus : 0))
-      * (taught ? 1 : SCORING.alsoWorksFactor);
+    const base = SCORING.base + (quality > 0.95 ? SCORING.perfectInteractionBonus : 0);
     const gained = Math.round(base * this.combo);
     this._addScore(gained, pos, `+${gained}`, m.colour);
     if (quality > 0.95) {
@@ -474,12 +438,6 @@ export class Game {
     // loud after the child dials 4°C for milk.
     this.hud.flash(`${methodName(methodId)} → ${methodMechShort(methodId, m.mechanism)}`, { kind: 'good', ms: 1500 });
     this.hud.say(`${methodName(methodId)}. ${t(`methods.${methodId}.exam`)}`);
-    if (!taught) {
-      const primary = FOODS[food.foodId]?.primary;
-      const note = t('ui.alsoWorksNote', { food: foodName(food.foodId), method: methodName(primary) });
-      setTimeout(() => this.hud.flash(note, { kind: 'info', ms: 2600 }), 1600);
-      this.hud.say(note);
-    }
     this.hud.setGoal(this.preserved, this.stage.targetPreserved);
 
     // Preserved food leaves the counter after a beat.
@@ -556,11 +514,11 @@ export class Game {
     return bestN > 0 ? best : (fallback || pool[(Math.random() * pool.length) | 0]);
   }
 
-  _askQuiz(methodId, foodId, afterMistake = false) {
+  _askQuiz(methodId, foodId) {
     this.mode = 'quiz';
     this.input.setEnabled(false);
     this.quizAsked++;
-    const q = makeQuestion({ methodId, foodId, stageId: this.stageId, afterMistake });
+    const q = makeQuestion({ methodId, foodId, stageId: this.stageId });
     this.quiz.ask(q, (correct) => {
       if (correct) {
         this.quizRight++;
