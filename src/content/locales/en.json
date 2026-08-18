@@ -1,0 +1,362 @@
+{
+  "_comment": "Wording taken from 'Year 6 Science — Unit 8: Food Preservation Technology'. Exam sentences are verbatim. Do not paraphrase them.",
+  "lang": "English",
+  "langShort": "EN",
+  "ui": {
+    "title": "Preservation Panic!",
+    "subtitle": "Year 6 Science · Unit 8",
+    "play": "Play",
+    "continue": "Continue",
+    "score": "Score",
+    "combo": "Combo",
+    "level": "Level",
+    "stage": "Stage",
+    "time": "Time",
+    "preserved": "Preserved",
+    "goal": "Today's Goal",
+    "factBook": "Fact Book",
+    "pause": "Pause",
+    "resume": "Resume",
+    "restart": "Restart",
+    "quit": "Quit to menu",
+    "settings": "Settings",
+    "sound": "Sound",
+    "music": "Music",
+    "reducedMotion": "Reduced motion",
+    "language": "Language",
+    "loading": "Warming up the kitchen…",
+    "tapToStart": "Tap to start",
+    "microbeMeter": "Microbe Meter",
+    "microbeMeterHint": "Use the right method to stop microorganisms!",
+    "spoilage": "Spoilage",
+    "orders": "Orders",
+    "next": "Next",
+    "back": "Back",
+    "close": "Close",
+    "skip": "Skip",
+    "stars": "Stars",
+    "accuracy": "Accuracy",
+    "bestCombo": "Best combo",
+    "retry": "Try again",
+    "nextStage": "Next stage",
+    "stageComplete": "Stage complete!",
+    "stageFailed": "Too much food spoilt!",
+    "dragHint": "Drag the food to the right station",
+    "whyItWorks": "Why it works!",
+    "quizTitle": "Quiz time!",
+    "correct": "Correct!",
+    "wrong": "Not quite",
+    "spoilt": "Spoilt!",
+    "wrongStation": "Wrong method!",
+    "perfect": "Perfect!",
+    "methodBadges": "Method Badges",
+    "preservationMemory": "Preservation Memory",
+    "recallPrompt": "Which method is this machine?",
+    "howToPlay": "How to play",
+    "learned": "You learned",
+    "factBookLocked": "The Fact Book is closed in this stage — try to remember!"
+  },
+  "station": {
+    "drying": {
+      "hang": "Hang it on the hook",
+      "sweep": "Sweep the sun across it"
+    },
+    "freezing": {
+      "open": "Open the door",
+      "close": "Close the door",
+      "dial": "Set the temperature"
+    },
+    "vacuum": {
+      "bag": "Put it in the bag",
+      "pump": "Hold to pump the air out",
+      "seal": "Seal the bag"
+    },
+    "pickling": {
+      "drop": "Drop it in the jar",
+      "choose": "Pour one of these",
+      "pour": "Hold to pour",
+      "twist": "Screw the lid on"
+    },
+    "salting": {
+      "scoop": "Scoop the salt",
+      "spread": "Rub the salt all over"
+    },
+    "pasteurising": {
+      "choose": "Choose a programme",
+      "heat": "Hold to heat",
+      "cool": "Cool it now!"
+    }
+  },
+  "stages": {
+    "learn": {
+      "name": "Learn",
+      "tagline": "Two methods. Take your time.",
+      "brief": "Food spoils because microorganisms grow on it. Send each food to the station that stops them."
+    },
+    "practice": {
+      "name": "Practice",
+      "tagline": "Four stations. Fewer hints.",
+      "brief": "Two more stations are open, and the cold cabinet now has two settings. The food no longer tells you which method it needs — look at what the food is."
+    },
+    "panic": {
+      "name": "Panic",
+      "tagline": "All six stations. Move fast!",
+      "brief": "Every station is running and food is spoiling faster. Keep the microorganisms down."
+    },
+    "recall": {
+      "name": "Recall",
+      "tagline": "Labels off. Positions shuffled.",
+      "brief": "The station labels are gone and the machines have moved. Recognise each one by how it works."
+    },
+    "why": {
+      "name": "Why It Works",
+      "tagline": "Explain the science.",
+      "brief": "After every preservation you must say what the method changes."
+    },
+    "mastery": {
+      "name": "Mastery",
+      "tagline": "Everything moves.",
+      "brief": "The stations have swapped places. Nothing is where you left it — you have to know the methods themselves."
+    }
+  },
+  "mechanisms": {
+    "removes_water": {
+      "short": "Removes water",
+      "long": "Water is removed, so microorganisms cannot grow easily."
+    },
+    "removes_air": {
+      "short": "Removes air",
+      "long": "Air is removed, so microorganisms cannot reproduce easily."
+    },
+    "low_temperature": {
+      "short": "Low temperature",
+      "long": "Low temperature slows down the growth of microorganisms."
+    },
+    "high_temperature": {
+      "short": "High temperature",
+      "long": "High temperature kills microorganisms."
+    },
+    "changes_environment": {
+      "short": "Vinegar, sugar or salt",
+      "long": "High acidity or a high concentration of sugar or salt prevents microorganisms from growing."
+    },
+    "seals_surface": {
+      "short": "Coats the surface",
+      "long": "The surface is coated so microorganisms cannot grow on it."
+    },
+    "heat_then_cool": {
+      "short": "Heat, then cool quickly",
+      "long": "Heat kills the microorganisms, then the food is cooled immediately at 4°C."
+    }
+  },
+  "methods": {
+    "drying": {
+      "name": "Drying",
+      "verb": "Dry it",
+      "mechanismShort": "Removes water",
+      "explain": "Drying removes water from food. Microorganisms cannot survive or become inactive when there is no water.",
+      "exam": "Drying preserves food by removing water, so microorganisms cannot grow easily.",
+      "hint": "Hang it up and let the sun take the water out.",
+      "instruction": "Hang the food on a hook, then sweep the sun across it.",
+      "recallClue": "Sun and air, no water left",
+      "detail": "Food can be dried under the sun or in an oven."
+    },
+    "freezing": {
+      "name": "Freezing",
+      "stationName": "Freezing & Cooling",
+      "verb": "Freeze it",
+      "mechanismShort": "Low temperature",
+      "explain": "Food is stored at 0°C and below. Low temperature makes microorganisms less active and slows down their growth.",
+      "exam": "Freezing and cooling preserve food because low temperature slows down the growth of microorganisms.",
+      "hint": "Put it inside and set it to 0°C or below.",
+      "instruction": "Open the door, put the food in, close it, then set the dial.",
+      "recallClue": "Cold air, frost on the door",
+      "detail": "Freezing stores food at 0°C and below. Examples: chicken, meat, prawns, squid.",
+      "range": "0°C and below",
+      "dialWrong": "Not the right temperature for this food.",
+      "dialCorrection": "{food} needs {range}."
+    },
+    "cooling": {
+      "name": "Cooling",
+      "verb": "Chill it",
+      "mechanismShort": "Low temperature",
+      "explain": "Food is stored at a low temperature, around 4°C. Low temperature makes microorganisms less active and slows down their growth.",
+      "exam": "Freezing and cooling preserve food because low temperature slows down the growth of microorganisms.",
+      "hint": "Put it inside and set it to about 4°C.",
+      "instruction": "Open the door, put the food in, close it, then set the dial to 4°C.",
+      "recallClue": "Cold air, frost on the door",
+      "detail": "Cooling stores food at a low temperature, around 4°C. Examples: fruits, vegetables, milk.",
+      "range": "around 4°C",
+      "dialWrong": "Not the right temperature for this food.",
+      "dialCorrection": "{food} needs {range}."
+    },
+    "vacuum": {
+      "name": "Vacuum Packing",
+      "verb": "Pack it",
+      "mechanismShort": "Removes air",
+      "explain": "Vacuum packing removes air from food packaging. Microorganisms cannot reproduce without air inside the packaging.",
+      "exam": "Vacuum packing preserves food by removing air so microorganisms cannot reproduce.",
+      "hint": "Bag it, then pull all the air out.",
+      "instruction": "Hold the pump until the air gauge reaches zero, then seal.",
+      "recallClue": "A bag that shrinks tight",
+      "detail": "The bag is sealed so no air can get back in."
+    },
+    "pickling": {
+      "name": "Pickling",
+      "verb": "Pickle it",
+      "mechanismShort": "Vinegar, sugar or salt",
+      "explain": "High acidity or high concentration of sugar or salt prevents microorganisms from growing.",
+      "exam": "Pickling preserves food because vinegar, sugar or salt prevents the growth of microorganisms.",
+      "hint": "Into the jar, then pour a solution over it.",
+      "instruction": "Drop the food in, tilt a bottle to fill the jar, then twist the lid shut.",
+      "recallClue": "A jar filling with liquid",
+      "detail": "Pickling means soaking food in vinegar, sugar solution or salt solution.",
+      "chooseSolution": "Pour one of these",
+      "solutions": {
+        "vinegar": "Vinegar",
+        "sugar_solution": "Sugar solution",
+        "salt_solution": "Salt solution"
+      },
+      "anySolutionOk": "All three work — vinegar, sugar solution and salt solution all stop microorganisms."
+    },
+    "salting": {
+      "name": "Salting",
+      "verb": "Salt it",
+      "mechanismShort": "Removes moisture",
+      "explain": "Salt removes moisture from food and prevents microorganisms from growing.",
+      "exam": "Salting preserves food by removing moisture from food.",
+      "hint": "Cover it with a lot of salt.",
+      "instruction": "Scoop salt, then rub it all over the food until it is covered.",
+      "recallClue": "A heap of salt being rubbed in",
+      "detail": "Salting means covering food with a large quantity of salt.",
+      "coverage": "Coverage"
+    },
+    "pasteurising": {
+      "name": "Pasteurising",
+      "verb": "Pasteurise it",
+      "mechanismShort": "Heat, then cool quickly",
+      "explain": "Pasteurising uses heat to kill microorganisms without changing the taste or nutritional value of food.",
+      "exam": "Pasteurising preserves food by heating it to kill microorganisms and then cooling it quickly.",
+      "hint": "Heat it, then cool it straight away.",
+      "instruction": "Hold HEAT until the programme completes, then hit COOL immediately.",
+      "recallClue": "A hot pipe and a cold pipe",
+      "detail": "Heat at 63°C for 30 minutes, or 72°C for 15 seconds. Then cool immediately at 4°C.",
+      "programmes": {
+        "p63": "63°C for 30 minutes",
+        "p72": "72°C for 15 seconds"
+      },
+      "chooseProgramme": "Choose a programme",
+      "coolNow": "Cool it now!",
+      "coolTooLate": "Too slow — it must be cooled immediately.",
+      "eitherProgrammeOk": "Both programmes work — 63°C for 30 minutes, or 72°C for 15 seconds."
+    },
+    "boiling": {
+      "name": "Boiling",
+      "mechanismShort": "High temperature",
+      "explain": "Boiling uses high temperature to kill microorganisms such as bacteria and fungi.",
+      "exam": "Boiling preserves food because high temperature kills microorganisms.",
+      "detail": "Examples: rendang, jam."
+    },
+    "waxing": {
+      "name": "Waxing",
+      "mechanismShort": "Coats the surface",
+      "explain": "Waxing means coating fruits and vegetables with liquid wax. This prevents microorganisms from growing on the surface.",
+      "exam": "Waxing preserves food by coating the surface and preventing microorganisms from growing.",
+      "detail": "Examples: apples, oranges, tomatoes."
+    },
+    "smoking": {
+      "name": "Smoking",
+      "mechanismShort": "Dries with smoke",
+      "explain": "Smoking dries food using smoke. This method takes a long time.",
+      "exam": "Smoking preserves food by drying the food and reducing moisture.",
+      "detail": "Examples: fish, meat, bananas."
+    },
+    "canning": {
+      "name": "Canning and Bottling",
+      "mechanismShort": "Kills and seals",
+      "explain": "Cooking food at high temperature to kill microorganisms and storing it in airtight cans or bottles.",
+      "exam": "Canning and bottling preserve food by killing microorganisms and sealing the food in airtight containers.",
+      "detail": "Examples: meat, fruits, vegetables."
+    }
+  },
+  "foods": {
+    "fish": "Fish",
+    "prawns": "Prawns",
+    "squid": "Squid",
+    "chicken": "Chicken",
+    "meat": "Meat",
+    "sausages": "Sausages",
+    "mushrooms": "Mushrooms",
+    "fruits": "Fruits",
+    "vegetables": "Vegetables",
+    "eggs": "Eggs",
+    "milk": "Milk",
+    "fruit_juice": "Fruit Juice",
+    "rendang": "Rendang",
+    "jam": "Jam",
+    "apples": "Apples",
+    "oranges": "Oranges",
+    "tomatoes": "Tomatoes",
+    "bananas": "Bananas"
+  },
+  "quiz": {
+    "whyMethod": "Why does {method} preserve food?",
+    "whatChanges": "What does {method} change?",
+    "whichMethod": "Which preservation method did we just use?",
+    "whichMethodForFood": "Which method preserves {food}?",
+    "microbeQ": "What happens to the microorganisms?",
+    "microbeA": {
+      "removes_water": "They cannot grow without water",
+      "removes_air": "They cannot reproduce without air",
+      "low_temperature": "They become less active and grow slowly",
+      "high_temperature": "They are killed by the heat",
+      "changes_environment": "They cannot grow in vinegar, sugar or salt",
+      "heat_then_cool": "They are killed by the heat, then kept out by the cold"
+    }
+  },
+  "spoilage": {
+    "title": "Food Spoilage",
+    "what": "Food spoilage means food has become bad and unsafe to eat.",
+    "why": "Food spoilage happens because of the action of microorganisms.",
+    "grow": "Bacteria and fungi grow easily on food that is moist, exposed to air, or not stored properly.",
+    "unsafe": "Spoilt food is unsafe for consumption.",
+    "signs": [
+      "Smells bad",
+      "Tastes unpleasant",
+      "Changes colour",
+      "Changes texture",
+      "Becomes mouldy"
+    ],
+    "senses": {
+      "sight": "Food becomes mouldy, changes colour",
+      "smell": "Food smells bad or rotten",
+      "taste": "Food has an unpleasant taste",
+      "touch": "Food changes texture, becomes slimy or soft"
+    }
+  },
+  "microbes": {
+    "strong": "Strong — spoilage is fast!",
+    "weakening": "Weakening — getting slower",
+    "weak": "Weak — almost gone",
+    "safe": "Safe — food is preserved!",
+    "bacteria": "Bacteria",
+    "fungi": "Fungi"
+  },
+  "importance": {
+    "title": "Why preservation matters",
+    "items": [
+      "Makes food last longer",
+      "Allows food to be eaten all year round",
+      "Makes food easier to store and transport",
+      "Prevents food wastage",
+      "Ensures food supply during disasters"
+    ]
+  },
+  "a11y": {
+    "foodItem": "{food}, spoilage {percent} percent",
+    "stationButton": "{method} station",
+    "pickUp": "Pick up",
+    "dropAt": "Drop at {method}",
+    "keyboardHelp": "Use Tab to choose a food, then number keys 1 to 6 to send it to a station."
+  }
+}

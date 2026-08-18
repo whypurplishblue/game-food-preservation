@@ -1,0 +1,25 @@
+{
+  "name": "preservation-panic",
+  "version": "1.0.0",
+  "description": "Preservation Panic — Year 6 Science food preservation game (Three.js)",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173 --host",
+    "test:content": "node tools/check-content.mjs",
+    "test:play": "node tools/probe.mjs",
+    "shots": "node tools/shoot.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1",
+    "vite": "^6.4.3"
+  },
+  "type": "module"
+}

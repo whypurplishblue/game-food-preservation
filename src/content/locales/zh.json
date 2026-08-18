@@ -1,0 +1,362 @@
+{
+  "_comment": "Terminology taken from §10 of the Unit 8 notes (中文/拼音 keyword list). Gameplay chrome translated to match. Verify with a teacher before classroom use.",
+  "lang": "中文",
+  "langShort": "中",
+  "ui": {
+    "title": "保鲜大作战！",
+    "subtitle": "六年级科学 · 第八单元",
+    "play": "开始",
+    "continue": "继续",
+    "score": "分数",
+    "combo": "连击",
+    "level": "关卡",
+    "stage": "阶段",
+    "time": "时间",
+    "preserved": "已保存",
+    "goal": "今日目标",
+    "factBook": "知识本",
+    "pause": "暂停",
+    "resume": "继续",
+    "restart": "重新开始",
+    "quit": "回到主菜单",
+    "settings": "设置",
+    "sound": "音效",
+    "music": "音乐",
+    "reducedMotion": "减少动画",
+    "language": "语言",
+    "loading": "正在准备厨房…",
+    "tapToStart": "点击开始",
+    "microbeMeter": "微生物指数",
+    "microbeMeterHint": "用正确的方法阻止微生物！",
+    "spoilage": "腐坏",
+    "orders": "订单",
+    "next": "下一个",
+    "back": "返回",
+    "close": "关闭",
+    "skip": "跳过",
+    "stars": "星星",
+    "accuracy": "正确率",
+    "bestCombo": "最高连击",
+    "retry": "再试一次",
+    "nextStage": "下一阶段",
+    "stageComplete": "阶段完成！",
+    "stageFailed": "太多食物腐坏了！",
+    "dragHint": "把食物拖到正确的站",
+    "whyItWorks": "原理是什么！",
+    "quizTitle": "小测验！",
+    "correct": "正确！",
+    "wrong": "不对哦",
+    "spoilt": "腐坏了！",
+    "wrongStation": "方法不对！",
+    "perfect": "完美！",
+    "methodBadges": "方法徽章",
+    "preservationMemory": "保存法笔记",
+    "recallPrompt": "这是哪一种方法？",
+    "howToPlay": "玩法",
+    "learned": "你学到了",
+    "factBookLocked": "这一关知识本关闭了——试着回忆！"
+  },
+  "station": {
+    "drying": {
+      "hang": "挂在钩子上",
+      "sweep": "让太阳扫过它"
+    },
+    "freezing": {
+      "open": "打开门",
+      "close": "关上门",
+      "dial": "设定温度"
+    },
+    "vacuum": {
+      "bag": "放进袋子里",
+      "pump": "按住抽出空气",
+      "seal": "密封袋子"
+    },
+    "pickling": {
+      "drop": "放进罐子里",
+      "choose": "倒入其中一种",
+      "pour": "按住倒入",
+      "twist": "拧上盖子"
+    },
+    "salting": {
+      "scoop": "舀起盐",
+      "spread": "把盐涂满食物"
+    },
+    "pasteurising": {
+      "choose": "选择程序",
+      "heat": "按住加热",
+      "cool": "马上冷却！"
+    }
+  },
+  "stages": {
+    "learn": {
+      "name": "学习",
+      "tagline": "两种方法，慢慢来。",
+      "brief": "微生物在食物上生长，食物就会腐坏。把每种食物送到能阻止微生物的站。"
+    },
+    "practice": {
+      "name": "练习",
+      "tagline": "四个站，提示变少。",
+      "brief": "又开了两个站，冷藏柜现在有两个设定。食物不再告诉你该用哪种方法——要看食物本身。"
+    },
+    "panic": {
+      "name": "手忙脚乱",
+      "tagline": "六个站全开，快！",
+      "brief": "所有站都在运作，食物腐坏得更快了。让微生物保持低活动。"
+    },
+    "recall": {
+      "name": "回忆",
+      "tagline": "标签消失，位置也换了。",
+      "brief": "站名不见了，机器也移动了。要靠机器的工作方式认出它。"
+    },
+    "why": {
+      "name": "原理",
+      "tagline": "说出科学原因。",
+      "brief": "每次保存之后，你都要说出这个方法改变了什么。"
+    },
+    "mastery": {
+      "name": "精通",
+      "tagline": "全部都会移动。",
+      "brief": "各站互换了位置。位置记忆没用了——你必须真正记住方法。"
+    }
+  },
+  "mechanisms": {
+    "removes_water": {
+      "short": "去除水分",
+      "long": "水分被去除，微生物无法轻易生长。"
+    },
+    "removes_air": {
+      "short": "去除空气",
+      "long": "空气被去除，微生物无法轻易繁殖。"
+    },
+    "low_temperature": {
+      "short": "低温",
+      "long": "低温减缓微生物的生长。"
+    },
+    "high_temperature": {
+      "short": "高温",
+      "long": "高温杀死微生物。"
+    },
+    "changes_environment": {
+      "short": "醋、糖或盐",
+      "long": "高酸性或高浓度的糖或盐可防止微生物生长。"
+    },
+    "seals_surface": {
+      "short": "覆盖表面",
+      "long": "表面被覆盖，微生物无法在上面生长。"
+    },
+    "heat_then_cool": {
+      "short": "加热后快速冷却",
+      "long": "高温杀死微生物，然后立即冷却至4°C。"
+    }
+  },
+  "methods": {
+    "drying": {
+      "name": "烘干／晒干",
+      "verb": "晒干它",
+      "mechanismShort": "去除水分",
+      "explain": "干燥去除食物中的水分。没有水分时，微生物无法生存或变得不活跃。",
+      "exam": "干燥通过去除水分来保存食物，使微生物无法轻易生长。",
+      "hint": "挂起来，让太阳把水分带走。",
+      "instruction": "把食物挂在钩子上，然后让太阳扫过它。",
+      "recallClue": "阳光和空气，水分不见了",
+      "detail": "食物可以在阳光下或烤箱中干燥。"
+    },
+    "freezing": {
+      "name": "冷冻",
+      "stationName": "冷冻／冷藏",
+      "verb": "冷冻它",
+      "mechanismShort": "低温",
+      "explain": "食物存放在0°C或以下。低温使微生物活动减弱，减缓它们的生长。",
+      "exam": "冷冻和冷藏保存食物，因为低温减缓微生物的生长。",
+      "hint": "放进去，设定在0°C或以下。",
+      "instruction": "打开门，放入食物，关上门，然后转动温度旋钮。",
+      "recallClue": "冷空气，门上结霜",
+      "detail": "冷冻是把食物存放在0°C或以下。例子：鸡肉、肉、虾、鱿鱼。",
+      "range": "0°C 及以下",
+      "dialWrong": "这个温度不适合这个食物。",
+      "dialCorrection": "{food}需要{range}。"
+    },
+    "cooling": {
+      "name": "冷藏",
+      "verb": "冷藏它",
+      "mechanismShort": "低温",
+      "explain": "食物存放在约4°C的低温。低温使微生物活动减弱，减缓它们的生长。",
+      "exam": "冷冻和冷藏保存食物，因为低温减缓微生物的生长。",
+      "hint": "放进去，设定在约4°C。",
+      "instruction": "打开门，放入食物，关上门，然后把旋钮转到4°C。",
+      "recallClue": "冷空气，门上结霜",
+      "detail": "冷藏是把食物存放在约4°C的低温。例子：水果、蔬菜、牛奶。",
+      "range": "约 4°C",
+      "dialWrong": "这个温度不适合这个食物。",
+      "dialCorrection": "{food}需要{range}。"
+    },
+    "vacuum": {
+      "name": "真空包装",
+      "verb": "包装它",
+      "mechanismShort": "去除空气",
+      "explain": "真空包装去除食物包装中的空气。包装内没有空气，微生物就无法繁殖。",
+      "exam": "真空包装通过去除空气来保存食物，使微生物无法繁殖。",
+      "hint": "装袋，然后把空气全部抽出来。",
+      "instruction": "按住抽气按钮直到空气表归零，然后密封。",
+      "recallClue": "袋子被吸得紧紧的",
+      "detail": "袋子被密封，空气无法再进入。"
+    },
+    "pickling": {
+      "name": "腌制",
+      "verb": "腌制它",
+      "mechanismShort": "醋、糖或盐",
+      "explain": "高酸性或高浓度的糖或盐可防止微生物生长。",
+      "exam": "腌制保存食物，因为醋、糖或盐可防止微生物生长。",
+      "hint": "放进罐子，然后倒入溶液。",
+      "instruction": "把食物放进去，倾斜瓶子把罐子装满，然后拧紧盖子。",
+      "recallClue": "罐子正在被液体填满",
+      "detail": "腌制是把食物浸泡在醋、糖溶液或盐溶液中。",
+      "chooseSolution": "倒入其中一种",
+      "solutions": {
+        "vinegar": "醋",
+        "sugar_solution": "糖溶液",
+        "salt_solution": "盐溶液"
+      },
+      "anySolutionOk": "三种都可以——醋、糖溶液和盐溶液都能阻止微生物。"
+    },
+    "salting": {
+      "name": "盐腌",
+      "verb": "撒盐",
+      "mechanismShort": "去除水分",
+      "explain": "盐去除食物中的水分，防止微生物生长。",
+      "exam": "盐腌通过去除食物中的水分来保存食物。",
+      "hint": "用大量的盐覆盖它。",
+      "instruction": "舀起盐，涂抹在食物上，直到完全覆盖。",
+      "recallClue": "一堆盐被涂抹上去",
+      "detail": "盐腌是用大量的盐覆盖食物。",
+      "coverage": "覆盖率"
+    },
+    "pasteurising": {
+      "name": "巴氏消毒",
+      "verb": "消毒它",
+      "mechanismShort": "加热后快速冷却",
+      "explain": "巴氏消毒利用热力杀死微生物，而不改变食物的味道或营养价值。",
+      "exam": "巴氏消毒通过加热杀死微生物，然后快速冷却来保存食物。",
+      "hint": "加热，然后马上冷却。",
+      "instruction": "按住加热直到程序完成，然后立即按冷却。",
+      "recallClue": "一根热管和一根冷管",
+      "detail": "在63°C加热30分钟，或在72°C加热15秒。然后立即冷却至4°C。",
+      "programmes": {
+        "p63": "63°C 30分钟",
+        "p72": "72°C 15秒"
+      },
+      "chooseProgramme": "选择一个程序",
+      "coolNow": "马上冷却！",
+      "coolTooLate": "太慢了——必须立即冷却。",
+      "eitherProgrammeOk": "两个程序都可以——63°C 30分钟，或 72°C 15秒。"
+    },
+    "boiling": {
+      "name": "煮沸",
+      "mechanismShort": "高温",
+      "explain": "煮沸利用高温杀死细菌和真菌等微生物。",
+      "exam": "煮沸保存食物，因为高温杀死微生物。",
+      "detail": "例子：仁当、果酱。"
+    },
+    "waxing": {
+      "name": "涂蜡",
+      "mechanismShort": "覆盖表面",
+      "explain": "涂蜡是用液体蜡涂在水果和蔬菜上，防止微生物在表面生长。",
+      "exam": "涂蜡通过覆盖表面防止微生物生长来保存食物。",
+      "detail": "例子：苹果、橙、番茄。"
+    },
+    "smoking": {
+      "name": "烟熏",
+      "mechanismShort": "用烟干燥",
+      "explain": "烟熏用烟把食物弄干。这个方法需要很长时间。",
+      "exam": "烟熏通过干燥食物、减少水分来保存食物。",
+      "detail": "例子：鱼、肉、香蕉。"
+    },
+    "canning": {
+      "name": "罐装与瓶装",
+      "mechanismShort": "杀菌并密封",
+      "explain": "用高温烹煮食物杀死微生物，然后存放在密封的罐或瓶中。",
+      "exam": "罐装和瓶装通过杀死微生物并把食物密封在密封容器中来保存食物。",
+      "detail": "例子：肉、水果、蔬菜。"
+    }
+  },
+  "foods": {
+    "fish": "鱼",
+    "prawns": "虾",
+    "squid": "鱿鱼",
+    "chicken": "鸡肉",
+    "meat": "肉",
+    "sausages": "香肠",
+    "mushrooms": "蘑菇",
+    "fruits": "水果",
+    "vegetables": "蔬菜",
+    "eggs": "蛋",
+    "milk": "牛奶",
+    "fruit_juice": "果汁",
+    "rendang": "仁当",
+    "jam": "果酱",
+    "apples": "苹果",
+    "oranges": "橙",
+    "tomatoes": "番茄",
+    "bananas": "香蕉"
+  },
+  "quiz": {
+    "whyMethod": "为什么{method}能保存食物？",
+    "whatChanges": "{method}改变了什么？",
+    "whichMethod": "我们刚才用了哪一种保存方法？",
+    "whichMethodForFood": "哪种方法可以保存{food}？",
+    "microbeQ": "微生物会怎么样？",
+    "microbeA": {
+      "removes_water": "没有水分就无法生长",
+      "removes_air": "没有空气就无法繁殖",
+      "low_temperature": "活动减弱，生长缓慢",
+      "high_temperature": "被高温杀死",
+      "changes_environment": "在醋、糖或盐中无法生长",
+      "heat_then_cool": "被高温杀死，再靠低温阻止"
+    }
+  },
+  "spoilage": {
+    "title": "食物腐坏",
+    "what": "食物腐坏是指食物变坏，不安全食用。",
+    "why": "食物腐坏是因为微生物的活动。",
+    "grow": "细菌和真菌容易在潮湿、暴露在空气中或存放不当的食物上生长。",
+    "unsafe": "腐坏的食物不安全食用。",
+    "signs": [
+      "有异味",
+      "味道不好",
+      "改变颜色",
+      "改变质感",
+      "发霉"
+    ],
+    "senses": {
+      "sight": "食物发霉、改变颜色",
+      "smell": "食物有腐臭味",
+      "taste": "食物味道不好",
+      "touch": "食物质感改变，变黏或变软"
+    }
+  },
+  "microbes": {
+    "strong": "强——腐坏很快！",
+    "weakening": "减弱中——变慢了",
+    "weak": "微弱——快没了",
+    "safe": "安全——食物已保存！",
+    "bacteria": "细菌",
+    "fungi": "真菌"
+  },
+  "importance": {
+    "title": "为什么保存食物很重要",
+    "items": [
+      "使食物保存更久",
+      "全年都能吃到",
+      "更容易储存和运输",
+      "防止食物浪费",
+      "确保灾区的食物供应"
+    ]
+  },
+  "a11y": {
+    "foodItem": "{food}，腐坏 {percent} %",
+    "stationButton": "{method}站",
+    "pickUp": "拿起",
+    "dropAt": "放到{method}",
+    "keyboardHelp": "用 Tab 选择食物，然后按数字键 1 到 6 送到对应的站。"
+  }
+}
