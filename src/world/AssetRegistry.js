@@ -1,5 +1,5 @@
 /**
- * Optional GLB assets for the six station machines.
+ * GLB assets: the six station machines, and the food models.
  *
  * THE CONTRACT
  * `tools/blender/build_stations.py` writes one GLB per station into
@@ -15,7 +15,15 @@
  * coils, the pickling bottles) cannot be driven as one merged mesh and would
  * only duplicate the procedural version that is still doing the work.
  *
- * WHY IT IS OPTIONAL
+ * FOODS
+ * `tools/blender/build_foods.py` writes one GLB per food model into
+ * `public/assets/models/foods/<model>.glb`. These are not optional in the same
+ * sense: where a food asset exists it is the shipped model, because silhouette
+ * is what makes a food nameable at counter size and the modelled shapes beat
+ * the procedural blobs outright. A missing file still falls back to the
+ * procedural builder, so a partial set ships fine.
+ *
+ * WHY THE STATIONS ARE OPTIONAL
  * Every station builds a complete procedural version first, and that stays as
  * the fallback. If a GLB is missing, malformed, or fails to load, the game is
  * unaffected — it simply keeps the procedural machine. Nothing about gameplay,
@@ -24,7 +32,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-const BASE = 'assets/models/stations/';
+const STATION_BASE = 'assets/models/stations/';
+const FOOD_BASE = 'assets/models/foods/';
 
 /** Blender node name -> the Station property the game animates. */
 export const MOVER_BINDINGS = {
@@ -37,7 +46,15 @@ export const MOVER_BINDINGS = {
 };
 
 class Registry {
-  constructor() {
+  /**
+   * @param {string} base            url prefix for this registry's files
+   * @param {() => string[]} available  ids the build found on disk
+   * @param {boolean} optIn          require ?models=1, or load whenever present
+   */
+  constructor(base, available, optIn = false) {
+    this.base = base;
+    this.available = available;
+    this.optIn = optIn;
     this.models = new Map();     // stationId -> gltf.scene (template)
     this.enabled = false;
     this.report = [];
@@ -54,37 +71,33 @@ class Registry {
   }
 
   /**
-   * Load whichever station GLBs the build found in public/assets/models/.
-   * `__PP_STATION_MODELS__` is baked in by vite.config.js, so the usual case —
-   * no models at all — costs zero requests and logs nothing.
+   * Load whichever GLBs the build found on disk. The id list is baked in by
+   * vite.config.js, so the empty case costs zero requests and logs nothing —
+   * probing at runtime would mean a red 404 per file on every boot.
    */
-  async preload(stationIds) {
-    // OPT-IN, and deliberately so. The visual gauntlet judged the Blender
-    // shells against the procedural machines they replace and the procedural
-    // ones won: they carry canvas-drawn displays, gauges and badges that the
-    // exported meshes have no equivalent for, so swapping them in trades a
-    // readable machine for a blank one. The pipeline stays wired and verified —
-    // `?models=1` runs it — but the shipped look is the one that reads better.
-    if (typeof location === 'undefined' ||
-        new URLSearchParams(location.search).get('models') !== '1') {
+  async preload(ids) {
+    // Stations are opt-in, and deliberately so: the visual gauntlet judged the
+    // Blender shells against the procedural machines and the procedural ones
+    // won, because they carry canvas-drawn displays and gauges the exported
+    // meshes have no equivalent for. Foods went the other way.
+    if (this.optIn && !(typeof location !== 'undefined' &&
+        new URLSearchParams(location.search).get('models') === '1')) {
       this.report.push('off (add ?models=1 to load Blender shells)');
       return this.report;
     }
-    const present = new Set(
-      (typeof __PP_STATION_MODELS__ !== 'undefined' ? __PP_STATION_MODELS__ : [])
-    );
-    const wanted = stationIds.filter((id) => present.has(id));
+    const present = new Set(this.available());
+    const wanted = ids.filter((id) => present.has(id));
     if (!wanted.length) return this.report;
     const loader = this._loader();
     await Promise.all(wanted.map(async (id) => {
       try {
-        const gltf = await loader.loadAsync(`${BASE}${id}.glb`);
+        const gltf = await loader.loadAsync(`${this.base}${id}.glb`);
         this.models.set(id, gltf.scene);
         this.report.push(`${id}: loaded`);
       } catch (e) {
-        // A broken asset must never take the game down; the procedural machine
+        // A broken asset must never take the game down; the procedural version
         // is still there.
-        console.warn(`[assets] ${id} failed to load, using procedural machine`, e);
+        console.warn(`[assets] ${id} failed to load, using the procedural build`, e);
         this.report.push(`${id}: failed`);
       }
     }));
@@ -92,11 +105,11 @@ class Registry {
     return this.report;
   }
 
-  has(stationId) { return this.models.has(stationId); }
+  has(id) { return this.models.has(id); }
 
-  /** A fresh clone, so six stations never share one mutated scene graph. */
-  instance(stationId) {
-    const tpl = this.models.get(stationId);
+  /** A fresh clone, so two users of one asset never share a mutated graph. */
+  instance(id) {
+    const tpl = this.models.get(id);
     if (!tpl) return null;
     const root = tpl.clone(true);
     root.traverse((o) => {
@@ -111,4 +124,14 @@ class Registry {
   }
 }
 
-export const assets = new Registry();
+/** Station shells — opt-in; see the header. */
+export const assets = new Registry(
+  STATION_BASE,
+  () => (typeof __PP_STATION_MODELS__ !== 'undefined' ? __PP_STATION_MODELS__ : []),
+  true);
+
+/** Food models — used whenever the file exists. */
+export const foodAssets = new Registry(
+  FOOD_BASE,
+  () => (typeof __PP_FOOD_MODELS__ !== 'undefined' ? __PP_FOOD_MODELS__ : []),
+  false);
