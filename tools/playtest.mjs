@@ -58,7 +58,7 @@ async function completePanel() {
       });
     } else if (kind === 'choice') {
       await p.click('.pp-panel .pp-choice').catch(() => {});
-      await sleep(1600);
+      await sleep(3200);   // the "all three are correct" note holds the step
     } else if (kind === 'hold') {
       const bb = await (await p.$('.pp-panel .pp-btn--hold'))?.boundingBox();
       if (bb) {

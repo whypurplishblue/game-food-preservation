@@ -78,7 +78,7 @@ async function runStation(stationId, foodFilter, dial = 'right') {
       });
       if (!urgent) await p.click('.pp-panel .pp-btn--tap').catch(() => {});
     }
-    else if (kind === 'choice') { await p.click('.pp-panel .pp-choice').catch(() => {}); await sleep(1600); }
+    else if (kind === 'choice') { await p.click('.pp-panel .pp-choice').catch(() => {}); await sleep(3200); }
     else if (kind === 'hold') {
       const bb = await (await p.$('.pp-panel .pp-btn--hold'))?.boundingBox();
       if (bb) {

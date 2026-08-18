@@ -20,16 +20,34 @@ export class Freezer extends Station {
     const shell = plastic(0xcfe0ee, { rough: 0.35, clearcoat: 0.7 });
     const shellBlue = plastic(PALETTE.freezing, { rough: 0.4, clearcoat: 0.6 });
 
-    // Cabinet
-    this.body.add(mesh(roundedBox(2.1, 2.25, 1.6, 0.14), shell, { y: 1.32 }));
+    // Cabinet — a CARCASS, not a block. Five panels around an opening, because
+    // the door has to reveal something: with a solid cabinet, opening the door
+    // showed a flat white face and the food loaded inside was sealed in
+    // geometry no one could see.
+    const W = 2.1, H = 2.25, D = 1.6, T = 0.17, CY = 1.32;
+    this.body.add(mesh(roundedBox(T, H, D, 0.06), shell, { x: -(W / 2 - T / 2), y: CY }));
+    this.body.add(mesh(roundedBox(T, H, D, 0.06), shell, { x: (W / 2 - T / 2), y: CY }));
+    this.body.add(mesh(roundedBox(W, T, D, 0.06), shell, { y: CY + H / 2 - T / 2 }));
+    this.body.add(mesh(roundedBox(W, T, D, 0.06), shell, { y: CY - H / 2 + T / 2 }));
+    this.body.add(mesh(roundedBox(W, H, T, 0.06), shell, { y: CY, z: -(D / 2 - T / 2) }));
     this.body.add(mesh(roundedBox(2.16, 0.34, 1.66, 0.1), shellBlue, { y: 2.36 }));
     this.body.add(mesh(roundedBox(2.2, 0.14, 1.7, 0.06), plastic(PALETTE.freezingDeep), { y: 0.28 }));  // header band
 
-    // Interior — dark and cold, so the open door reads instantly.
-    this.body.add(mesh(roundedBox(1.78, 1.78, 1.2, 0.06), matte(0x1d3a52, 0.7), { y: 1.28, z: 0.06 }));
+    // Interior — five panels around a real cavity, not a filled block. The old
+    // version was a solid box, so a food loaded into the freezer was buried
+    // inside it and the open door showed a slab of dark plastic.
+    const inner = matte(0x1d3a52, 0.7);
+    const IW = W - 2 * T, IH = H - 2 * T, ID = D - T;
+    this.body.add(mesh(roundedBox(IW, IH, 0.05, 0.02), inner, { y: CY, z: -(D / 2 - T) }));   // back wall
+    this.body.add(mesh(roundedBox(0.05, IH, ID, 0.02), inner, { x: -(IW / 2), y: CY, z: T / 2 }));
+    this.body.add(mesh(roundedBox(0.05, IH, ID, 0.02), inner, { x: (IW / 2), y: CY, z: T / 2 }));
+    this.body.add(mesh(roundedBox(IW, 0.05, ID, 0.02), inner, { y: CY + IH / 2, z: T / 2 }));
+    this.body.add(mesh(roundedBox(IW, 0.05, ID, 0.02), inner, { y: CY - IH / 2, z: T / 2 }));
+    // Glow at the BACK of the cavity: in front of the food it read as a veil
+    // over everything on the shelf.
     const innerGlow = mesh(new THREE.PlaneGeometry(1.7, 1.7), new THREE.MeshBasicMaterial({
       color: 0x8fd4ff, transparent: true, opacity: 0.22, toneMapped: false, depthWrite: false,
-    }), { y: 1.28, z: 0.62, cast: false, receive: false });
+    }), { y: CY, z: -(D / 2 - T) + 0.04, cast: false, receive: false });
     this.body.add(innerGlow);
     this.innerGlow = innerGlow;
     const coldLight = new THREE.PointLight(0x9fd8ff, 0, 3.5, 2);
@@ -175,11 +193,25 @@ export class Freezer extends Station {
    * muscle memory — and confirming the wrong band is a real, correctable
    * failure rather than a button that refuses to appear.
    */
+  /**
+   * The door opens on its own the moment the food arrives, so the player's
+   * first act is CLOSING it. Tapping "open" was a button that only ever had one
+   * correct answer; shutting the door is the part that means something — an
+   * open freezer is not preserving anything.
+   */
+  accept(food) {
+    const steps = super.accept(food);
+    this._targetDoor = 1;
+    this._loading = true;
+    this._loadT = 0;
+    this._puff();
+    return steps;
+  }
+
   getSteps(food) {
     const m = METHODS[this.activeMethodId] || METHODS.cooling;
     this._mode = m;
     return [
-      { kind: 'tap', id: 'open', textKey: 'station.freezing.open', icon: 'door' },
       { kind: 'tap', id: 'close', textKey: 'station.freezing.close', icon: 'door' },
       {
         kind: 'dial', id: 'temp', textKey: 'station.freezing.dial', icon: 'thermometer',
@@ -195,7 +227,7 @@ export class Freezer extends Station {
   }
 
   onStepProgress(index, progress, value) {
-    if (index === 2 && typeof value === 'number') {
+    if (index === 1 && typeof value === 'number') {
       this._tempC = value;
       // Neutral readout: showing "in band" live would hand over the answer the
       // child is supposed to retrieve.
@@ -214,12 +246,7 @@ export class Freezer extends Station {
   }
 
   onStepDone(index) {
-    if (index === 0) {
-      this._targetDoor = 1;
-      this._puff();
-      // Food glides onto the shelf.
-      this._loading = true; this._loadT = 0;
-    } else if (index === 1) {
+    if (index === 0) {                       // door closed
       this._targetDoor = 0;
       this._puff();
     }
@@ -269,7 +296,7 @@ export class Freezer extends Station {
 
     if (this._loading && this.food) {
       this._loadT += dt;
-      const target = this.root.localToWorld(new THREE.Vector3(0, 1.62, 0.0));
+      const target = this.root.localToWorld(new THREE.Vector3(0, 1.50, 0.05));
       this.food.group.position.lerp(target, 1 - Math.pow(0.004, dt));
       this.food.model.rotation.y += dt * 1.2;
     }

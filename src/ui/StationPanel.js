@@ -38,7 +38,7 @@ export class StationPanel {
    */
   start(opts) {
     this.stop();
-    this.active = { ...opts, index: 0, quality: 1, startedAt: performance.now() };
+    this.active = { ...opts, index: opts.index || 0, quality: opts.quality ?? 1, startedAt: performance.now() };
     this.el.hidden = false;
     this.el.style.setProperty('--accent', opts.methodColour || '#66bb6a');
     this._renderStep();
@@ -56,6 +56,20 @@ export class StationPanel {
 
   _detach() {
     if (this._cleanup) { this._cleanup(); this._cleanup = null; }
+  }
+
+  /**
+   * Everything needed to rebuild this interaction later.
+   *
+   * Pause used to call stop(), which left the food sitting in a busy station
+   * with no controls to finish it — the run was unrecoverable. The widgets are
+   * live DOM with their own timers, so rather than trying to freeze them, the
+   * panel hands back its state and is rebuilt from the step it was on.
+   */
+  snapshot() {
+    if (!this.active) return null;
+    const { steps, methodColour, onProgress, onStepDone, onComplete, onFail, index, quality } = this.active;
+    return { steps, methodColour, onProgress, onStepDone, onComplete, onFail, index, quality };
   }
 
   _nextStep(value) {
@@ -494,7 +508,13 @@ export class StationPanel {
           note.className = 'pp-choices__note';
           note.textContent = t(step.allCorrectKey);
           stage.appendChild(note);
-          setTimeout(() => { this._ackShown = false; this._nextStep(opt.id); }, 1300);
+          // Lock the chips while the note is up. Otherwise a second tap during
+          // the pause advances the step immediately AND the timer advances it
+          // again, skipping the next one entirely.
+          buttons.forEach((x) => { x.disabled = true; });
+          // Long enough to READ. This note is the one place the game says
+          // "all three solutions are correct", and at 1.3s it flashed past.
+          setTimeout(() => { this._ackShown = false; this._nextStep(opt.id); }, 2800);
           return;
         }
         this._nextStep(opt.id);

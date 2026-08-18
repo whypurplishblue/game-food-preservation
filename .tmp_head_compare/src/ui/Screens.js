@@ -9,7 +9,6 @@
  */
 import { t, tList, methodName, mechShort, methodMechShort, foodName, AVAILABLE_LANGS, getLang, setLang } from '../content/i18n.js';
 import { METHODS, FOODS, SCORING } from '../content/curriculum.js';
-import { CREDITS } from '../content/credits.js';
 import { sfx, audio } from '../core/Audio.js';
 
 const el = (tag, cls, html) => {
@@ -51,7 +50,7 @@ export class Screens {
   get isOpen() { return !this.el.hidden; }
 
   // ------------------------------------------------------------------ title
-  title({ onPlay, onFactBook, hasSave, onContinue, onCredits }) {
+  title({ onPlay, onFactBook, hasSave, onContinue }) {
     const langs = AVAILABLE_LANGS.map((l) =>
       `<button class="pp-lang${l === getLang() ? ' is-on' : ''}" data-lang="${l}">${l.toUpperCase()}</button>`).join('');
     const node = this._open(`
@@ -68,18 +67,16 @@ export class Screens {
         </div>
         <div class="pp-title__langs">${langs}</div>
         <p class="pp-title__hint">${t('a11y.keyboardHelp')}</p>
-        <button class="pp-title__credits" data-act="credits">© ${t('ui.credits')}</button>
       </div>`, { cls: 'is-title' });
 
     node.querySelector('[data-act="play"]').addEventListener('click', () => { sfx('ui.tap'); onPlay(); });
     node.querySelector('[data-act="fact"]').addEventListener('click', () => { sfx('ui.open'); onFactBook(); });
     node.querySelector('[data-act="continue"]')?.addEventListener('click', () => { sfx('ui.tap'); onContinue(); });
-    node.querySelector('[data-act="credits"]').addEventListener('click', () => { sfx('ui.open'); onCredits(); });
     for (const b of node.querySelectorAll('.pp-lang')) {
       b.addEventListener('click', () => {
         setLang(b.dataset.lang);
         sfx('ui.tap');
-        this.title({ onPlay, onFactBook, hasSave, onContinue, onCredits });
+        this.title({ onPlay, onFactBook, hasSave, onContinue });
       });
     }
   }
@@ -186,33 +183,8 @@ export class Screens {
     node.querySelector('[data-act="close"]').addEventListener('click', () => { sfx('ui.back'); onClose(); });
   }
 
-  // -------------------------------------------------------------- credits
-  credits(onClose) {
-    // Sourced from src/content/credits.js — the single place attribution
-    // lives. tools/check-credits.mjs keeps this list honest against what is
-    // actually on disk, so this screen never drifts out of date.
-    const items = CREDITS.map((c) => `
-      <li class="pp-credits__item">
-        <b><a href="${c.sourceUrl}" target="_blank" rel="noopener noreferrer">${c.title}</a></b>
-        <span>${t('ui.creditsBy', { author: c.author })}</span>
-        <a class="pp-credits__license" href="${c.licenseUrl}" target="_blank" rel="noopener noreferrer">${c.license}</a>
-      </li>`).join('');
-    const node = this._open(`
-      <div class="pp-fact pp-credits">
-        <header class="pp-fact__top">
-          <h2>© ${t('ui.credits')}</h2>
-          <button class="pp-icon-btn" data-act="close" aria-label="${t('ui.close')}">✕</button>
-        </header>
-        <div class="pp-fact__scroll">
-          <p class="pp-credits__intro">${t('ui.creditsIntro')}</p>
-          <ul class="pp-credits__list">${items}</ul>
-        </div>
-      </div>`, { escapable: true, onEscape: onClose, cls: 'is-fact' });
-    node.querySelector('[data-act="close"]').addEventListener('click', () => { sfx('ui.back'); onClose(); });
-  }
-
   // ------------------------------------------------------------------ pause
-  pause({ onResume, onRestart, onMenu, onFactBook, onCredits, settings, onSetting }) {
+  pause({ onResume, onRestart, onMenu, onFactBook, settings, onSetting }) {
     const node = this._open(`
       <div class="pp-pause">
         <h2>${t('ui.pause')}</h2>
@@ -227,13 +199,11 @@ export class Screens {
           <button class="pp-btn" data-act="restart">${t('ui.restart')}</button>
           <button class="pp-btn" data-act="menu">${t('ui.quit')}</button>
         </div>
-        <button class="pp-title__credits" data-act="credits">© ${t('ui.credits')}</button>
       </div>`, { escapable: true, onEscape: onResume, cls: 'is-pause' });
     node.querySelector('[data-act="resume"]').addEventListener('click', () => { sfx('ui.tap'); onResume(); });
     node.querySelector('[data-act="restart"]').addEventListener('click', () => { sfx('ui.tap'); onRestart(); });
     node.querySelector('[data-act="menu"]').addEventListener('click', () => { sfx('ui.back'); onMenu(); });
     node.querySelector('[data-act="fact"]').addEventListener('click', () => { sfx('ui.open'); onFactBook(); });
-    node.querySelector('[data-act="credits"]').addEventListener('click', () => { sfx('ui.open'); onCredits(); });
     for (const c of node.querySelectorAll('[data-set]')) {
       c.addEventListener('change', () => onSetting(c.dataset.set, c.checked));
     }

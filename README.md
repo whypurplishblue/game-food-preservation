@@ -23,14 +23,37 @@ keyboard all work.
 
 ## The source of truth
 
-Every educational claim comes from the supplied notes,
-*Year 6 Science — Unit 8: Food Preservation Technology*. The exam sentences are
-**verbatim**. Each method carries a `sourceRef` (`§5B`, `§5E`, …) pointing at the
-section it came from, so the game can be audited against the handout.
+Every educational claim comes from the supplied notes, which live in the repo at
+`docs/y6-sci-u8.md`. The exam sentences are **verbatim**, and each method carries
+a `sourceRef` (`§5B`, `§5E`, …) pointing at the section it came from.
+
+That is checkable, not just claimed:
+
+```bash
+node tools/check-notes.mjs
+```
+
+It parses the handout and diffs it against the game — every method's example
+foods, every exam sentence word for word, the spoilage signs, the senses table,
+the importance list, the temperature bands, and the §10 Chinese glossary against
+the `zh` locale. If it disagrees, the notes win.
 
 The notes list ten methods. Six are playable stations; the other four (boiling,
 waxing, smoking, canning and bottling) are in the Fact Book so the unit is
 covered end to end.
+
+### Two food lists per method
+
+`foods` is the notes' own examples — the exam answers, and `check-notes.mjs`
+holds them to §5 exactly. `alsoWorks` is pairings
+that are true in a kitchen but are not this method's example in Unit 8:
+sausages in the freezer, meat on the drying rack, eggs in the pickling jar.
+
+The game accepts both, because telling a child that a true thing is false to
+protect a worksheet is the wrong trade. It scores an `alsoWorks` pairing at
+half, and says so: *"That works in a real kitchen! In Unit 8, Sausages is the
+Vacuum Packing example."* The Fact Book and every quiz answer stay strictly on
+`foods`, so what gets rehearsed for the exam is unchanged.
 
 **Freezing and cooling are two methods, not one.** §5E gives them different
 temperatures and different food lists, and §7 lists them as separate rows. They
@@ -168,10 +191,13 @@ behind the same call sites.
 ## Tools
 
 ```bash
+node tools/check-notes.mjs     # game content vs docs/y6-sci-u8.md, line by line
 node tools/check-content.mjs   # curriculum + quiz + locale coverage test
 node tools/probe.mjs           # drives all six interactions, asserts outcomes
 node tools/shoot.mjs           # screenshots each stage and station
 node tools/quick.mjs           # fast single-screen visual check
+node tools/playtest.mjs        # plays a whole stage by mouse, asserts it ends
+node tools/pausetest.mjs       # pause mid-interaction must be recoverable
 node tools/models.mjs          # A/B: Blender shells vs procedural machines
 PP_NO_GLB=1 node tools/models.mjs
 ```
