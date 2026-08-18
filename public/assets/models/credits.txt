@@ -1,0 +1,3 @@
+shrimp_low_poly.glb	"Shrimp [Low Poly]" (https://skfb.ly/oKoOB) by Fecalis is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+low_poly_fish.glb	"low poly fish" (https://skfb.ly/pK8ZJ) by mastergames2435 is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+low_poly_meat.glb 	"Cartoon Raw Steak Lowpoly" (https://skfb.ly/oxQuz) by Seth is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
