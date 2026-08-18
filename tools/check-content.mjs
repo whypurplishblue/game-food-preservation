@@ -22,6 +22,9 @@ page.on('pageerror', (e) => consoleErrors.push(String(e)));
 page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
 
 await page.goto('http://localhost:4173/', { waitUntil: 'networkidle' });
+// Poll rather than sleep: boot now waits on the food GLBs, and under software
+// rendering that is slow enough that a fixed delay is a coin toss.
+await page.waitForFunction(() => !!window.__pp, null, { timeout: 45000 });
 await new Promise((r) => setTimeout(r, 1500));
 
 const results = await page.evaluate(() => {

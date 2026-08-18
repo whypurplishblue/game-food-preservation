@@ -8,11 +8,12 @@ import * as QUIZ from './content/quiz.js';
 import * as I18N from './content/i18n.js';
 import { injectCssVariables } from './world/Palette.js';
 import { Stage3D } from './world/Stage3D.js';
+import * as FOODFACTORY from './world/FoodFactory.js';
 import { Kitchen } from './world/Kitchen.js';
 import { Particles, Popups } from './fx/Effects.js';
 import { Input } from './core/Input.js';
 import { Game } from './core/Game.js';
-import { assets, MOVER_BINDINGS } from './world/AssetRegistry.js';
+import { assets, foodAssets, MOVER_BINDINGS } from './world/AssetRegistry.js';
 import { HUD } from './ui/HUD.js';
 import { StationPanel } from './ui/StationPanel.js';
 import { QuizCard } from './ui/QuizCard.js';
@@ -66,8 +67,11 @@ async function boot() {
   // with procedural machines, and a slow or missing asset host must never hold
   // up the boot, so the probe is bounded.
   await Promise.race([
-    assets.preload(Object.keys(MOVER_BINDINGS)),
-    new Promise((r) => setTimeout(r, 2500)),
+    Promise.all([
+      assets.preload(Object.keys(MOVER_BINDINGS)),
+      foodAssets.preload(FOODFACTORY.FOOD_MODEL_LIST),
+    ]),
+    new Promise((r) => setTimeout(r, 4000)),
   ]);
   if (import.meta.env?.DEV && assets.report.length) console.info('[assets]', assets.report.join(', '));
 
@@ -122,7 +126,9 @@ async function boot() {
   // Expose for the automated visual/perf harness.
   window.__pp = {
     game, stage3d, kitchen, input, hud, validation: problems,
+    foodFactory: FOODFACTORY,
     assetReport: assets.report,
+    foodAssetReport: foodAssets.report,
     // Content surface for tools/check-content.mjs.
     content: { ...CURRICULUM, ...QUIZ, i18n: I18N },
     get fps() { return fps; },

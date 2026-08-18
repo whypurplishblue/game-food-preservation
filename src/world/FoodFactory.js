@@ -15,6 +15,7 @@
  * guaranteed fallback so the game is never blocked on the asset pipeline.
  */
 import * as THREE from 'three';
+import { foodAssets } from './AssetRegistry.js';
 import { foodMaterial, matte, plastic, metal, glass, roundedBox, cyl, sphere, capsule, torus, blob, mesh } from './Materials.js';
 
 // ------------------------------------------------------------------- faces
@@ -371,11 +372,31 @@ const BUILDERS = {
 };
 
 export function buildFoodModel(modelId) {
-  const build = BUILDERS[modelId] || BUILDERS.fruits;
-  const g = build();
-  g.traverse((o) => { if (o.isMesh && !o.userData.isFace) { o.castShadow = true; o.receiveShadow = true; } });
-  g.userData.face = g.children.find((c) => c.userData.isFace) || null;
+  // A Blender-modelled food wins outright where one exists: the whole job of a
+  // food model is to be nameable in a second at counter size, and that is
+  // silhouette. Modelled foods carry no face decal either — the reference art
+  // has an anatomical eye, and a camera-facing smiley plane sits in the middle
+  // of the shape it is supposed to be helping you read.
+  const g = foodAssets.has(modelId) ? foodAssets.instance(modelId) : (BUILDERS[modelId] || BUILDERS.fruits)();
+
+  // Faces off, on every food. They were a fourth channel for the spoilage
+  // timer, but a Year 6 audience is not a preschool one, the microorganisms are
+  // the characters in this story and already have faces, and a camera-facing
+  // decal parked in the middle of a silhouette actively fights the thing it is
+  // sitting on — half of why the squid read as a piglet. Spoilage still shows
+  // as desaturation, mould patches, stink wisps, the swarm and the meter.
+  for (const child of [...g.children]) if (child.userData.isFace) child.removeFromParent();
+  g.userData.face = null;
+
+  g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  if (!g.userData.radius) {
+    const box = new THREE.Box3().setFromObject(g);
+    g.userData.radius = box.getSize(new THREE.Vector3()).length() * 0.42;
+  }
   return g;
 }
 
 export const FOOD_MODEL_IDS = Object.keys(BUILDERS);
+
+/** Which foods the modelled assets cover — used by the asset preloader. */
+export const FOOD_MODEL_LIST = FOOD_MODEL_IDS;

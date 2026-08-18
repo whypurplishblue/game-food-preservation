@@ -40,6 +40,13 @@ await p.evaluate(() => window.__pp.pump(1.2));
 await p.screenshot({ path: `${OUT}/00-wide-${suffix}.png`, timeout: 25000 });
 console.log('shot wide');
 
+// Freeze the game's own render loop. It keeps scheduling frames even in a
+// throttled headless browser, and one of them lands between the harness's
+// render and the screenshot — which is how a hand-placed camera ends up
+// photographing the room from the play framing instead.
+await p.evaluate(() => { window.requestAnimationFrame = () => 0; });
+await new Promise((r) => setTimeout(r, 400));
+
 const ids = ['DryingRack', 'Freezer', 'VacuumSealer', 'PicklingJar', 'SaltTable', 'Pasteuriser'];
 for (const id of ids) {
   await p.evaluate((sid) => {
@@ -65,7 +72,9 @@ for (const id of ids) {
     const fx = Math.sin(ry), fz = Math.cos(ry);
     g.stage3d.camera.position.set(c.x + fx * 8.2, 4.4, c.z + fz * 8.2);
     g.stage3d.camera.lookAt(c.x, 1.6, c.z);
-    g.stage3d.render(0);
+    // Bypass stage3d.render(): it re-runs updateCamera and would ease the
+    // camera back to the play framing before the frame is drawn.
+    g.stage3d.renderer.render(g.stage3d.scene, g.stage3d.camera);
   }, id);
   await p.screenshot({ path: `${OUT}/${id}-${suffix}.png`, timeout: 25000 });
   console.log('shot', id);

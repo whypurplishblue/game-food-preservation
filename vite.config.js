@@ -10,10 +10,10 @@ import path from 'node:path';
  * lines in the console on every boot of the normal case, so the list is baked
  * in instead: drop files into public/assets/models/stations/ and restart.
  */
-function stationModels() {
-  const dir = path.resolve('public/assets/models/stations');
+function glbsIn(rel) {
   try {
-    return fs.readdirSync(dir).filter((f) => f.endsWith('.glb')).map((f) => f.slice(0, -4));
+    return fs.readdirSync(path.resolve(rel))
+      .filter((f) => f.endsWith('.glb')).map((f) => f.slice(0, -4));
   } catch {
     return [];
   }
@@ -21,7 +21,10 @@ function stationModels() {
 
 export default defineConfig({
   base: './',
-  define: { __PP_STATION_MODELS__: JSON.stringify(stationModels()) },
+  define: {
+    __PP_STATION_MODELS__: JSON.stringify(glbsIn('public/assets/models/stations')),
+    __PP_FOOD_MODELS__: JSON.stringify(glbsIn('public/assets/models/foods')),
+  },
   server: { host: true, port: 5173 },
   build: {
     target: 'es2020',

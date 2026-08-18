@@ -187,6 +187,10 @@ screenshot mid-transition.
 
 ## The Blender pipeline
 
+Two builders, and they landed on opposite sides of the same question.
+
+### Stations
+
 `tools/blender/build_stations.py` builds all six machines from primitives and
 exports one GLB per station, named exactly as the game names it:
 
@@ -220,8 +224,40 @@ Closing that gap means giving the Blender models their own baked textures rather
 than flat material colours. The loader, the naming contract and the mover
 bindings are all in place for that work; nothing about it needs gameplay changes.
 
-Current cost of the set: 35 476 triangles, 991 KB across six files, no Draco —
-the decoder would outweigh what it saves at this size and the game works offline.
+### Foods — these ones ship
+
+`tools/blender/build_foods.py` builds fish, prawns, squid and chicken and
+exports to `public/assets/models/foods/`. **These are on by default**, because
+here the modelled version wins outright.
+
+The procedural fish, prawn and squid were all the same soft blob primitive in
+different colours with a face decal on the front, so they collapsed into each
+other — a food has about a second to be named at counter size, and that second
+is spent on silhouette. A forked tail, an overlapping shell curl with a fan, a
+mantle with trailing arms and a bone sticking out of a drumstick are shapes, and
+shapes are what modelling is for.
+
+It took five passes, and the failures are worth recording because they are all
+silhouette failures:
+
+| Pass | What broke |
+| --- | --- |
+| 1 | sRGB palette fed to Blender's linear Base Color — everything pastel |
+| 1 | a trig taper profile went negative past π and made NaN vertices; the drumstick came out a sphere |
+| 2 | prawn built as equally spaced beads — reads as a caterpillar |
+| 3 | fish tail lobes floated clear of the body — two loose triangles |
+| 4 | prawn rebuilt as one smooth bent tube — reads as a bird |
+| 5 | prawn as overlapping stretched plates on a flat arc — reads as a prawn |
+
+**Faces are gone from every food.** They were a fourth channel for the spoilage
+timer, but the microorganisms are the characters here and already have faces,
+and a camera-facing decal in the middle of a silhouette fights the shape it sits
+on. Spoilage still reads four ways: desaturation, mould patches, stink wisps and
+the swarm.
+
+Cost: stations 35 476 triangles / 991 KB (not loaded by default), foods 3 708
+triangles / 373 KB. No Draco either way — the decoder would outweigh what it
+saves at this size, and the game has to work offline.
 
 ---
 
@@ -230,11 +266,11 @@ the decoder would outweigh what it saves at this size and the game works offline
 - **The Blender shells lose to the procedural machines** and are therefore
   opt-in — see the section above. The pipeline itself is finished and verified
   end to end; the models need baked textures before they are worth switching on.
-- **Foods are procedural only.** `FoodFactory` is structured the same way, so
-  the same GLB route is open for them, but no food assets have been built.
+- **Eight foods are still procedural.** Four are modelled. Meat is the weakest
+  of the rest — a pink disc on a white rim reads as a fried egg — and the carrot
+  in `vegetables` hides behind the broccoli at the play angle.
 - **Chinese and Malay need a teacher's eye.** The terminology comes from §10 of
   the notes and standard KSSR usage, but the gameplay chrome around it is a
   translation, not a review.
 - Boiling, waxing, smoking and canning are Fact Book only. Promoting one to a
   station needs a `station` class and a slot; the data is already there.
-"# game-food-preservation" 
