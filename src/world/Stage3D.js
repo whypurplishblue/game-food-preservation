@@ -86,7 +86,7 @@ export class Stage3D {
     this.projScreenMatrix = new THREE.Matrix4();
     this._lights();
     this._environment();
-    if (quality !== 'low') this._post();
+    if (quality === 'high') this._post();
 
     this._onResize = this.resize.bind(this);
     window.addEventListener('resize', this._onResize);
@@ -103,6 +103,16 @@ export class Stage3D {
     if (this.quality === 'low') return Math.min(1.25, dpr);
     if (this.quality === 'medium') return Math.min(1.6, dpr);
     return Math.min(2, dpr);
+  }
+
+  _shadowMapSize() {
+    if (this.quality === 'low') return 512;
+    if (this.quality === 'medium') {
+      const w = window.innerWidth;
+      return w < 720 ? 512 : 1024;
+    }
+    const w = window.innerWidth;
+    return w < 1080 ? 1024 : 2048;
   }
 
   /** Vertical gradient sky so the backdrop isn't a flat fill. */
@@ -128,7 +138,7 @@ export class Stage3D {
     const key = new THREE.DirectionalLight(0xfff0d0, 1.75);
     key.position.set(-9, 15, 10);
     key.castShadow = this.quality !== 'low';
-    const s = this.quality === 'high' ? 2048 : 1024;
+    const s = this._shadowMapSize();
     key.shadow.mapSize.set(s, s);
     key.shadow.camera.near = 1;
     key.shadow.camera.far = 40;
