@@ -14,7 +14,7 @@
 import * as THREE from 'three';
 import { Station } from './Station.js';
 import { PALETTE } from '../Palette.js';
-import { plastic, metal, matte, hot, roundedBox, cyl, sphere, mesh } from '../Materials.js';
+import { plastic, metal, matte, hot, roundedBox, cyl, sphere, mesh, clearcoatFor } from '../Materials.js';
 import { METHODS } from '../../content/curriculum.js';
 
 export class Smokehouse extends Station {
@@ -72,7 +72,10 @@ export class Smokehouse extends Station {
     // Pane kept light: a smoked-glass door looked right and hid the food, which
     // is the one thing the door is there to show.
     const pane = mesh(roundedBox(1.32, 0.9, 0.05, 0.04), new THREE.MeshPhysicalMaterial({
-      color: 0xd8c6b4, roughness: 0.18, transmission: 0.86, transparent: true,
+      // Real transmission renders a background pass every frame — the single
+      // most expensive material feature in three.js. Fall back to a plain
+      // translucent pane off the high tier.
+      color: 0xd8c6b4, roughness: 0.18, transmission: clearcoatFor(0.86), transparent: true,
       opacity: 0.34, thickness: 0.12,
     }), { z: 0.03 });
     door.add(pane);

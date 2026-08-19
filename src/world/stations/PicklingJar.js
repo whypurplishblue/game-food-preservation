@@ -13,7 +13,7 @@
 import * as THREE from 'three';
 import { Station } from './Station.js';
 import { PALETTE } from '../Palette.js';
-import { plastic, metal, matte, glass, roundedBox, cyl, sphere, torus, mesh } from '../Materials.js';
+import { plastic, metal, matte, glass, roundedBox, cyl, sphere, torus, mesh, clearcoatFor } from '../Materials.js';
 
 const SOLUTION_LOOK = {
   vinegar:        { colour: 0xf2e18a, bottle: 0xd9c15a, fizz: 0xfff6c4 },
@@ -37,7 +37,7 @@ export class PicklingJar extends Station {
     jar.scale.setScalar(1.12);
     const jarGlass = new THREE.MeshPhysicalMaterial({
       color: 0xdff0e8, roughness: 0.04, transparent: true, opacity: 0.28,
-      clearcoat: 1, clearcoatRoughness: 0.02, side: THREE.DoubleSide, metalness: 0, ior: 1.5,
+      clearcoat: clearcoatFor(1), clearcoatRoughness: 0.02, side: THREE.DoubleSide, metalness: 0, ior: 1.5,
     });
     jar.add(mesh(cyl(0.46, 0.44, 1.05, 28, true), jarGlass, { y: 0.52, cast: false }));
     jar.add(mesh(cyl(0.44, 0.44, 0.04, 24), jarGlass, { y: 0.02, cast: false }));
@@ -50,7 +50,7 @@ export class PicklingJar extends Station {
     // Liquid — a cylinder whose height and colour we animate.
     this.liquidMat = new THREE.MeshPhysicalMaterial({
       color: 0xdff0e8, roughness: 0.08, transparent: true, opacity: 0.72,
-      transmission: 0, clearcoat: 1, metalness: 0,
+      transmission: 0, clearcoat: clearcoatFor(1), metalness: 0,
     });
     this.liquid = mesh(cyl(0.42, 0.41, 1.0, 24), this.liquidMat, { y: 0.5, cast: false });
     this.liquid.scale.y = 0.001;

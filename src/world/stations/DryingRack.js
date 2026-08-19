@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { Station } from './Station.js';
 import { PALETTE } from '../Palette.js';
-import { plastic, metal, matte, roundedBox, cyl, sphere, torus, blob, mesh } from '../Materials.js';
+import { plastic, metal, matte, roundedBox, cyl, sphere, torus, blob, mesh, clearcoatFor } from '../Materials.js';
 
 export class DryingRack extends Station {
   build() {
@@ -105,7 +105,7 @@ export class DryingRack extends Station {
     this.drops = [];
     const dropMat = new THREE.MeshPhysicalMaterial({
       color: 0x9fdcff, roughness: 0.05, transparent: true, opacity: 0.9,
-      clearcoat: 1, transmission: 0, metalness: 0,
+      clearcoat: clearcoatFor(1), transmission: 0, metalness: 0,
     });
     for (let i = 0; i < 18; i++) {
       const d = mesh(sphere(0.055, 8, 6), dropMat, { cast: false, receive: false });

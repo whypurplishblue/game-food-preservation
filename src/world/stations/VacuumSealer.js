@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { Station } from './Station.js';
 import { PALETTE } from '../Palette.js';
-import { plastic, metal, matte, glass, roundedBox, cyl, sphere, torus, mesh } from '../Materials.js';
+import { plastic, metal, matte, glass, roundedBox, cyl, sphere, torus, mesh, clearcoatFor } from '../Materials.js';
 
 export class VacuumSealer extends Station {
   build() {
@@ -45,7 +45,7 @@ export class VacuumSealer extends Station {
     // The bag. Built as a box we squash on the Y and Z axes during the pump.
     const bagMat = new THREE.MeshPhysicalMaterial({
       color: 0xe8eef5, roughness: 0.1, transparent: true, opacity: 0.42,
-      clearcoat: 1, clearcoatRoughness: 0.05, side: THREE.DoubleSide, metalness: 0,
+      clearcoat: clearcoatFor(1), clearcoatRoughness: 0.05, side: THREE.DoubleSide, metalness: 0,
     });
     this.bag = mesh(roundedBox(1.25, 0.62, 0.95, 0.16), bagMat, { y: 1.32, z: 0.12, cast: false });
     this.bag.visible = false;

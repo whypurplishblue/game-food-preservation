@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 import { Station } from './Station.js';
 import { PALETTE } from '../Palette.js';
-import { plastic, metal, matte, roundedBox, cyl, sphere, torus, blob, mesh } from '../Materials.js';
+import { plastic, metal, matte, roundedBox, cyl, sphere, torus, blob, mesh, clearcoatFor } from '../Materials.js';
 
 export class SaltTable extends Station {
   build() {
@@ -86,7 +86,7 @@ export class SaltTable extends Station {
     // Water beads drawn OUT of the food — the mechanism.
     this.beads = [];
     const beadMat = new THREE.MeshPhysicalMaterial({
-      color: 0x9fdcff, roughness: 0.05, transparent: true, opacity: 0.9, clearcoat: 1, metalness: 0,
+      color: 0x9fdcff, roughness: 0.05, transparent: true, opacity: 0.9, clearcoat: clearcoatFor(1), metalness: 0,
     });
     for (let i = 0; i < 14; i++) {
       const b = mesh(sphere(0.05, 8, 6), beadMat.clone(), { cast: false, receive: false });
