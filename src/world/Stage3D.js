@@ -82,6 +82,8 @@ export class Stage3D {
     this.scene.add(this.cameraRig);
     this.setCameraFraming('play');
 
+    this.frustum = new THREE.Frustum();
+    this.projScreenMatrix = new THREE.Matrix4();
     this._lights();
     this._environment();
     if (quality !== 'low') this._post();
@@ -286,8 +288,18 @@ export class Stage3D {
   render(dt) {
     this.updateCamera(dt);
     this._applyShake();
+    this._updateFrustum();
     if (this.composer) this.composer.render(dt);
     else this.renderer.render(this.scene, this.camera);
+  }
+
+  _updateFrustum() {
+    this.projScreenMatrix.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
+    this.frustum.setFromProjectionMatrix(this.projScreenMatrix);
+  }
+
+  isPointInViewFrustum(pos, margin = 2) {
+    return this.frustum.containsPoint(pos) || pos.distanceTo(this.camera.position) < margin;
   }
 
   dispose() {
