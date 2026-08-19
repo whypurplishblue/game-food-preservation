@@ -9,7 +9,7 @@
  */
 import * as THREE from 'three';
 import {
-  STAGES, METHODS, FOODS, SCORING, isTaughtPairing,
+  STAGES, METHODS, FOODS, FOOD_METHODS, SCORING, isTaughtPairing,
   STATION_METHODS, stationsFor, methodAtStation,
 } from '../content/curriculum.js';
 import { t, methodName, foodName, mechShort, methodMechShort } from '../content/i18n.js';
@@ -520,7 +520,12 @@ export class Game {
       // method they have just demonstrated they can do. Held off until the
       // banner above has cleared, so the quiz backdrop doesn't bury it.
       setTimeout(() => {
-        this._askQuiz(Math.random() < 0.45 ? this._weakestMethod(methodId) : methodId, food.foodId);
+        // Only bias toward the weakest method when it is actually valid for
+        // this food — otherwise a food-association question would mark a
+        // method the notes never pair with this food as the "correct" one.
+        const weakest = this._weakestMethod(methodId);
+        const biased = (FOOD_METHODS[food.foodId] || []).includes(weakest);
+        this._askQuiz(Math.random() < 0.45 && biased ? weakest : methodId, food.foodId);
       }, bannerClearMs);
     } else {
       this.input.setEnabled(true);
