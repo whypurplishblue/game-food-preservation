@@ -22,7 +22,7 @@
  */
 import * as THREE from 'three';
 import { PALETTE } from '../Palette.js';
-import { plastic, metal, matte, roundedBox, cyl, mesh, labelTexture, blobShadow } from '../Materials.js';
+import { plastic, metal, matte, roundedBox, cyl, mesh, labelTexture, blobShadow, mergeStatic } from '../Materials.js';
 import { METHODS } from '../../content/curriculum.js';
 import { assets, MOVER_BINDINGS } from '../AssetRegistry.js';
 import { t, methodName, methodClue } from '../../content/i18n.js';
@@ -115,6 +115,31 @@ export class Station {
     this.body.add(ring);
   }
 
+  /**
+   * Merge everything this machine does not animate into one mesh per material.
+   *
+   * A station is authored as fifty-odd small meshes — bricks, bolts, panels,
+   * shelves — and every one was its own draw call. Eight machines meant ~900
+   * draw calls a frame before a single food appeared: most of the frame budget
+   * spent submitting geometry nobody is moving. The kitchen has been batched
+   * this way from the start; the machines never were.
+   *
+   * Anything the station holds a reference to, and everything above it in the
+   * tree, is marked dynamic and left alone — so doors still swing, dials still
+   * turn, embers still glow.
+   */
+  batchStatic() {
+    const dyn = this._dynamicObjects();
+    const mark = (o) => { o.userData.dynamic = true; for (const c of o.children) mark(c); };
+    for (const d of dyn) {
+      mark(d);
+      let n = d.parent;
+      while (n && n !== this.body) { n.userData.dynamic = true; n = n.parent; }
+    }
+    mergeStatic(this.body);
+    return this;
+  }
+
   // ------------------------------------------------------------- GLB shells
   /**
    * Swap the *static* half of this machine for a Blender-authored GLB, keeping
@@ -182,7 +207,10 @@ export class Station {
   _dynamicObjects() {
     const out = [];
     for (const key of Object.keys(this)) {
-      if (key === 'root' || key === 'body' || key === 'model') continue;
+      // `_procParts` is the full list of everything build() made, so counting it
+      // marked the entire machine as animated — which silently disabled both the
+      // static batching and the GLB prune that depend on this list.
+      if (key === 'root' || key === 'body' || key === 'model' || key === '_procParts') continue;
       const v = this[key];
       if (v?.isObject3D) out.push(v);
       else if (Array.isArray(v)) for (const e of v) if (e?.isObject3D) out.push(e);

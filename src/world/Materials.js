@@ -226,10 +226,18 @@ export function labelTexture(text, {
  *
  * Anything that animates must opt out with `userData.dynamic = true`.
  */
+const _tmpMat = new THREE.Matrix4();
+
 export function mergeStatic(root) {
   const buckets = new Map();
 
   root.updateWorldMatrix(true, true);
+  // Bake each mesh's transform RELATIVE TO ROOT, not its world matrix. The
+  // merged mesh is parented to root, so baking world would apply root's own
+  // transform twice — invisible for the kitchen, which sits at the origin at
+  // identity scale, but the station bodies are scaled 1.22 and would have come
+  // out half again too big.
+  const toLocal = root.matrixWorld.clone().invert();
   root.traverse((o) => {
     if (!o.isMesh || o.userData.dynamic || o.userData.merged) return;
     if (Array.isArray(o.material)) return;
@@ -241,7 +249,7 @@ export function mergeStatic(root) {
       buckets.set(key, { material: o.material, cast: o.castShadow, receive: o.receiveShadow, geos: [], meshes: [] });
     }
     const g = o.geometry.clone();
-    g.applyMatrix4(o.matrixWorld);
+    g.applyMatrix4(_tmpMat.multiplyMatrices(toLocal, o.matrixWorld));
     // mergeGeometries requires identical attribute sets across inputs.
     for (const name of Object.keys(g.attributes)) {
       if (!['position', 'normal', 'uv'].includes(name)) g.deleteAttribute(name);
@@ -258,8 +266,14 @@ export function mergeStatic(root) {
   let batches = 0, removed = 0;
   for (const b of buckets.values()) {
     if (b.geos.length < 2) { b.geos.forEach((g) => g.dispose()); continue; }
+    // mergeGeometries needs every input to agree on having an index or not,
+    // and station geometry mixes the two (a PlaneGeometry is indexed, a merged
+    // one may not be). Normalise the bucket rather than dropping the batch.
+    const anyUnindexed = b.geos.some((g) => !g.index);
+    const geos = anyUnindexed ? b.geos.map((g) => (g.index ? g.toNonIndexed() : g)) : b.geos;
     let batch = null;
-    try { batch = mergeGeometries(b.geos, false); } catch { batch = null; }
+    try { batch = mergeGeometries(geos, false); } catch { batch = null; }
+    for (const g of geos) if (!b.geos.includes(g)) g.dispose();
     b.geos.forEach((g) => g.dispose());
     if (!batch) continue;
     const m = new THREE.Mesh(batch, b.material);
