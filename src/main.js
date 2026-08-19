@@ -139,13 +139,22 @@ async function boot() {
   const frameTimes = [];
   const MAX_FRAME_HISTORY = 5;
 
+  const timings = { update: 0, render: 0, n: 0 };
   function frame() {
     requestAnimationFrame(frame);
     // Clamp dt so a background tab or a long GC pause cannot teleport the game.
     const dt = Math.min(0.05, clock.getDelta());
 
+    const t0 = statsEl ? performance.now() : 0;
     game.update(dt);
+    const t1 = statsEl ? performance.now() : 0;
     stage3d.render(dt);
+    if (statsEl) {
+      const t2 = performance.now();
+      timings.update += t1 - t0;
+      timings.render += t2 - t1;
+      timings.n++;
+    }
 
     // Adaptive quality: if last 5 frames average <45fps, drop pixel ratio
     // immediately rather than waiting 1 second. Feels snappier under load.
@@ -165,12 +174,15 @@ async function boot() {
       if (import.meta.env?.DEV) window.__ppFps = Math.round(fps);
       if (statsEl) {
         const i = stage3d.renderer.info;
+        const n = Math.max(1, timings.n);
         statsEl.textContent =
           `fps    ${Math.round(fps)}\n`
           + `calls  ${i.render.calls}\n`
           + `tris   ${(i.render.triangles / 1000).toFixed(0)}k\n`
           + `geo    ${i.memory.geometries}  tex ${i.memory.textures}\n`
-          + `dpr    ${stage3d.renderer.getPixelRatio().toFixed(2)}  foods ${game.foods.length}`;
+          + `dpr    ${stage3d.renderer.getPixelRatio().toFixed(2)}  foods ${game.foods.length}\n`
+          + `update ${(timings.update / n).toFixed(1)}ms  render ${(timings.render / n).toFixed(1)}ms`;
+        timings.update = 0; timings.render = 0; timings.n = 0;
       }
     }
   }

@@ -406,7 +406,7 @@ export function deriveFoodMethods() {
   for (const id of [...Object.keys(FOODS), ...REFERENCE_ONLY_FOODS]) map[id] = [];
   for (const m of Object.values(METHODS)) {
     if (!m.playable) continue;
-    for (const f of m.foods) if (map[f]) map[f].push(m.id);
+    for (const f of [...m.foods, ...(m.alsoWorks || [])]) if (map[f]) map[f].push(m.id);
   }
   return Object.freeze(map);
 }
