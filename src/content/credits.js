@@ -29,9 +29,9 @@ export const CREDITS = [
   },
   {
     file: 'foods/meat.glb',
-    title: 'Cartoon Raw Steak Lowpoly',
-    author: 'Seth',
-    sourceUrl: 'https://skfb.ly/oxQuz',
+    title: 'Steak',
+    author: 'unclef',
+    sourceUrl: 'https://skfb.ly/JD7w',
     license: 'CC BY 4.0',
     licenseUrl: 'http://creativecommons.org/licenses/by/4.0/',
   },
