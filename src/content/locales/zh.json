@@ -57,7 +57,33 @@
     "factBookLocked": "这一关知识本关闭了——试着回忆！",
     "credits": "致谢",
     "creditsIntro": "这个游戏中的 3D 模型来自才华横溢的创意工作者,并根据开放许可证共享。",
-    "creditsBy": "来自 {author}"
+    "creditsBy": "来自 {author}",
+    "chapter": "章",
+    "howItWorks": "原理",
+    "signsOfSpoilage": "食物变质的迹象",
+    "usingOurSenses": "运用我们的感官",
+    "foodSafety": "食品安全",
+    "inThisChapter": "本章内容",
+    "theEnd": "完",
+    "referenceOnly": "仅在知识书中",
+    "methodBadge": "方法",
+    "interactive3d": "可交互 3D 模型",
+    "dragToRotate": "拖动以旋转",
+    "resetView": "重置视角",
+    "suitableFoods": "适用的食物",
+    "alsoWorksWith": "也适用于",
+    "examNote": "考试要点",
+    "source": "来源：{ref}",
+    "methodOf": "第 {n} / {total} 种方法",
+    "backToMethod": "返回方法",
+    "inspectFood": "查看{food}",
+    "prevPage": "上一页",
+    "nextPage": "下一页",
+    "factBookMore": "更多保存方法",
+    "factBookPlayableNote": "你在游戏中使用的方法。",
+    "factBookExtraNote": "笔记中的其他方法，游戏中没有对应的机器。",
+    "contents": "目录",
+    "openBook": "翻开书本"
   },
   "station": {
     "drying": {
@@ -356,6 +382,12 @@
       "smell": "食物有腐臭味",
       "taste": "食物味道不好",
       "touch": "食物质感改变，变黏或变软"
+    },
+    "senseNames": {
+      "sight": "视觉",
+      "smell": "嗅觉",
+      "taste": "味觉",
+      "touch": "触觉"
     }
   },
   "microbes": {
@@ -381,6 +413,7 @@
     "stationButton": "{method}站",
     "pickUp": "拿起",
     "dropAt": "放到{method}",
-    "keyboardHelp": "用 Tab 选择食物，然后按数字键 1 到 6 送到对应的站。"
+    "keyboardHelp": "用 Tab 选择食物，然后按数字键 1 到 6 送到对应的站。",
+    "bookArea": "知识书页面。使用左右方向键翻页。"
   }
 }

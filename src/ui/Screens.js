@@ -136,6 +136,13 @@ export class Screens {
   }
 
   // -------------------------------------------------------------- fact book
+  /**
+   * The FLAT Fact Book. Since the 3D book landed (src/ui/factbook/) this is the
+   * fallback Game.openFactBook() falls back to when a second WebGL context
+   * cannot be created — an old driver, or a browser at its context limit. It
+   * covers exactly the same curriculum from exactly the same sources, so the
+   * reference layer is never simply missing.
+   */
   factBook(onClose) {
     const methodCard = (m) => {
       const foods = (m.foods || []).map((f) => FOODS[f] ? foodName(f) : t(`foods.${f}`)).join(' · ');

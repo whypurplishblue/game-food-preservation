@@ -148,7 +148,9 @@ async function boot() {
     const t0 = statsEl ? performance.now() : 0;
     game.update(dt);
     const t1 = statsEl ? performance.now() : 0;
-    stage3d.render(dt);
+    // While the 3D Fact Book is up it covers the screen and runs its own loop,
+    // so rendering the kitchen underneath is pure cost for pixels nobody sees.
+    if (!game.factBook?.isOpen) stage3d.render(dt);
     if (statsEl) {
       const t2 = performance.now();
       timings.update += t1 - t0;
