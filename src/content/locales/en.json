@@ -58,7 +58,33 @@
     "alsoWorksNote": "That works in a real kitchen! In Unit 8, {food} is the {method} example.",
     "credits": "Credits",
     "creditsIntro": "The 3D models in this game come from talented creators and are shared under open licenses.",
-    "creditsBy": "By {author}"
+    "creditsBy": "By {author}",
+    "chapter": "Chapter",
+    "howItWorks": "How it works",
+    "signsOfSpoilage": "Signs of spoilage",
+    "usingOurSenses": "Using our senses",
+    "foodSafety": "Food safety",
+    "inThisChapter": "In this chapter",
+    "theEnd": "The end",
+    "referenceOnly": "Fact Book only",
+    "methodBadge": "Method",
+    "interactive3d": "Interactive 3D model",
+    "dragToRotate": "Drag to rotate",
+    "resetView": "Reset view",
+    "suitableFoods": "Suitable foods",
+    "alsoWorksWith": "Also works with",
+    "examNote": "Exam note",
+    "source": "Source: {ref}",
+    "methodOf": "Method {n} of {total}",
+    "backToMethod": "Back to method",
+    "inspectFood": "Inspect {food}",
+    "prevPage": "Previous page",
+    "nextPage": "Next page",
+    "factBookMore": "More preservation methods",
+    "factBookPlayableNote": "The methods you use in the game.",
+    "factBookExtraNote": "Extra methods from the notes. These do not have a machine in the game.",
+    "contents": "Contents",
+    "openBook": "Open the book"
   },
   "station": {
     "drying": {
@@ -357,6 +383,12 @@
       "smell": "Food smells bad or rotten",
       "taste": "Food has an unpleasant taste",
       "touch": "Food changes texture, becomes slimy or soft"
+    },
+    "senseNames": {
+      "sight": "Sight",
+      "smell": "Smell",
+      "taste": "Taste",
+      "touch": "Touch"
     }
   },
   "microbes": {
@@ -382,6 +414,7 @@
     "stationButton": "{method} station",
     "pickUp": "Pick up",
     "dropAt": "Drop at {method}",
-    "keyboardHelp": "Use Tab to choose a food, then number keys 1 to 6 to send it to a station."
+    "keyboardHelp": "Use Tab to choose a food, then number keys 1 to 6 to send it to a station.",
+    "bookArea": "Fact Book pages. Use the left and right arrow keys to turn the page."
   }
 }

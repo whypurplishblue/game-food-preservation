@@ -57,7 +57,33 @@
     "factBookLocked": "Buku Fakta ditutup pada peringkat ini — cuba ingat!",
     "credits": "Kredit",
     "creditsIntro": "Model 3D dalam permainan ini berasal daripada pencipta berbakat dan dikongsi di bawah lesen terbuka.",
-    "creditsBy": "Oleh {author}"
+    "creditsBy": "Oleh {author}",
+    "chapter": "Bab",
+    "howItWorks": "Bagaimana ia berfungsi",
+    "signsOfSpoilage": "Tanda makanan rosak",
+    "usingOurSenses": "Menggunakan deria kita",
+    "foodSafety": "Keselamatan makanan",
+    "inThisChapter": "Dalam bab ini",
+    "theEnd": "Tamat",
+    "referenceOnly": "Buku Fakta sahaja",
+    "methodBadge": "Kaedah",
+    "interactive3d": "Model 3D interaktif",
+    "dragToRotate": "Seret untuk putar",
+    "resetView": "Set semula paparan",
+    "suitableFoods": "Makanan yang sesuai",
+    "alsoWorksWith": "Juga sesuai dengan",
+    "examNote": "Nota peperiksaan",
+    "source": "Sumber: {ref}",
+    "methodOf": "Kaedah {n} daripada {total}",
+    "backToMethod": "Kembali ke kaedah",
+    "inspectFood": "Periksa {food}",
+    "prevPage": "Halaman sebelumnya",
+    "nextPage": "Halaman seterusnya",
+    "factBookMore": "Kaedah pengawetan lain",
+    "factBookPlayableNote": "Kaedah yang anda guna dalam permainan.",
+    "factBookExtraNote": "Kaedah tambahan daripada nota. Kaedah ini tiada mesin dalam permainan.",
+    "contents": "Kandungan",
+    "openBook": "Buka buku"
   },
   "station": {
     "drying": {
@@ -356,6 +382,12 @@
       "smell": "Makanan berbau busuk",
       "taste": "Makanan berasa tidak enak",
       "touch": "Tekstur berubah, menjadi berlendir atau lembik"
+    },
+    "senseNames": {
+      "sight": "Penglihatan",
+      "smell": "Bau",
+      "taste": "Rasa",
+      "touch": "Sentuhan"
     }
   },
   "microbes": {
@@ -381,6 +413,7 @@
     "stationButton": "Stesen {method}",
     "pickUp": "Ambil",
     "dropAt": "Letak di {method}",
-    "keyboardHelp": "Guna Tab untuk pilih makanan, kemudian kekunci nombor 1 hingga 6 untuk hantar ke stesen."
+    "keyboardHelp": "Guna Tab untuk pilih makanan, kemudian kekunci nombor 1 hingga 6 untuk hantar ke stesen.",
+    "bookArea": "Halaman Buku Fakta. Gunakan kekunci anak panah kiri dan kanan untuk membelek halaman."
   }
 }

@@ -26,6 +26,7 @@ import { Pasteuriser } from '../world/stations/Pasteuriser.js';
 import { Smokehouse } from '../world/stations/Smokehouse.js';
 import { Cannery } from '../world/stations/Cannery.js';
 import { sfx, audio } from './Audio.js';
+import { FactBook3D } from '../ui/factbook/FactBook3D.js';
 
 /**
  * Keyed by STATION, not by method. The Freezer serves two methods (freezing at
@@ -187,11 +188,28 @@ export class Game {
     const wasPlaying = this.mode === 'playing';
     if (wasPlaying) this.mode = 'paused';
     this.input.setEnabled(false);
-    this.screens.factBook(() => {
+    const done = () => {
       if (back) back();
       else if (wasPlaying) { this.screens.close(); this.mode = 'playing'; this.input.setEnabled(true); }
       else this.showMenu();
-    });
+    };
+    // The Fact Book is a physical 3D book (src/ui/factbook). It needs its own
+    // WebGL context; if that cannot be had — a second context refused, an old
+    // driver — the flat Fact Book screen is still there and carries exactly the
+    // same curriculum, so the reference layer never disappears.
+    try {
+      this.factBook ||= new FactBook3D(this.hud.root.parentElement || document.body, {
+        reducedMotion: () => this.settings.reducedMotion,
+        quality: this.stage3d.quality,
+      });
+      this.hud.setVisible(false);
+      this.factBook.open(() => { this.hud.setVisible(true); done(); });
+    } catch (e) {
+      console.warn('[factbook] 3D book unavailable, using the flat Fact Book', e);
+      this.factBook = null;
+      this.hud.setVisible(true);
+      this.screens.factBook(done);
+    }
   }
 
   pause() {
