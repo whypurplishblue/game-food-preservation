@@ -58,6 +58,7 @@ export class Game {
     this.settings = { sound: true, music: true, reducedMotion: false };
 
     this._tmpVec = new THREE.Vector3();
+    this._builtStations = new Set();
     this._buildAllStations();
     this._wireInput();
     this._loadSettings();
@@ -80,17 +81,21 @@ export class Game {
       const methods = STATION_METHODS[stationId] || [];
       const s = new Cls(methods[0], stationId);
       s.stationId = stationId;
-      s.methods = methods;          // e.g. Freezer -> ['freezing','cooling']
-      // Optional Blender shell; a no-op when the asset is absent. Batching and
-      // the GLB swap are alternatives: the swap needs the individual procedural
-      // parts still present so it can prune them.
-      if (assets.has(stationId)) s.useModel(stationId);
-      else s.batchStatic();
+      s.methods = methods;
       s.enabled = false;
       s.root.visible = false;
       this.stage3d.scene.add(s.root);
       this.stations.set(stationId, s);
     }
+  }
+
+  _ensureStationBuilt(stationId) {
+    if (this._builtStations.has(stationId)) return;
+    const s = this.stations.get(stationId);
+    if (!s) return;
+    if (assets.has(stationId)) s.useModel(stationId);
+    else s.batchStatic();
+    this._builtStations.add(stationId);
   }
 
   /** The method this station would apply to this food, or null if it cannot. */
@@ -283,6 +288,7 @@ export class Game {
       s.enabled = on;
       s.root.visible = on;
       if (on) {
+        this._ensureStationBuilt(id);
         s.placeAt(slots[idx]);
         s.setLabelsVisible(this.stage.showStationLabels);
         // Stage 4 only. In Stage 5 every preservation is followed by a "why"
@@ -736,7 +742,8 @@ export class Game {
     for (let i = this.foods.length - 1; i >= 0; i--) {
       const f = this.foods[i];
       const wasSpoilt = f.state === 'spoilt';
-      f.update(playing || this.mode === 'quiz' ? dt : 0, cam, playing ? 1 : 0);
+      const updateDt = (playing || this.mode === 'quiz') && this.stage3d.isPointInViewFrustum(f.group.position) ? dt : 0;
+      f.update(updateDt, cam, playing ? 1 : 0);
       if (!wasSpoilt && f.state === 'spoilt') this._onSpoilt(f);
 
       if (f.state === 'idle' || f.state === 'held') { microbeSum += f.swarm.activity; microbeN++; }
