@@ -36,6 +36,23 @@ function detectQuality() {
   return 'high';
 }
 
+async function staggeredPreload(loader, ids, base, delayMs = 100) {
+  const results = new Map();
+  const batches = [ids.slice(0, 5), ids.slice(5, 10), ids.slice(10)].filter(b => b.length);
+  for (const batch of batches) {
+    await Promise.all(batch.map(async (id) => {
+      try {
+        const gltf = await loader.loadAsync(`${base}${id}.glb`);
+        results.set(id, gltf.scene);
+      } catch (e) {
+        console.warn(`[assets] ${id} failed to load`, e);
+      }
+    }));
+    if (batch !== batches[batches.length - 1]) await new Promise(r => setTimeout(r, delayMs));
+  }
+  return results;
+}
+
 async function boot() {
   initLang();
   injectCssVariables();
@@ -65,7 +82,10 @@ async function boot() {
 
   // Optional Blender-authored station shells. Absent by default: the game ships
   // with procedural machines, and a slow or missing asset host must never hold
-  // up the boot, so the probe is bounded.
+  // up the boot, so the probe is bounded. Measure load time; if slow network,
+  // downgrade quality to reduce visual expectations.
+  let finalQuality = quality;
+  const assetStart = performance.now();
   await Promise.race([
     Promise.all([
       assets.preload(Object.keys(MOVER_BINDINGS)),
@@ -73,6 +93,13 @@ async function boot() {
     ]),
     new Promise((r) => setTimeout(r, 4000)),
   ]);
+  const assetTime = performance.now() - assetStart;
+  if (assetTime > 2000 && quality === 'high') {
+    finalQuality = 'medium';
+    stage3d.quality = 'medium';
+    stage3d.renderer.setPixelRatio(stage3d._pixelRatio());
+    if (import.meta.env?.DEV) console.info('[assets] slow network detected, downgrading to medium quality');
+  }
   if (import.meta.env?.DEV && assets.report.length) console.info('[assets]', assets.report.join(', '));
 
   const input = new Input(canvas, stage3d, {});
