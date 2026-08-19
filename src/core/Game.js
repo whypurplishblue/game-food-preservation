@@ -155,6 +155,18 @@ export class Game {
       onPlay: () => this.startStage(1),
       onContinue: () => this.startStage(this.savedStage),
       onFactBook: () => this.openFactBook(() => this.showMenu()),
+      onCredits: () => this.openCredits(() => this.showMenu()),
+    });
+  }
+
+  openCredits(back) {
+    const wasPlaying = this.mode === 'playing';
+    if (wasPlaying) this.mode = 'paused';
+    this.input.setEnabled(false);
+    this.screens.credits(() => {
+      if (back) back();
+      else if (wasPlaying) { this.screens.close(); this.mode = 'playing'; this.input.setEnabled(true); }
+      else this.showMenu();
     });
   }
 
@@ -202,6 +214,7 @@ export class Game {
       onRestart: () => { this._pausedPanel = null; this.screens.close(); this.startStage(this.stageId); },
       onMenu: () => { this._pausedPanel = null; this.screens.close(); this.showMenu(); },
       onFactBook: () => this.openFactBook(() => this.pause()),
+      onCredits: () => this.openCredits(() => this.pause()),
     });
   }
 
