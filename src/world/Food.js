@@ -12,7 +12,7 @@
  */
 import * as THREE from 'three';
 import { PALETTE } from './Palette.js';
-import { applySpoil, matte, plastic, glass, sphere, cyl, blob, roundedBox, torus, mesh, blobShadow } from './Materials.js';
+import { applySpoil, matte, plastic, glass, sphere, cyl, blob, roundedBox, torus, mesh, blobShadow, clearcoatFor } from './Materials.js';
 import { buildFoodModel, setFaceForSpoil } from './FoodFactory.js';
 import { MicrobeSwarm } from './Microbes.js';
 import { FOODS, FOOD_METHODS, METHODS } from '../content/curriculum.js';
@@ -191,7 +191,7 @@ export class Food {
         // Frost shell + ice crystals.
         const frost = new THREE.MeshPhysicalMaterial({
           color: 0xdff3ff, roughness: 0.35, transparent: true, opacity: 0.42,
-          clearcoat: 1, clearcoatRoughness: 0.1,
+          clearcoat: clearcoatFor(1), clearcoatRoughness: 0.1,
         });
         g.add(mesh(sphere(r * 1.06, 18, 14), frost, { cast: false }));
         for (let i = 0; i < 7; i++) {
@@ -205,7 +205,7 @@ export class Food {
         // Shrink-wrapped film hugging the food, plus a sealed seam.
         const film = new THREE.MeshPhysicalMaterial({
           color: 0xdfe9f2, roughness: 0.12, transparent: true, opacity: 0.36,
-          clearcoat: 1, clearcoatRoughness: 0.04, side: THREE.DoubleSide,
+          clearcoat: clearcoatFor(1), clearcoatRoughness: 0.04, side: THREE.DoubleSide,
         });
         const wrap = mesh(sphere(r * 1.02, 20, 14), film, { cast: false });
         wrap.scale.set(1.05, 0.92, 1.05);

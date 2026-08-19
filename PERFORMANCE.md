@@ -142,6 +142,35 @@ if (frameFps < 45 && frameTimes.length === MAX_FRAME_HISTORY && stage3d.renderer
 }
 ```
 
+### 9. Quality-Gated Clearcoat, Sheen, Transmission and IBL
+**Location**: `src/world/Materials.js`, `src/world/Stage3D.js:_environment()` / `_lights()`, plus per-station `MeshPhysicalMaterial` call sites
+**Impact**: Large GPU win on weak tablet/phone GPUs (Mali-400/PowerVR class) — clearcoat and transmission are the most expensive fragment-shader features three.js offers; this was previously unconditional even on `low` quality.
+**Why**: `Materials.js` never checked quality tier. Every machine shell, food item and station prop used `MeshPhysicalMaterial` with `clearcoat` (an extra BRDF layer) and the scene always built a PMREM environment map for IBL — pure cost on devices too weak to render the "premium" look anyway. `applySpoil()` also wrote a nonzero `clearcoat`/`sheen` every frame during spoilage, which forces three.js to keep the expensive shader variant compiled even if the material started at 0.
+**Fix**: `setMaterialQuality(quality)` called once at boot from `main.js`. A `clearcoatFor(v)` helper returns `v` on `high`, `0` otherwise; every `clearcoat`/`sheen`/`transmission` value in `Materials.js` and the station files that build `MeshPhysicalMaterial` directly (`Food.js`, `PicklingJar.js`, `SaltTable.js`, `VacuumSealer.js`, `DryingRack.js`, `Smokehouse.js`) now runs through it. `Stage3D._environment()` skips the PMREM/IBL pass entirely on `low`. `Stage3D._lights()` drops the rim light on `low` (2 directional + hemisphere instead of 3 + hemisphere).
+**Implementation**:
+```js
+// Materials.js
+let _quality = 'high';
+export function setMaterialQuality(q) { _quality = q; }
+export function clearcoatFor(v) { return _quality === 'high' ? v : 0; }
+
+export function plastic(colour, { rough = 0.42, clearcoat = 0.55, ... } = {}) {
+  clearcoat = clearcoatFor(clearcoat);
+  return memo(`plastic:${colour}:${rough}:${clearcoat}:...:${_quality}`, () =>
+    new THREE.MeshPhysicalMaterial({ color: colour, roughness: rough, clearcoat, clearcoatRoughness: 0.35 }));
+}
+
+// applySpoil() — must stay pinned at 0 off high, or the per-frame write
+// re-triggers the clearcoat shader variant regardless of the initial value.
+if (_quality === 'high') {
+  mat.clearcoat = THREE.MathUtils.lerp(0.2, 0.02, spoil);
+  mat.sheen = THREE.MathUtils.lerp(0.3, 0.0, spoil);
+}
+
+// main.js
+setMaterialQuality(quality); // before Stage3D/Kitchen construct any materials
+```
+
 ## Other Performance Patterns Already in Place
 
 ### Pixel Ratio Capping (Stage3D)

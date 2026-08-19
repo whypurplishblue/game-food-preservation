@@ -18,11 +18,20 @@ function memo(key, make) {
   return cache.get(key);
 }
 
+// Clearcoat and IBL-driven sheen are the most expensive thing a mobile GPU
+// can be asked to shade per-fragment (extra BRDF layer + extra env-map mip
+// lookups). Set once at boot from detectQuality() so weak tablets never pay
+// for it — high quality keeps the "premium" look untouched.
+let _quality = 'high';
+export function setMaterialQuality(q) { _quality = q; }
+export function clearcoatFor(v) { return _quality === 'high' ? v : 0; }
+
 // ---------------------------------------------------------------- materials
 
 /** Moulded plastic — machine shells, UI-ish props. Slight clearcoat = premium. */
 export function plastic(colour, { rough = 0.42, clearcoat = 0.55, emissive = 0, emissiveIntensity = 0 } = {}) {
-  return memo(`plastic:${colour}:${rough}:${clearcoat}:${emissive}:${emissiveIntensity}`, () =>
+  clearcoat = clearcoatFor(clearcoat);
+  return memo(`plastic:${colour}:${rough}:${clearcoat}:${emissive}:${emissiveIntensity}:${_quality}`, () =>
     new THREE.MeshPhysicalMaterial({
       color: colour, roughness: rough, metalness: 0.0,
       clearcoat, clearcoatRoughness: 0.35,
@@ -44,10 +53,11 @@ export function matte(colour, rough = 0.85) {
 
 /** Transmissive glass — jars, freezer window, bag film. */
 export function glass(colour = PALETTE.glass, { opacity = 0.32, rough = 0.06, ior = 1.45 } = {}) {
-  return memo(`glass:${colour}:${opacity}:${rough}`, () =>
+  const clearcoat = clearcoatFor(1);
+  return memo(`glass:${colour}:${opacity}:${rough}:${_quality}`, () =>
     new THREE.MeshPhysicalMaterial({
       color: colour, roughness: rough, metalness: 0, transmission: 0.0,
-      transparent: true, opacity, ior, clearcoat: 1, clearcoatRoughness: 0.05,
+      transparent: true, opacity, ior, clearcoat, clearcoatRoughness: 0.05,
       depthWrite: false, side: THREE.DoubleSide,
     }));
 }
@@ -74,8 +84,8 @@ export function hot(colour, intensity = 1.2) {
 export function foodMaterial(baseColour, { rough = 0.55, sheen = 0.25 } = {}) {
   const m = new THREE.MeshPhysicalMaterial({
     color: baseColour, roughness: rough, metalness: 0.02,
-    sheen, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xffffff),
-    clearcoat: 0.15, clearcoatRoughness: 0.6,
+    sheen: clearcoatFor(sheen), sheenRoughness: 0.6, sheenColor: new THREE.Color(0xffffff),
+    clearcoat: clearcoatFor(0.15), clearcoatRoughness: 0.6,
   });
   m.userData.baseColour = new THREE.Color(baseColour);
   return m;
@@ -94,8 +104,13 @@ export function applySpoil(mat, spoil) {
   _tmpCol.setHSL(hsl.h, hsl.s * (1 - spoil * 0.55), hsl.l * (1 - spoil * 0.3));
   mat.color.copy(_tmpCol);
   mat.roughness = THREE.MathUtils.lerp(0.45, 0.95, spoil); // dull + slimy
-  mat.clearcoat = THREE.MathUtils.lerp(0.2, 0.02, spoil);
-  mat.sheen = THREE.MathUtils.lerp(0.3, 0.0, spoil);
+  // Keep these pinned at 0 off the high tier — writing a nonzero value here
+  // every frame would force three.js to (re)compile the clearcoat/sheen shader
+  // variant, undoing the saving from creating the material with clearcoat: 0.
+  if (_quality === 'high') {
+    mat.clearcoat = THREE.MathUtils.lerp(0.2, 0.02, spoil);
+    mat.sheen = THREE.MathUtils.lerp(0.3, 0.0, spoil);
+  }
 }
 
 // ---------------------------------------------------------------- geometry

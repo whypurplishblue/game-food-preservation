@@ -7,6 +7,7 @@ import * as CURRICULUM from './content/curriculum.js';
 import * as QUIZ from './content/quiz.js';
 import * as I18N from './content/i18n.js';
 import { injectCssVariables } from './world/Palette.js';
+import { setMaterialQuality } from './world/Materials.js';
 import { Stage3D } from './world/Stage3D.js';
 import * as FOODFACTORY from './world/FoodFactory.js';
 import { Kitchen } from './world/Kitchen.js';
@@ -69,6 +70,7 @@ async function boot() {
   const canvas = document.getElementById('scene');
   const quality = detectQuality();
   document.documentElement.dataset.quality = quality;
+  setMaterialQuality(quality);
 
   const stage3d = new Stage3D(canvas, { quality });
   const kitchen = new Kitchen(stage3d.scene, { quality });

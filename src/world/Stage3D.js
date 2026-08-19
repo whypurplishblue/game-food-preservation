@@ -156,15 +156,23 @@ export class Stage3D {
     this.scene.add(fill);
 
     // Rim — from behind, separates machine silhouettes from the backdrop.
-    const rim = new THREE.DirectionalLight(0xffc98a, 0.85);
-    rim.position.set(2, 8, -12);
-    this.scene.add(rim);
+    // Skipped on low quality: one fewer light in the per-fragment loop on
+    // weak mobile GPUs, where every directional light is a real fixed cost.
+    if (this.quality !== 'low') {
+      const rim = new THREE.DirectionalLight(0xffc98a, 0.85);
+      rim.position.set(2, 8, -12);
+      this.scene.add(rim);
+    }
 
     // Ambient bounce, tinted from the warm floor upward.
     this.scene.add(new THREE.HemisphereLight(0xffe4bd, 0x4a3524, 0.32));
   }
 
   _environment() {
+    // The IBL env map is only read by clearcoat/sheen (which are zeroed out
+    // off the high tier in Materials.js) plus roughness-based reflections —
+    // on low quality it's pure fragment-shader cost for a look nobody sees.
+    if (this.quality === 'low') return;
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     pmrem.compileEquirectangularShader();
     const env = pmrem.fromScene(new RoomEnvironment(), 0.035);
