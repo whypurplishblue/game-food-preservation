@@ -54,7 +54,9 @@
     "recallPrompt": "这是哪一种方法？",
     "howToPlay": "玩法",
     "learned": "你学到了",
-    "factBookLocked": "这一关知识本关闭了——试着回忆！"
+    "factBookLocked": "这一关知识本关闭了——试着回忆！",
+    "creditsIntro": "这个游戏中的 3D 模型来自才华横溢的创意工作者,并根据开放许可证共享。",
+    "creditsBy": "来自 {author}"
   },
   "station": {
     "drying": {
