@@ -480,11 +480,16 @@ export class Game {
     // loud after the child dials 4°C for milk.
     this.hud.flash(`${methodName(methodId)} → ${methodMechShort(methodId, m.mechanism)}`, { kind: 'good', ms: 1500 });
     this.hud.say(`${methodName(methodId)}. ${t(`methods.${methodId}.exam`)}`);
+    // The quiz modal (if one follows) opens with a blurred full-screen backdrop
+    // that buries this banner if it fires underneath it — so the quiz is held
+    // off until the note has had its moment on screen. See below.
+    let bannerClearMs = 1500;
     if (!taught) {
       const primary = FOODS[food.foodId]?.primary;
       const note = t('ui.alsoWorksNote', { food: foodName(food.foodId), method: methodName(primary) });
       setTimeout(() => this.hud.flash(note, { kind: 'info', ms: 2600 }), 1600);
       this.hud.say(note);
+      bannerClearMs = 1600 + 2600;
     }
     this.hud.setGoal(this.preserved, this.stage.targetPreserved);
 
@@ -501,8 +506,11 @@ export class Game {
 
     if (Math.random() < this.stage.quizChance) {
       // Bias toward whatever this child keeps getting wrong, not always the
-      // method they have just demonstrated they can do.
-      this._askQuiz(Math.random() < 0.45 ? this._weakestMethod(methodId) : methodId, food.foodId);
+      // method they have just demonstrated they can do. Held off until the
+      // banner above has cleared, so the quiz backdrop doesn't bury it.
+      setTimeout(() => {
+        this._askQuiz(Math.random() < 0.45 ? this._weakestMethod(methodId) : methodId, food.foodId);
+      }, bannerClearMs);
     } else {
       this.input.setEnabled(true);
       this._checkStageEnd();
