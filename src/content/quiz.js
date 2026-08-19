@@ -78,7 +78,7 @@ function methodQuestion(methodId, rnd) {
  */
 function foodQuestion(foodId, methodId, rnd) {
   const valid = FOOD_METHODS[foodId] || [];
-  const invalid = playable().map((m) => m.id).filter((id) => !valid.includes(id));
+  const invalid = playable().map((m) => m.id).filter((id) => id !== methodId && !valid.includes(id));
   // Never offer the twin of a valid answer as a distractor.
   const twins = valid.flatMap((v) => (v === 'freezing' ? ['cooling'] : v === 'cooling' ? ['freezing'] : []));
   const distractors = shuffle(invalid.filter((id) => !twins.includes(id)), rnd).slice(0, 2);
