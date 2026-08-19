@@ -57,6 +57,7 @@ export class Game {
     this.mode = 'menu';           // menu | brief | playing | paused | quiz | result
     this.settings = { sound: true, music: true, reducedMotion: false };
 
+    this._tmpVec = new THREE.Vector3();
     this._buildAllStations();
     this._wireInput();
     this._loadSettings();
@@ -456,7 +457,9 @@ export class Game {
 
     sfx(`preserve.${METHODS[methodId].station === 'Freezer' ? 'freezing' : methodId}`);
     const m = METHODS[methodId];
-    const pos = food.group.position.clone().add(new THREE.Vector3(0, 1.1, 0));
+    this._tmpVec.copy(food.group.position);
+    this._tmpVec.y += 1.1;
+    const pos = this._tmpVec;
     this.particles.burst(pos, {
       count: 34, colours: [m.colour, m.accent ?? 0xffffff, PALETTE.gold, 0xffffff],
       speed: 4.5, size: 0.19, life: 1.25,
@@ -472,7 +475,9 @@ export class Game {
     const gained = Math.round(base * this.combo);
     this._addScore(gained, pos, `+${gained}`, m.colour);
     if (quality > 0.95) {
-      this.popups.show(pos.clone().add(new THREE.Vector3(0, 0.7, 0)), t('ui.perfect'), { colour: '#ffd54f', size: 62, scale: 0.8 });
+      const perfectPos = new THREE.Vector3().copy(pos);
+      perfectPos.y += 0.7;
+      this.popups.show(perfectPos, t('ui.perfect'), { colour: '#ffd54f', size: 62, scale: 0.8 });
     }
 
     // The teaching beat: name the method and its mechanism, every time. For the
@@ -601,7 +606,9 @@ export class Game {
     this.score += delta;
     this.hud.setScore(Math.max(0, this.score));
     if (worldPos && label) {
-      this.popups.show(worldPos.clone().add(new THREE.Vector3(0, 0.4, 0)), label, {
+      const popupPos = new THREE.Vector3().copy(worldPos);
+      popupPos.y += 0.4;
+      this.popups.show(popupPos, label, {
         colour: `#${(colour ?? PALETTE.gold).toString(16).padStart(6, '0')}`,
         size: delta > 0 ? 92 : 74,
       });
@@ -667,7 +674,9 @@ export class Game {
     this._addScore(SCORING.spoiledPenalty, food.group.position, `${SCORING.spoiledPenalty}`, PALETTE.danger);
     sfx('food.spoil');
     this.stage3d.shake(0.35, 320);
-    this.particles.burst(food.group.position.clone().add(new THREE.Vector3(0, 0.5, 0)), {
+    this._tmpVec.copy(food.group.position);
+    this._tmpVec.y += 0.5;
+    this.particles.burst(this._tmpVec, {
       count: 22, colours: [PALETTE.mould, PALETTE.mouldDark, 0x8a9a5b], speed: 2.6, life: 1.2, grav: -3,
     });
     // Say WHY it spoiled — this is §3 of the notes, delivered at the moment of failure.

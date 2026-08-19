@@ -40,6 +40,7 @@ export class Particles {
     this._q = new THREE.Quaternion();
     this._p = new THREE.Vector3();
     this._s = new THREE.Vector3();
+    this._lastLiveCount = -1;
   }
 
   _take() {
@@ -106,8 +107,11 @@ export class Particles {
       this.mesh.setMatrixAt(i, this._m);
       this.mesh.instanceColor.setXYZ(i, p.colour.r * t, p.colour.g * t, p.colour.b * t);
     }
-    this.mesh.instanceMatrix.needsUpdate = true;
-    this.mesh.instanceColor.needsUpdate = true;
+    if (any !== this._lastLiveCount) {
+      this._lastLiveCount = any;
+      this.mesh.instanceMatrix.needsUpdate = true;
+      this.mesh.instanceColor.needsUpdate = true;
+    }
     this.mesh.visible = any;
   }
 }
