@@ -80,8 +80,11 @@ export class Game {
       const s = new Cls(methods[0], stationId);
       s.stationId = stationId;
       s.methods = methods;          // e.g. Freezer -> ['freezing','cooling']
-      // Optional Blender shell; a no-op when the asset is absent.
+      // Optional Blender shell; a no-op when the asset is absent. Batching and
+      // the GLB swap are alternatives: the swap needs the individual procedural
+      // parts still present so it can prune them.
       if (assets.has(stationId)) s.useModel(stationId);
+      else s.batchStatic();
       s.enabled = false;
       s.root.visible = false;
       this.stage3d.scene.add(s.root);

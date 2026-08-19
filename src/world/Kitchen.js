@@ -277,8 +277,15 @@ export class Kitchen {
         g.add(mesh(cyl(0.085, 0.1, 0.28, 10), metal(0x9aa4ae), { x: px, y: 2.04, z: -0.72 }));
         g.add(mesh(sphere(0.15, 12, 9), matte(0xe0603c, 0.8), { x: px, y: 2.22, z: -0.72 }));
       }
-      g.userData.dynamic = true;   // toggled per stage, so keep it unbatched
+      // Batched island-by-island: the group still moves as a unit when the arc
+      // widens, but its nine pieces stop being nine draw calls. And an island
+      // does not need to cast — it sits flat on the floor under the machine
+      // that is already casting, so its shadow is invisible and its 70-odd
+      // shadow-pass draw calls were pure cost.
+      g.userData.dynamic = true;   // toggled per stage, so keep it out of the room batch
       this.root.add(g);
+      mergeStatic(g);
+      g.traverse((o) => { if (o.isMesh) o.castShadow = false; });
       this.islands.push(g);
     }
   }

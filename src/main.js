@@ -91,6 +91,18 @@ async function boot() {
   document.getElementById('boot')?.remove();
   game.showMenu();
 
+  // ---- optional on-screen stats: ?stats=1
+  // Software rendering in CI makes frame times meaningless, so the only honest
+  // way to know what a real machine is doing is to show it there.
+  let statsEl = null;
+  if (new URLSearchParams(location.search).get('stats') === '1') {
+    statsEl = document.createElement('div');
+    statsEl.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:9999;padding:6px 9px;'
+      + 'font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;color:#d7ffe6;background:rgba(12,16,24,.82);'
+      + 'border-radius:8px;white-space:pre;pointer-events:none';
+    app.appendChild(statsEl);
+  }
+
   // ---- loop
   const clock = new THREE.Clock();
   let acc = 0;
@@ -114,6 +126,15 @@ async function boot() {
         stage3d.renderer.setPixelRatio(Math.max(1, stage3d.renderer.getPixelRatio() - 0.25));
       }
       if (import.meta.env?.DEV) window.__ppFps = Math.round(fps);
+      if (statsEl) {
+        const i = stage3d.renderer.info;
+        statsEl.textContent =
+          `fps    ${Math.round(fps)}\n`
+          + `calls  ${i.render.calls}\n`
+          + `tris   ${(i.render.triangles / 1000).toFixed(0)}k\n`
+          + `geo    ${i.memory.geometries}  tex ${i.memory.textures}\n`
+          + `dpr    ${stage3d.renderer.getPixelRatio().toFixed(2)}  foods ${game.foods.length}`;
+      }
     }
   }
   frame();
