@@ -134,6 +134,8 @@ async function boot() {
   const clock = new THREE.Clock();
   let acc = 0;
   let frames = 0, fpsT = 0, fps = 60;
+  const frameTimes = [];
+  const MAX_FRAME_HISTORY = 5;
 
   function frame() {
     requestAnimationFrame(frame);
@@ -143,15 +145,21 @@ async function boot() {
     game.update(dt);
     stage3d.render(dt);
 
-    // Adaptive quality: if we sit under 45fps for a second, drop the pixel
-    // ratio one notch rather than letting the whole game feel sluggish.
+    // Adaptive quality: if last 5 frames average <45fps, drop pixel ratio
+    // immediately rather than waiting 1 second. Feels snappier under load.
+    frameTimes.push(dt);
+    if (frameTimes.length > MAX_FRAME_HISTORY) frameTimes.shift();
+    const avgDt = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
+    const frameFps = avgDt > 0 ? 1 / avgDt : 60;
+    if (frameFps < 45 && frameTimes.length === MAX_FRAME_HISTORY && stage3d.renderer.getPixelRatio() > 1) {
+      stage3d.renderer.setPixelRatio(Math.max(1, stage3d.renderer.getPixelRatio() - 0.25));
+    }
+
+    // Second-level FPS tracking for stats display
     frames++; fpsT += dt;
     if (fpsT >= 1) {
       fps = frames / fpsT;
       frames = 0; fpsT = 0;
-      if (fps < 45 && stage3d.renderer.getPixelRatio() > 1) {
-        stage3d.renderer.setPixelRatio(Math.max(1, stage3d.renderer.getPixelRatio() - 0.25));
-      }
       if (import.meta.env?.DEV) window.__ppFps = Math.round(fps);
       if (statsEl) {
         const i = stage3d.renderer.info;
