@@ -303,7 +303,7 @@ html, body {
 .pp-window i { display: block; height: 100%; transform-origin: left; background: linear-gradient(90deg, #ff5252, #ffab00); }
 
 /* pads */
-.pp-pad { width: min(420px, 82vw); display: grid; gap: 10px; justify-items: center; }
+.pp-pad { width: min(420px, 82vw); display: grid; gap: 10px; justify-items: center; user-select: none; }
 .pp-pad:focus-visible { outline: 4px solid #4fc3f7; outline-offset: 4px; border-radius: var(--r-md); }
 .pp-pad__hint { font-size: clamp(12px, 1.4vw, 15px); color: var(--ui-ink-soft); font-weight: 700; }
 .pp-pad__track {
