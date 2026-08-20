@@ -52,6 +52,10 @@ export class StationAutoplay {
     this.index = 0;
     this._t = 0;
     this.done = this.steps.length === 0;
+    // Some gameplay sequences have a physical setup performed by accept(food)
+    // before their first control appears. The Fact Book has no food to accept,
+    // so give the station a narrowly scoped way to recreate that opening pose.
+    station.beginAutoplay?.();
     if (!this.done) this._emit(0);
   }
 

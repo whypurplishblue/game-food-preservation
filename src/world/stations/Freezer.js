@@ -208,6 +208,24 @@ export class Freezer extends Station {
     return steps;
   }
 
+  /**
+   * Gameplay opens the door in accept(food), before the first "close" step.
+   * Fact Book autoplay deliberately has no food, so reproduce only that
+   * physical setup: open the fridge, show the cold puff, then let the real
+   * first step close it again.
+   */
+  beginAutoplay() {
+    this._targetDoor = 1;
+    this._loading = false;
+    this._puff();
+  }
+
+  /** Give the no-food demo enough time to present the open interior clearly. */
+  stepDurationMs(step) {
+    if (step?.id === 'close') return 1100;
+    return undefined;
+  }
+
   getSteps(food) {
     const m = METHODS[this.activeMethodId] || METHODS.cooling;
     this._mode = m;

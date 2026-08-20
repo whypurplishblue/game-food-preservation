@@ -279,6 +279,8 @@ export class Station {
   playSuccess() { return Promise.resolve(); }
   /** @abstract reset visuals for the next food */
   resetVisuals() {}
+  /** Optional no-food setup for the Fact Book's real-sequence autoplay. */
+  beginAutoplay() {}
 
   // ---------------------------------------------------------------- lifecycle
   accept(food) {
