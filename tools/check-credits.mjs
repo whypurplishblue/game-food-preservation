@@ -44,8 +44,10 @@ const doubleListed = onDisk.filter((f) => credited.has(f) && selfMade.has(f));
 
 // Entries whose file no longer exists — stale bookkeeping, not a hard
 // failure on its own, but worth flagging so credits.js does not silently
-// accumulate dead rows as models get renamed or removed.
-const stale = [...credited, ...selfMade].filter((f) => !onDisk.includes(f));
+// accumulate dead rows as models get renamed or removed. Only .glb entries
+// are checked here; credits.js also carries non-model assets (e.g. sounds)
+// that this script does not track.
+const stale = [...credited, ...selfMade].filter((f) => f.endsWith('.glb') && !onDisk.includes(f));
 
 const line = (name, arr) =>
   console.log(name.padEnd(24) + (arr.length === 0 ? 'PASS' : `FAIL (${arr.length})\n    ` + arr.join('\n    ')));

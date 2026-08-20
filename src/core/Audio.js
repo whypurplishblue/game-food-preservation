@@ -19,6 +19,7 @@ class AudioEngine {
     this.musicOn = true;
     this.master = null;
     this._musicNodes = null;
+    this._buffers = new Map();
   }
 
   /** Must be called from a user gesture (browsers block autoplay otherwise). */
@@ -34,6 +35,33 @@ class AudioEngine {
     comp.threshold.value = -12;
     comp.ratio.value = 8;
     this.master.connect(comp).connect(this.ctx.destination);
+  }
+
+  /** Fetch + decode a recorded sample once, then cache the AudioBuffer. */
+  _loadBuffer(url) {
+    if (this._buffers.has(url)) return this._buffers.get(url);
+    const p = fetch(url)
+      .then((r) => r.arrayBuffer())
+      .then((data) => this.ctx.decodeAudioData(data))
+      .catch(() => null);
+    this._buffers.set(url, p);
+    return p;
+  }
+
+  /** Play a recorded sample through the shared master bus. */
+  _sample(url, { peak = 0.5, rate = 1 } = {}) {
+    if (!this.ctx || !this.enabled) return;
+    this.resume();
+    this._loadBuffer(url).then((buffer) => {
+      if (!buffer || !this.ctx || !this.enabled) return;
+      const src = this.ctx.createBufferSource();
+      src.buffer = buffer;
+      src.playbackRate.value = rate;
+      const g = this.ctx.createGain();
+      g.gain.value = peak;
+      src.connect(g).connect(this.master);
+      src.start();
+    });
   }
 
   resume() { if (this.ctx?.state === 'suspended') this.ctx.resume(); }
@@ -93,6 +121,7 @@ class AudioEngine {
     const S = {
       // --- interface
       'ui.tap':      () => this._tone(620, { type: 'triangle', dur: 0.07, peak: 0.18 }),
+      'book.turn':   () => this._sample('assets/sounds/creatorshome-turn-a-page-336933.mp3', { peak: 0.5, rate: 0.9 + Math.random() * 0.2 }),
       'ui.back':     () => this._tone(360, { type: 'triangle', dur: 0.09, peak: 0.16, slideTo: 260 }),
       'ui.open':     () => { this._tone(520, { type: 'sine', dur: 0.12, peak: 0.18 }); this._tone(780, { type: 'sine', dur: 0.16, peak: 0.14, delay: 0.05 }); },
 
