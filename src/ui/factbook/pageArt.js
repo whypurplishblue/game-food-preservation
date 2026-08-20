@@ -784,20 +784,39 @@ function drawDiagram(ctx, mv, box) {
       break;
     }
     case 'pasteurising': {
-      // §5I is heat AND immediate cooling — both phases get equal weight.
-      const lx = cx - 118, rx = cx + 118;
-      drawIcon(ctx, 'flame', lx, cy - 30, 52, '#e2622b');
+      // Each temperature belongs to a specific hold time; they are two valid
+      // programmes, not the endpoints of a temperature range. Both routes then
+      // converge on the same immediate 4°C cooling step.
+      const lx = cx - 126, rx = cx + 132;
       ctx.fillStyle = rgba('#e2622b', 0.14);
-      roundRect(ctx, lx - 82, cy - 104, 164, 176, 20); ctx.fill();
+      roundRect(ctx, lx - 106, cy - 122, 212, 244, 22); ctx.fill();
       ctx.strokeStyle = rgba('#e2622b', 0.5); ctx.lineWidth = 3; ctx.stroke();
-      drawIcon(ctx, 'snowflake', rx, cy - 30, 48, '#3d8fb8');
+      drawIcon(ctx, 'flame', lx, cy - 82, 32, '#e2622b');
+      for (const [i, programme] of mv.programmes.slice(0, 2).entries()) {
+        const py = cy - 27 + i * 66;
+        ctx.fillStyle = i === 0 ? rgba('#f39a31', 0.2) : rgba('#e2622b', 0.2);
+        roundRect(ctx, lx - 91, py - 25, 182, 50, 18); ctx.fill();
+        const text = programme.label || `${programme.holdC}°C`;
+        let size = 19;
+        setFont(ctx, 800, size, SANS);
+        while (ctx.measureText(text).width > 160 && size > 13) {
+          size--;
+          setFont(ctx, 800, size, SANS);
+        }
+        ctx.fillStyle = i === 0 ? '#b45b16' : '#a74320';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(text, lx, py + 1);
+      }
+
       ctx.fillStyle = rgba('#3d8fb8', 0.14);
-      roundRect(ctx, rx - 82, cy - 104, 164, 176, 20); ctx.fill();
+      roundRect(ctx, rx - 82, cy - 104, 164, 208, 20); ctx.fill();
       ctx.strokeStyle = rgba('#3d8fb8', 0.5); ctx.lineWidth = 3; ctx.stroke();
-      arrow(lx + 88, cy - 16, rx - 88, cy - 16, INK_SOFT, false);
-      const hot = mv.programmes.length ? `${mv.programmes.map((p) => p.holdC).join(' / ')}°C` : null;
-      if (hot) tempPlate(lx, cy + 100, hot, '#d9531f');
-      if (mv.chill) tempPlate(rx, cy + 100, `${mv.chill.targetC}°C`, '#2f86ad');
+      drawIcon(ctx, 'snowflake', rx, cy - 48, 44, '#3d8fb8');
+      if (mv.chill) tempPlate(rx, cy + 54, `${mv.chill.targetC}°C`, '#2f86ad');
+
+      arrow(lx + 112, cy, rx - 88, cy, INK_SOFT, false);
+      drawIcon(ctx, 'clock', cx + 3, cy + 50, 20, INK_FAINT);
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
       break;
     }
     case 'smoking': {
@@ -967,7 +986,11 @@ function pageMethodRight(ctx, s, headings) {
   // freezing's range, pasteurising's two programmes, pickling's solutions.
   const facts = [];
   if (mv.range) facts.push(mv.range);
-  for (const p of mv.programmes) if (p.label) facts.push(p.label);
+  // Pasteurising pairs are already printed inside its diagram, where their
+  // relationship is clearer than repeating them as disconnected chips.
+  if (mv.id !== 'pasteurising') {
+    for (const p of mv.programmes) if (p.label) facts.push(p.label);
+  }
   for (const sol of mv.solutions) if (sol.label) facts.push(sol.label);
   if (facts.length) {
     y += 74;
