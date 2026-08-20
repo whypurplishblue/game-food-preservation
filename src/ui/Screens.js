@@ -357,7 +357,9 @@ export class Screens {
         <h2>${t('ui.pause')}</h2>
         <div class="pp-pause__settings">
           <label><input type="checkbox" data-set="sound" ${settings.sound ? 'checked' : ''}> ${t('ui.sound')}</label>
+          <label class="pp-pause__volume"><span>${t('ui.sfxVolume')}</span><input type="range" min="0" max="1" step="0.05" data-set="sfxVolume" value="${settings.sfxVolume}"></label>
           <label><input type="checkbox" data-set="music" ${settings.music ? 'checked' : ''}> ${t('ui.music')}</label>
+          <label class="pp-pause__volume"><span>${t('ui.musicVolume')}</span><input type="range" min="0" max="1" step="0.05" data-set="musicVolume" value="${settings.musicVolume}"></label>
           <label><input type="checkbox" data-set="reducedMotion" ${settings.reducedMotion ? 'checked' : ''}> ${t('ui.reducedMotion')}</label>
         </div>
         <div class="pp-pause__actions">
@@ -374,7 +376,10 @@ export class Screens {
     node.querySelector('[data-act="fact"]').addEventListener('click', () => { sfx('ui.open'); onFactBook(); });
     node.querySelector('[data-act="credits"]').addEventListener('click', () => { sfx('ui.open'); onCredits(); });
     for (const c of node.querySelectorAll('[data-set]')) {
-      c.addEventListener('change', () => onSetting(c.dataset.set, c.checked));
+      const isRange = c.type === 'range';
+      c.addEventListener(isRange ? 'input' : 'change', () => {
+        onSetting(c.dataset.set, isRange ? parseFloat(c.value) : c.checked);
+      });
     }
   }
 

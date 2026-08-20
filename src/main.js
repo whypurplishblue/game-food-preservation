@@ -118,6 +118,7 @@ async function boot() {
   const unlock = () => {
     audio.init();
     audio.setEnabled(game.settings.sound);
+    if (game.settings.music) audio.startMusic();
     window.removeEventListener('pointerdown', unlock);
     window.removeEventListener('keydown', unlock);
   };

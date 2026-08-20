@@ -601,7 +601,10 @@ html, body {
 .pp-result__actions, .pp-pause__actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .pp-pause__settings { display: grid; gap: 10px; justify-items: start; max-width: 260px; margin: 0 auto 20px; }
 .pp-pause__settings label { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; cursor: pointer; }
-.pp-pause__settings input { width: 22px; height: 22px; accent-color: #43a047; }
+.pp-pause__settings input[type="checkbox"] { width: 22px; height: 22px; accent-color: #43a047; }
+.pp-pause__volume { width: 100%; padding-left: 32px; }
+.pp-pause__volume span { flex: 0 0 auto; font-weight: 600; font-size: 13px; opacity: 0.8; }
+.pp-pause__volume input[type="range"] { flex: 1 1 auto; width: auto; accent-color: #43a047; }
 
 /* fact book */
 .pp-fact {
