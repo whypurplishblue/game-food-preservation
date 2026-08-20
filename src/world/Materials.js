@@ -219,7 +219,7 @@ export function blobShadow(radius = 0.5, opacity = 0.75) {
 export function labelTexture(text, {
   width = 512, height = 128, bg = '#ffffff', fg = '#2b1d33',
   font = '700 64px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-  radius = 28, padding = 16, border = null,
+  radius = 28, padding = 16, border = null, maxLines = 1,
 } = {}) {
   const c = document.createElement('canvas');
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -238,13 +238,29 @@ export function labelTexture(text, {
   ctx.font = font;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  // shrink-to-fit so long translations never overflow the plaque
+  // Split long translated labels at the most balanced word boundary before
+  // shrinking them. This keeps mobile signage readable in verbose locales.
   let size = parseInt(font.match(/(\d+)px/)?.[1] || '64', 10);
-  while (ctx.measureText(text).width > width - padding * 3 && size > 18) {
+  let lines = [text];
+  if (maxLines > 1 && ctx.measureText(text).width > width - padding * 3) {
+    const words = text.trim().split(/\s+/);
+    let best = null;
+    for (let i = 1; i < words.length; i++) {
+      const candidate = [words.slice(0, i).join(' '), words.slice(i).join(' ')];
+      const widest = Math.max(...candidate.map((line) => ctx.measureText(line).width));
+      if (!best || widest < best.widest) best = { lines: candidate, widest };
+    }
+    if (best) lines = best.lines;
+  }
+  const fits = () => Math.max(...lines.map((line) => ctx.measureText(line).width)) <= width - padding * 3
+    && size * 1.04 * lines.length <= height - padding * 1.4;
+  while (!fits() && size > 18) {
     size -= 2;
     ctx.font = font.replace(/\d+px/, `${size}px`);
   }
-  ctx.fillText(text, width / 2, height / 2 + 2);
+  const lineHeight = size * 1.04;
+  const firstY = height / 2 + 2 - ((lines.length - 1) * lineHeight) / 2;
+  lines.forEach((line, i) => ctx.fillText(line, width / 2, firstY + i * lineHeight));
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
