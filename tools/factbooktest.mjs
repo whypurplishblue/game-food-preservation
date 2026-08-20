@@ -21,7 +21,10 @@ const check = (name, ok, extra = '') => {
   if (!ok) failures++;
 };
 
-const browser = await chromium.launch({ args: ['--use-gl=angle', '--enable-unsafe-swiftshader', '--no-sandbox'] });
+const browser = await chromium.launch({
+  executablePath: process.env.PP_CHROME || undefined,
+  args: ['--use-gl=angle', '--enable-unsafe-swiftshader', '--no-sandbox'],
+});
 const errors = [];
 
 async function session(viewport, fn, opts = {}) {
@@ -159,7 +162,7 @@ await session({ width: 1600, height: 900 }, async (page) => {
 // -------------------------------------------------------- opened in-game
 await session({ width: 1600, height: 900 }, async (page) => {
   console.log('\n[in game]');
-  await page.click('[data-act="play"]');
+  await page.click('[data-act="playLearning"]');
   await page.click('[data-act="go"]');
   await page.waitForFunction(() => window.__pp.game.mode === 'playing', null, { timeout: 15000 });
   await page.click('.pp-hud .pp-icon-btn');           // the Fact Book button
@@ -179,6 +182,33 @@ await session({ width: 1600, height: 900 }, async (page) => {
     await page.evaluate(() => !window.__pp.game.factBook.book.turning));
   check('play resumes', await page.evaluate(() => window.__pp.game.mode === 'playing'));
   check('the HUD comes back', await page.evaluate(() => !window.__pp.hud.root.classList.contains('is-hidden')));
+
+  // Completing the final learning method schedules a quiz after the teaching
+  // banner. The result screen must not win that delay and cover the quiz.
+  await page.evaluate(async () => {
+    const { game, content } = window.__pp;
+    for (const food of game.foods) food.dispose();
+    game.foods.length = 0;
+    const methodId = game.stage.methods.at(-1);
+    const foodId = content.METHODS[methodId].foods.find((id) => content.FOODS[id]);
+    game._learningMethodsDone = new Set(game.stage.methods.slice(0, -1));
+    game._learningQuizzed = new Set(game.stage.methods.slice(0, -1));
+    await game._finishInteraction({
+      foodId, state: 'processing', _wrongStationTried: false, _spawnedAt: game.elapsed,
+      group: new window.__ppTHREE.Group(), markPreserved() {},
+    }, { playSuccess: () => Promise.resolve(), release() {} }, methodId, 1);
+  });
+  check('final learning quiz is pending before results', await page.evaluate(() =>
+    window.__pp.game.mode === 'teaching' && !window.__pp.game.screens.isOpen));
+  await page.waitForFunction(() => window.__pp.game.mode === 'quiz' && window.__pp.game.quiz.isOpen,
+    null, { timeout: 5000 });
+  check('final learning quiz appears before results', await page.evaluate(() =>
+    window.__pp.game.mode === 'quiz' && !window.__pp.game.screens.isOpen));
+  await page.click('.pp-quiz__opt');
+  await page.click('.pp-quiz__next');
+  await page.waitForFunction(() => window.__pp.game.mode === 'result');
+  check('learning results wait until the final quiz closes', await page.evaluate(() =>
+    window.__pp.game.screens.isOpen && !window.__pp.game.quiz.isOpen));
 });
 
 // ------------------------------------------------------------ narrow layout
@@ -216,6 +246,11 @@ await session({ width: 1600, height: 900 }, async (page) => {
   console.log('\n[localisation]');
   await page.click('.pp-lang[data-lang="zh"]');
   await sleep(200);
+  const stationLabels = await page.evaluate(() =>
+    [...window.__pp.game.stations.values()].map((station) => station.plaqueLabel)
+  );
+  check('station plaques refresh to the chosen language',
+    stationLabels.every((label) => label && !/[A-Za-z]/.test(label)), stationLabels.join(', '));
   await openBook(page);
   await page.evaluate(() => window.__pp.game.factBook.goToMethod('salting'));
   await settle(page);

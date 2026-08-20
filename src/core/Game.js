@@ -58,7 +58,7 @@ export class Game {
 
     this.foods = [];
     this.stations = new Map();
-    this.mode = 'menu';           // menu | brief | playing | paused | quiz | result
+    this.mode = 'menu';           // menu | brief | playing | teaching | paused | quiz | result
     this.gameMode = 'arcade';     // arcade | learning — which content/scoring track
     this.settings = { sound: true, music: true, sfxVolume: 1, musicVolume: 0.6, reducedMotion: false };
 
@@ -381,6 +381,8 @@ export class Game {
   }
 
   _teardownStage() {
+    clearTimeout(this._quizTimer);
+    this._quizTimer = null;
     for (const f of this.foods) f.dispose();
     this.foods.length = 0;
     for (const s of this.stations.values()) { s.enabled = false; s.root.visible = false; s.release(); }
@@ -639,7 +641,16 @@ export class Game {
       // deterministic, not the arcade's probabilistic quizChance roll.
       if (!this._learningQuizzed.has(methodId)) {
         this._learningQuizzed.add(methodId);
-        setTimeout(() => this._askQuiz(methodId, food.foodId), bannerClearMs);
+        // The method is already counted as complete, but its quiz deliberately
+        // waits for the teaching banner. Leave `playing` during that gap and
+        // the frame-end completion check shows results before the quiz.
+        this.mode = 'teaching';
+        clearTimeout(this._quizTimer);
+        this._quizTimer = setTimeout(() => {
+          this._quizTimer = null;
+          if (this.mode !== 'teaching') return;
+          this._askQuiz(methodId, food.foodId);
+        }, bannerClearMs);
       } else {
         this.input.setEnabled(true);
         this._checkStageEnd();
@@ -873,6 +884,9 @@ export class Game {
 
   _checkStageEnd() {
     if (this.gameMode === 'learning') {
+      // A final method is not finished until its deterministic quiz has been
+      // answered. This also prevents a fail screen from covering an open quiz.
+      if (this.mode === 'teaching' || this.mode === 'quiz') return;
       if (this._learningMethodsDone.size >= this.stage.methods.length) this._endStage(true);
       else if (this.spoiltCount >= 5) this._endStage(false);
       return;

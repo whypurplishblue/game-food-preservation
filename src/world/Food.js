@@ -97,7 +97,7 @@ export class Food {
    * on top (guided stages only), spoilage bar underneath, always aligned.
    */
   _buildMeter() {
-    const W = 288, H = this.showHint ? 128 : 62;
+    const W = 360, H = this.showHint ? 156 : 76;
     const c = document.createElement('canvas');
     c.width = W; c.height = H;
     this._meterW = W; this._meterH = H;
@@ -107,12 +107,12 @@ export class Food {
     tex.anisotropy = 4;
     this._meterTex = tex;
 
-    const wUnits = 1.05;
+    const wUnits = 1.28;
     const spr = new THREE.Mesh(
       new THREE.PlaneGeometry(wUnits, wUnits * (H / W)),
       new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false, toneMapped: false })
     );
-    spr.position.y = this.radius + (this.showHint ? 0.46 : 0.34);
+    spr.position.y = this.radius + (this.showHint ? 0.5 : 0.38);
     spr.renderOrder = 10;
     this.meter = spr;
     this.group.add(spr);
@@ -130,24 +130,39 @@ export class Food {
       const m = METHODS[this.hintMethodId];
       const hex = `#${m.colour.toString(16).padStart(6, '0')}`;
       ctx.fillStyle = hex;
-      ctx.beginPath(); ctx.roundRect(8, 6, W - 16, 60, 28); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(8, 6, W - 16, 76, 34); ctx.fill();
       ctx.strokeStyle = 'rgba(255,255,255,0.96)'; ctx.lineWidth = 6;
-      ctx.beginPath(); ctx.roundRect(8, 6, W - 16, 60, 28); ctx.stroke();
+      ctx.beginPath(); ctx.roundRect(8, 6, W - 16, 76, 34); ctx.stroke();
       ctx.fillStyle = '#fff';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       const label = (globalThis.__ppMethodName?.(m.id)) || m.id;
-      let size = 38;
+      let size = 48;
       ctx.font = `800 ${size}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-      while (ctx.measureText(label).width > W - 52 && size > 15) {
+      let lines = [label];
+      if (ctx.measureText(label).width > W - 52) {
+        const words = label.trim().split(/\s+/);
+        let best = null;
+        for (let i = 1; i < words.length; i++) {
+          const candidate = [words.slice(0, i).join(' '), words.slice(i).join(' ')];
+          const widest = Math.max(...candidate.map((line) => ctx.measureText(line).width));
+          if (!best || widest < best.widest) best = { lines: candidate, widest };
+        }
+        if (best) lines = best.lines;
+      }
+      const fits = () => Math.max(...lines.map((line) => ctx.measureText(line).width)) <= W - 52
+        && size * 1.02 * lines.length <= 66;
+      while (!fits() && size > 22) {
         size -= 2; ctx.font = `800 ${size}px system-ui, sans-serif`;
       }
       ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2;
-      ctx.fillText(label, W / 2, 37);
+      const lineHeight = size * 1.02;
+      const firstY = 45 - ((lines.length - 1) * lineHeight) / 2;
+      lines.forEach((line, i) => ctx.fillText(line, W / 2, firstY + i * lineHeight));
       ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-      by = 78;
+      by = 94;
     }
 
-    const pad = 22, bw = W - pad * 2, bh = 34;
+    const pad = 26, bw = W - pad * 2, bh = 40;
     ctx.fillStyle = 'rgba(28,18,34,0.55)';
     ctx.beginPath(); ctx.roundRect(pad, by, bw, bh, 17); ctx.fill();
     ctx.fillStyle = 'rgba(255,252,246,0.96)';
@@ -159,6 +174,12 @@ export class Food {
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.beginPath(); ctx.roundRect(pad + 6, by + 7, Math.max(12, (bw - 12) * v), (bh - 12) * 0.45, 9); ctx.fill();
     this._meterTex.needsUpdate = true;
+  }
+
+  /** Redraw the guided method badge after a language change. */
+  refreshLabel() {
+    this._lastMeter = this.spoil;
+    this._drawMeter(this.spoil);
   }
 
   // ---------------------------------------------------------------- gameplay

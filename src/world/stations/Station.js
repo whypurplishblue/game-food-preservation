@@ -78,25 +78,48 @@ export class Station {
   _buildPlaque() {
     const g = new THREE.Group();
     g.position.set(0, 2.82, 0.55);
-    const colour = this.def.colour;
-    const hex = `#${colour.toString(16).padStart(6, '0')}`;
-    // A station serving two methods (Freezer = freezing + cooling) needs its
-    // own name; falling back to one method's name would mislabel the other.
-    const key = `methods.${this.methodId}.stationName`;
-    const label = t(key) === key ? methodName(this.methodId) : t(key);
-    const tex = labelTexture(label.toUpperCase(), {
-      width: 512, height: 128, bg: hex, fg: '#ffffff', border: 'rgba(255,255,255,0.92)',
-      font: '800 62px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-    });
-    const board = mesh(new THREE.PlaneGeometry(2.0, 0.5), new THREE.MeshBasicMaterial({
-      map: tex, transparent: true, toneMapped: false, depthWrite: false,
+    const board = mesh(new THREE.PlaneGeometry(2.4, 0.66), new THREE.MeshBasicMaterial({
+      map: this._plaqueTexture(), transparent: true, toneMapped: false, depthWrite: false,
     }), { cast: false, receive: false });
     board.renderOrder = 3;
     g.add(board);
     // little post so the plaque reads as physically mounted
-    g.add(mesh(cyl(0.035, 0.035, 0.5, 8), metal(PALETTE.steelDark), { y: -0.42, z: -0.02 }));
+    g.add(mesh(cyl(0.04, 0.04, 0.56, 8), metal(PALETTE.steelDark), { y: -0.51, z: -0.02 }));
+    this.plaqueBoard = board;
     this.plaque = g;
     this.body.add(g);
+  }
+
+  /** Localised station name rendered large enough for the kitchen-wide camera. */
+  _plaqueTexture() {
+    const key = `methods.${this.methodId}.stationName`;
+    // A station serving two methods (Freezer = freezing + cooling) needs its
+    // own name; falling back to one method's name would mislabel the other.
+    const translated = t(key);
+    const label = translated === key ? methodName(this.methodId) : translated;
+    this.plaqueLabel = label;
+    const hex = `#${this.def.colour.toString(16).padStart(6, '0')}`;
+    return labelTexture(label.toUpperCase(), {
+      width: 640, height: 176, bg: hex, fg: '#ffffff', border: 'rgba(255,255,255,0.92)',
+      font: '800 88px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+      maxLines: 2,
+    });
+  }
+
+  /** Redraw language-dependent canvas textures without rebuilding the machine. */
+  refreshLabels() {
+    if (this.plaqueBoard) {
+      const old = this.plaqueBoard.material.map;
+      this.plaqueBoard.material.map = this._plaqueTexture();
+      this.plaqueBoard.material.needsUpdate = true;
+      old?.dispose();
+    }
+    if (this._clue) {
+      const old = this._clue.material.map;
+      this._clue.material.map = this._clueTexture();
+      this._clue.material.needsUpdate = true;
+      old?.dispose();
+    }
   }
 
   /** Ground ring that lights up when a dragged food can be dropped here. */
@@ -231,12 +254,8 @@ export class Station {
   /** Stage 4+ replaces the name with a process clue, so recall has a scaffold. */
   showClue(on) {
     if (!this._clue) {
-      const tex = labelTexture(methodClue(this.methodId), {
-        width: 512, height: 110, bg: 'rgba(20,14,26,0.78)', fg: '#ffe9c9', radius: 40,
-        font: '600 40px system-ui, sans-serif',
-      });
-      const m = mesh(new THREE.PlaneGeometry(1.9, 0.41), new THREE.MeshBasicMaterial({
-        map: tex, transparent: true, toneMapped: false, depthWrite: false,
+      const m = mesh(new THREE.PlaneGeometry(2.25, 0.52), new THREE.MeshBasicMaterial({
+        map: this._clueTexture(), transparent: true, toneMapped: false, depthWrite: false,
       }), { y: 2.82, z: 0.55, cast: false, receive: false });
       m.renderOrder = 3;
       this._clue = m;
@@ -244,6 +263,13 @@ export class Station {
       this.body.add(m);
     }
     this._clue.visible = on;
+  }
+
+  _clueTexture() {
+    return labelTexture(methodClue(this.methodId), {
+      width: 640, height: 148, bg: 'rgba(20,14,26,0.78)', fg: '#ffe9c9', radius: 44,
+      font: '600 52px system-ui, sans-serif', maxLines: 2,
+    });
   }
 
   setHighlight(on) { this._targetHighlight = on ? 1 : 0; }
