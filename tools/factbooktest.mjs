@@ -189,6 +189,8 @@ await session({ width: 1600, height: 900 }, async (page) => {
     const { game, content } = window.__pp;
     for (const food of game.foods) food.dispose();
     game.foods.length = 0;
+    game.stageId = content.LEARNING_STAGES.length;
+    game.stage = content.LEARNING_STAGES.at(-1);
     const methodId = game.stage.methods.at(-1);
     const foodId = content.METHODS[methodId].foods.find((id) => content.FOODS[id]);
     game._learningMethodsDone = new Set(game.stage.methods.slice(0, -1));
@@ -209,6 +211,8 @@ await session({ width: 1600, height: 900 }, async (page) => {
   await page.waitForFunction(() => window.__pp.game.mode === 'result');
   check('learning results wait until the final quiz closes', await page.evaluate(() =>
     window.__pp.game.screens.isOpen && !window.__pp.game.quiz.isOpen));
+  check('final learning results do not offer another level', await page.evaluate(() =>
+    !document.querySelector('.pp-result [data-act="next"]')));
 });
 
 // ------------------------------------------------------------ narrow layout
