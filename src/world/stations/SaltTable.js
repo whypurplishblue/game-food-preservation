@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 import { Station } from './Station.js';
 import { PALETTE } from '../Palette.js';
-import { plastic, metal, matte, roundedBox, cyl, sphere, torus, blob, mesh, clearcoatFor } from '../Materials.js';
+import { plastic, metal, matte, roundedBox, cyl, sphere, blob, mesh } from '../Materials.js';
 
 export class SaltTable extends Station {
   build() {
@@ -69,92 +69,126 @@ export class SaltTable extends Station {
     const bowl = mesh(sphere(0.17, 14, 10), metal(PALETTE.steel), {});
     bowl.scale.set(1, 0.55, 1);
     scoop.add(bowl);
+    const scoopSalt = mesh(sphere(0.13, 10, 7), new THREE.MeshBasicMaterial({
+      color: 0xfffdf4, toneMapped: false,
+    }), { y: 0.075, cast: false, receive: false });
+    scoopSalt.scale.set(1, 0.3, 1);
+    scoopSalt.visible = false;
+    scoop.add(scoopSalt);
     scoop.add(mesh(cyl(0.03, 0.03, 0.4, 8), plastic(PALETTE.saltingDeep), { x: 0.24, y: 0.12, rz: -0.7 }));
     this.scoop = scoop;
+    this.scoopSalt = scoopSalt;
     this.body.add(scoop);
 
-    // Salt grains that stick to the food as it gets covered.
-    this.grains = [];
-    const grainMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 });
-    for (let i = 0; i < 40; i++) {
-      const g = mesh(new THREE.BoxGeometry(0.05, 0.05, 0.05), grainMat, { cast: false, receive: false });
-      g.visible = false;
-      this.body.add(g);
-      this.grains.push(g);
+    // Fact Book autoplay has no gameplay food, so supply a cheap procedural
+    // fillet. Without it the scoop and moisture animated around empty space.
+    const demoFood = new THREE.Group();
+    demoFood.position.set(0.15, 1.43, 0.48);
+    demoFood.add(mesh(blob(0.53, 0.13, 0.31, 14, 8), matte(0xd97845, 0.82), { cast: false }));
+    for (const z of [-0.13, 0, 0.13]) {
+      demoFood.add(mesh(roundedBox(0.34, 0.018, 0.025, 0.01), matte(0xf3aa72, 0.9),
+        { x: 0.02, y: 0.125, z, ry: -0.18, cast: false, receive: false }));
     }
+    demoFood.visible = false;
+    this.demoFood = demoFood;
+    this.body.add(demoFood);
 
-    // Water beads drawn OUT of the food — the mechanism.
-    this.beads = [];
-    const beadMat = new THREE.MeshPhysicalMaterial({
-      color: 0x9fdcff, roughness: 0.05, transparent: true, opacity: 0.9, clearcoat: clearcoatFor(1), metalness: 0,
+    // Three broad coating patches communicate coverage more clearly (and in
+    // three draw calls) than forty independent grains floating around a food.
+    const saltPatchMat = new THREE.MeshBasicMaterial({
+      color: 0xfff2c2, toneMapped: false, transparent: true, opacity: 0.96,
+      side: THREE.DoubleSide, depthWrite: false,
     });
-    for (let i = 0; i < 14; i++) {
-      const b = mesh(sphere(0.05, 8, 6), beadMat.clone(), { cast: false, receive: false });
+    this.saltPatches = [[-0.18, -0.1], [0.12, 0.08], [0.27, -0.12]].map(([x, z], i) => {
+      const patch = mesh(new THREE.CircleGeometry(0.22 - i * 0.025, 14), saltPatchMat,
+        { x: 0.15 + x, y: 1.57, z: 0.48 + z, rx: -Math.PI / 2, cast: false, receive: false });
+      patch.visible = false;
+      patch.renderOrder = 3;
+      this.body.add(patch);
+      return patch;
+    });
+
+    // One instanced mesh makes the pour chunky and visible at mobile size while
+    // keeping all eight grains in a single draw call.
+    const streamGeometry = new THREE.BoxGeometry(0.065, 0.065, 0.065);
+    const streamGrains = new THREE.InstancedMesh(streamGeometry, new THREE.MeshBasicMaterial({
+      color: 0xfff2c2, toneMapped: false, transparent: true, opacity: 0.98, depthWrite: false,
+    }), 8);
+    const streamMatrix = new THREE.Matrix4();
+    for (let i = 0; i < 8; i++) {
+      streamMatrix.makeTranslation(
+        ((i % 3) - 1) * 0.045,
+        -0.08 - i * 0.07,
+        (((i * 2) % 3) - 1) * 0.035
+      );
+      streamGrains.setMatrixAt(i, streamMatrix);
+    }
+    streamGrains.instanceMatrix.needsUpdate = true;
+    streamGrains.frustumCulled = false;
+    const saltStream = new THREE.Group();
+    saltStream.add(streamGrains);
+    saltStream.add(mesh(cyl(0.045, 0.075, 0.48, 7), new THREE.MeshBasicMaterial({
+      color: 0xfff2c2, toneMapped: false, transparent: true, opacity: 0.72, depthWrite: false,
+    }), { y: -0.29, cast: false, receive: false }));
+    this.saltStream = saltStream;
+    this.saltStream.visible = false;
+    this.saltStream.renderOrder = 4;
+    this.body.add(this.saltStream);
+
+    // Four large water beads are easier to read than fourteen tiny droplets.
+    this.beads = [];
+    const beadMat = new THREE.MeshBasicMaterial({
+      color: 0x55bde9, toneMapped: false, transparent: true, opacity: 0.9, depthWrite: false,
+    });
+    for (let i = 0; i < 4; i++) {
+      const b = mesh(sphere(0.075, 8, 6), beadMat.clone(), { cast: false, receive: false });
       b.visible = false;
       this.body.add(b);
       this.beads.push({ mesh: b, t: 1 });
     }
 
-    // Coverage ring around the food, filling as the child rubs.
-    this.coverRing = new THREE.Mesh(
-      new THREE.RingGeometry(0.62, 0.76, 40, 1, -Math.PI / 2, 0.001),
-      new THREE.MeshBasicMaterial({ color: PALETTE.salting, toneMapped: false, side: THREE.DoubleSide, transparent: true, opacity: 0.95, depthWrite: false })
-    );
-    this.coverRing.rotation.x = -Math.PI / 2;
-    this.coverRing.position.set(0.1, 1.26, 0.2);
-    this.coverRing.visible = false;
-    this.coverRing.renderOrder = 3;
-    this.body.add(this.coverRing);
+    this.moisturePuddle = mesh(new THREE.CircleGeometry(0.24, 16), new THREE.MeshBasicMaterial({
+      color: 0x55bde9, toneMapped: false, transparent: true, opacity: 0.42,
+      side: THREE.DoubleSide, depthWrite: false,
+    }), { x: 0.75, y: 1.225, z: 0.49, rx: -Math.PI / 2, cast: false, receive: false });
+    this.moisturePuddle.visible = false;
+    this.moisturePuddle.renderOrder = 2;
+    this.body.add(this.moisturePuddle);
 
     this._coverage = 0;
+    this._rawProgress = 0;
   }
 
   getSteps() {
     return [
       { kind: 'tap', id: 'scoop', textKey: 'station.salting.scoop', icon: 'salt' },
-      { kind: 'scrub', id: 'spread', textKey: 'station.salting.spread', icon: 'hand', reps: 6, meterKey: 'methods.salting.coverage' },
+      { kind: 'scrub', id: 'spread', textKey: 'station.salting.spread', icon: 'hand', reps: 6,
+        ms: 2200, meterKey: 'methods.salting.coverage' },
     ];
   }
 
   onStepProgress(index, progress) {
     if (index !== 1) return;
-    this._coverage = progress;
+    this._rawProgress = progress;
+    this._coverage = THREE.MathUtils.clamp((progress - 0.18) / 0.82, 0, 1);
 
-    // Coverage ring sweeps round like a progress dial. Rebuilt only when the
-    // arc changes by a visible amount — regenerating a BufferGeometry on every
-    // pointermove allocated (and leaked) one per frame.
-    this.coverRing.visible = true;
-    if (Math.abs(progress - (this._ringAt ?? -1)) > 0.03) {
-      this._ringAt = progress;
-      this.coverRing.geometry.dispose();
-      this.coverRing.geometry = new THREE.RingGeometry(0.62, 0.76, 40, 1, -Math.PI / 2, Math.max(0.001, progress * Math.PI * 2));
+    // Coverage grows in three overlapping areas while the scoop rubs.
+    for (const [i, patch] of this.saltPatches.entries()) {
+      const p = THREE.MathUtils.clamp((this._coverage - i * 0.18) / 0.52, 0, 1);
+      patch.visible = p > 0;
+      patch.scale.setScalar(0.3 + p * 0.85);
     }
-
-    // Grains accumulate on the food surface.
-    const want = Math.floor(progress * this.grains.length);
-    for (let i = 0; i < this.grains.length; i++) {
-      const g = this.grains[i];
-      const on = i < want;
-      g.visible = on;
-      if (on && !g.userData.placed) {
-        g.userData.placed = true;
-        const a = Math.random() * Math.PI * 2;
-        const b = Math.acos(2 * Math.random() - 1);
-        const r = 0.42;
-        g.userData.local = new THREE.Vector3(
-          Math.sin(b) * Math.cos(a) * r,
-          Math.cos(b) * r * 0.8,
-          Math.sin(b) * Math.sin(a) * r * 0.85
-        );
-        g.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
-      }
-    }
+    this.saltStream.visible = progress > 0.1 && progress < 0.36;
+    this.scoopSalt.visible = progress < 0.36;
 
     // Water leaves the food in proportion to salt applied.
-    for (let i = 0; i < Math.floor(progress * this.beads.length); i++) {
+    const wetCount = Math.min(this.beads.length, Math.floor(this._coverage * (this.beads.length + 1)));
+    for (let i = 0; i < wetCount; i++) {
       const b = this.beads[i];
       if (b.t >= 1) { b.t = 0; b.a = Math.random() * Math.PI * 2; }
     }
+    this.moisturePuddle.visible = this._coverage > 0.3;
+    this.moisturePuddle.scale.setScalar(0.25 + this._coverage * 0.9);
 
     if (this.food) {
       // Food shrinks slightly as moisture is drawn out.
@@ -164,56 +198,72 @@ export class SaltTable extends Station {
   }
 
   onStepDone(index) {
-    if (index === 0) { this._scooping = true; this._scoopT = 0; }
+    if (index === 0) {
+      this._scooping = true;
+      this._scoopT = 0;
+      this.scoopSalt.visible = true;
+    }
+  }
+
+  /** Give Fact Book autoplay the food that gameplay normally docks here. */
+  beginAutoplay() {
+    this._demoActive = true;
+    this.demoFood.visible = true;
   }
 
   async playSuccess() {
-    await new Promise((r) => setTimeout(r, 620));
+    // Hold the completed coating and puddle long enough to read the outcome.
+    await new Promise((r) => setTimeout(r, 900));
   }
 
   resetVisuals() {
     this._coverage = 0;
-    this._ringAt = -1;
+    this._rawProgress = 0;
     this._scooping = false;
-    this.coverRing.visible = false;
+    this._demoActive = false;
+    this.demoFood.visible = false;
+    this.demoFood.scale.setScalar(1);
     this.scoop.position.set(-0.62, 1.55, 0.35);
     this.scoop.rotation.set(0, 0, 0);
-    for (const g of this.grains) { g.visible = false; g.userData.placed = false; }
+    this.saltStream.visible = false;
+    this.scoopSalt.visible = false;
+    for (const patch of this.saltPatches) { patch.visible = false; patch.scale.setScalar(1); }
     for (const b of this.beads) { b.t = 1; b.mesh.visible = false; }
+    this.moisturePuddle.visible = false;
+    this.moisturePuddle.scale.setScalar(1);
   }
 
   tick(dt, elapsed) {
-    this.shaker.rotation.y = Math.sin(elapsed * 0.7) * 0.15;
     this.saltHeap.scale.setScalar(1 - this._coverage * 0.22);
 
-    if (this._scooping) {
+    if (this._scooping && this._rawProgress < 0.34) {
       this._scoopT = Math.min(1, this._scoopT + dt * 1.8);
       const p = this._scoopT;
       this.scoop.position.set(
-        THREE.MathUtils.lerp(-0.62, 0.1, p),
+        THREE.MathUtils.lerp(-0.62, 0.15, p),
         1.55 + Math.sin(p * Math.PI) * 0.4,
-        THREE.MathUtils.lerp(0.35, 0.2, p)
+        THREE.MathUtils.lerp(0.35, 0.48, p)
       );
       this.scoop.rotation.z = -p * 2.2;
+    } else if (this._coverage > 0) {
+      // Once poured, the scoop makes an unmistakable left-right rubbing pass.
+      const rub = Math.sin(elapsed * 11);
+      this.scoop.position.set(0.15 + rub * 0.32 * (this._coverage < 1 ? 1 : 0), 1.7, 0.48);
+      this.scoop.rotation.set(0, 0, -1.15 + rub * 0.16);
     }
-    if (this._coverage > 0) {
-      // Scoop hovers and dabs in rhythm with the scrub.
-      this.scoop.position.x = 0.1 + Math.sin(elapsed * 9) * 0.3 * (this._coverage < 1 ? 1 : 0);
-      this.scoop.position.y = 1.75 + Math.abs(Math.sin(elapsed * 9)) * 0.1;
+    if (this.saltStream.visible) {
+      this.saltStream.position.set(this.scoop.position.x, this.scoop.position.y - 0.03, this.scoop.position.z);
+    }
+
+    if (this._demoActive) {
+      const shrink = 1 - this._coverage * 0.08;
+      this.demoFood.scale.set(shrink, 1 - this._coverage * 0.14, shrink);
     }
 
     // Food position while being salted
     if (this.food && (this._scooping || this._coverage > 0)) {
-      const target = this.root.localToWorld(new THREE.Vector3(0.1, 1.42, 0.2));
+      const target = this.root.localToWorld(new THREE.Vector3(0.15, 1.42, 0.48));
       this.food.group.position.lerp(target, 1 - Math.pow(0.004, dt));
-      const fw = this.food.group.position;
-      for (const g of this.grains) {
-        if (g.visible && g.userData.local) {
-          const l = g.userData.local;
-          const w = this.root.worldToLocal(fw.clone());
-          g.position.set(w.x + l.x, w.y + l.y, w.z + l.z);
-        }
-      }
     }
 
     for (const b of this.beads) {
@@ -222,9 +272,9 @@ export class SaltTable extends Station {
       b.mesh.visible = true;
       const p = b.t;
       b.mesh.position.set(
-        0.1 + Math.cos(b.a) * 0.42,
-        1.42 + 0.2 - p * 0.55,
-        0.2 + Math.sin(b.a) * 0.36
+        0.38 + p * 0.55,
+        1.54 - p * 0.38,
+        0.48 + Math.sin(b.a) * 0.25
       );
       const s = 1 - p * 0.7;
       b.mesh.scale.set(s, s * 1.4, s);
