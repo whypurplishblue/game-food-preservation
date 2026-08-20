@@ -519,10 +519,32 @@ export class FactBook3D {
     u.prev.disabled = this.index === 0;
     u.next.disabled = this.index === this.model.spreads.length - 1;
 
-    for (const tab of this._tabEls) tab.el.classList.toggle('is-on', isMethod && tab.id === mv.id);
+    for (const tab of this._tabEls) {
+      const isOn = isMethod && tab.id === mv.id;
+      tab.el.classList.toggle('is-on', isOn);
+      if (isOn) tab.el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
 
     this.live.textContent = `${s.label} — ${s.title}`;
     this._loadMethodModel(mv);
+    // Content just changed height — recheck once the browser has laid it out.
+    requestAnimationFrame(() => this._updatePanelFade());
+  }
+
+  /** Fade the panel's bottom (and top, once scrolled) edge against its actual overflow. */
+  _updatePanelFade() {
+    const el = this.ui.inner;
+    if (!el) return;
+    el.classList.toggle('has-more-below', el.scrollHeight - el.scrollTop - el.clientHeight > 4);
+    el.classList.toggle('has-more-above', el.scrollTop > 4);
+  }
+
+  /** Toggle left/right fade edges on the method tab strip against its overflow. */
+  _updateTabsFade() {
+    const el = this.tabs;
+    if (!el) return;
+    this.tabs.classList.toggle('has-fade-left', el.scrollLeft > 4);
+    this.tabs.classList.toggle('has-fade-right', el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
   }
 
   _sectionLead(s) {
@@ -749,6 +771,9 @@ export class FactBook3D {
     this.ui.next.addEventListener('click', () => this.go(1));
     this.closeBtn.addEventListener('click', () => this.close());
 
+    this.ui.inner.addEventListener('scroll', () => this._updatePanelFade(), { passive: true });
+    this.tabs.addEventListener('scroll', () => this._updateTabsFade(), { passive: true });
+
     this._onKey = (e) => {
       if (!this.isOpen) return;
       if (e.key === 'Escape') { e.preventDefault(); this.close(); }
@@ -905,6 +930,7 @@ export class FactBook3D {
     this._buildTabs();
     this._repaintStatic();
     this._updatePanel();
+    requestAnimationFrame(() => this._updateTabsFade());
 
     this.book.setProgress(0);
     this.book.setTurn(false);
@@ -1013,6 +1039,8 @@ export class FactBook3D {
     this.renderer.setSize(w, h, false);
     this._measureFrame(w, h);
     this._frameBook();
+    this._updatePanelFade();
+    this._updateTabsFade();
   }
 
   /**
