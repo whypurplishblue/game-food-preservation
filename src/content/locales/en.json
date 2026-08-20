@@ -90,7 +90,25 @@
     "factBookPlayableNote": "Microbes need water, warmth, air and a mild environment to grow. Every method here takes one of those away, so the food stays safe to eat for much longer.",
     "factBookExtraNote": "Extra methods from the notes. These do not have a machine in the game.",
     "contents": "Contents",
-    "openBook": "Open the book"
+    "openBook": "Open the book",
+    "arcadeMode": "Arcade",
+    "arcadeModeDesc": "Speed matters. Escalating stages, combos, stars.",
+    "learningMode": "Learn",
+    "learningModeDesc": "Mastery matters. One clean pass through every method.",
+    "leaderboard": "Leaderboard",
+    "viewLeaderboard": "View leaderboard",
+    "submitScore": "Submit to leaderboard",
+    "yourName": "Your name",
+    "submit": "Submit",
+    "scoreSubmitted": "Score submitted!",
+    "noScoresYet": "No scores yet — be the first!",
+    "leaderboardError": "Couldn't load the leaderboard. Try again later.",
+    "percentComplete": "{percent}% correct",
+    "firstAttempt": "First try",
+    "lateAttempt": "Got there after a wrong guess",
+    "quizBonus": "Quiz bonus",
+    "timeBonus": "Speed bonus",
+    "pointsBreakdown": "How you scored"
   },
   "station": {
     "drying": {
@@ -173,6 +191,26 @@
       "name": "The Whole Kitchen",
       "tagline": "Every machine. No labels. A question every time.",
       "brief": "Eight machines, no name plates, and they move while you work. You know all of this now — show it."
+    },
+    "learning1": {
+      "name": "Drying & Freezing",
+      "tagline": "Labels stay on. Take your time.",
+      "brief": "Meet drying and freezing. Every label and hint stays on — this is about understanding each method, not speed."
+    },
+    "learning2": {
+      "name": "Cooling, Vacuum & Pickling",
+      "tagline": "Cooling sits right next to freezing.",
+      "brief": "Cooling shares the freezer's cabinet with freezing but uses a much warmer setting. Compare them, then meet vacuum packing and pickling."
+    },
+    "learning3": {
+      "name": "Salting & Pasteurising",
+      "tagline": "Same idea as drying, a different action.",
+      "brief": "Salting removes moisture just like drying does, by a different route. Pasteurising heats, then cools — both steps matter."
+    },
+    "learning4": {
+      "name": "Smoking & Canning",
+      "tagline": "The last two machines.",
+      "brief": "Smoking dries food with smoke, the same reason drying works. Canning heats food to kill microorganisms, then seals it in."
     }
   },
   "mechanisms": {

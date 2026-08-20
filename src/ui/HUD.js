@@ -114,8 +114,13 @@ export class HUD {
     this.peekBtn.innerHTML = `💡 ${t('ui.preservationMemory')}`;
   }
 
-  /** Called on stage change — this is the hint-removal curve. */
-  applyStage(stage, unlockedMethods) {
+  /**
+   * Called on stage change — this is the hint-removal curve.
+   * @param {string} [gameMode] 'arcade' (default, id-driven fade curve below)
+   *   or 'learning', which keeps the memory panel fully open throughout since
+   *   labels/hints never turn off in that mode.
+   */
+  applyStage(stage, unlockedMethods, gameMode = 'arcade') {
     this.stageEl.querySelector('span').textContent = t('ui.stage');
     this.stageEl.querySelector('b').textContent = `${stage.id} · ${t(`stages.${stage.key}.name`)}`;
 
@@ -124,11 +129,19 @@ export class HUD {
       li.classList.toggle('is-locked', !unlockedMethods.includes(li.dataset.method));
     }
 
-    const mode = stage.id === 1 ? 'full' : stage.id === 2 ? 'names' : stage.id === 3 ? 'peek' : 'off';
+    const mode = gameMode === 'learning'
+      ? 'full'
+      : stage.id === 1 ? 'full' : stage.id === 2 ? 'names' : stage.id === 3 ? 'peek' : 'off';
     this.memory.classList.remove('is-full', 'is-names', 'is-peek', 'is-off', 'is-peeking');
     this.memory.classList.add(`is-${mode}`);
     this.peekBtn.hidden = mode !== 'peek';
     this.peekOpen = false;
+  }
+
+  /** Learning mode has no combo/stars — hide that chrome rather than rebuild the HUD. */
+  setArcadeUIVisible(v) {
+    this.comboEl.hidden = !v;
+    this.starsEl.hidden = !v;
   }
 
   setScore(v) { this.scoreEl.querySelector('b').textContent = v.toLocaleString(); }

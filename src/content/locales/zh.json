@@ -89,7 +89,25 @@
     "factBookPlayableNote": "微生物要生长，需要水分、温暖、空气和温和的环境。这里的每一种方法都拿走其中一项，食物就能安全食用更久。",
     "factBookExtraNote": "笔记中的其他方法，游戏中没有对应的机器。",
     "contents": "目录",
-    "openBook": "翻开书本"
+    "openBook": "翻开书本",
+    "arcadeMode": "街机模式",
+    "arcadeModeDesc": "速度至上。关卡逐渐加难，有连击和星星。",
+    "learningMode": "学习模式",
+    "learningModeDesc": "重在掌握。完整学一遍每一种方法。",
+    "leaderboard": "排行榜",
+    "viewLeaderboard": "查看排行榜",
+    "submitScore": "提交到排行榜",
+    "yourName": "你的名字",
+    "submit": "提交",
+    "scoreSubmitted": "分数已提交！",
+    "noScoresYet": "还没有分数——成为第一名！",
+    "leaderboardError": "排行榜加载失败，请稍后再试。",
+    "percentComplete": "{percent}% 正确",
+    "firstAttempt": "第一次就对了",
+    "lateAttempt": "猜错一次后答对了",
+    "quizBonus": "问答加分",
+    "timeBonus": "速度加分",
+    "pointsBreakdown": "得分明细"
   },
   "station": {
     "drying": {
@@ -172,6 +190,26 @@
       "name": "整间厨房",
       "tagline": "所有机器。没有名牌。每次都有问题。",
       "brief": "八台机器，没有名牌，而且会移动。这些你都学过了——现在证明给我看。"
+    },
+    "learning1": {
+      "name": "烘干与冷冻",
+      "tagline": "标签保持开启，慢慢来。",
+      "brief": "认识烘干和冷冻。所有标签和提示都保持开启——重点是理解每种方法，不是速度。"
+    },
+    "learning2": {
+      "name": "冷藏、真空与腌渍",
+      "tagline": "冷藏就在冷冻旁边。",
+      "brief": "冷藏和冷冻共用同一个冷藏柜，但设定温度暖得多。比较两者，然后认识真空包装和腌渍。"
+    },
+    "learning3": {
+      "name": "腌盐与巴氏消毒",
+      "tagline": "原理和烘干一样，做法不同。",
+      "brief": "腌盐和烘干一样都是去除水分，只是方式不同。巴氏消毒先加热再冷却——两个步骤都很重要。"
+    },
+    "learning4": {
+      "name": "烟熏与罐装",
+      "tagline": "最后两台机器。",
+      "brief": "烟熏用烟把食物弄干，原理和烘干一样。罐装先加热杀死微生物，再把食物密封起来。"
     }
   },
   "mechanisms": {

@@ -341,6 +341,68 @@ export const STAGES = [
   },
 ];
 
+/**
+ * LEARNING mode — one clean pass through all nine playable methods, grouped
+ * for contrast (cooling next to freezing, salting next to drying's mechanism,
+ * smoking next to drying's machine). Labels and the food hint badge stay ON
+ * throughout: the goal here is comprehension, not recall under pressure, so
+ * nothing is ever hidden. `quizChance` is unused for these stages — Game.js
+ * asks exactly one quiz per method, the first time it is correctly used,
+ * rather than rolling a probability.
+ */
+export const LEARNING_STAGES = [
+  {
+    id: 1, key: 'learning1',
+    methods: ['drying', 'freezing'],
+    showStationLabels: true, showMethodHintOnFood: true,
+    spoilRateMul: 0.5, spawnIntervalMs: 6000, maxActiveFoods: 2,
+    quizChance: 0, targetPreserved: 2,
+    shufflePositions: false, reshuffleMidStage: false, allowFactBook: true,
+  },
+  {
+    id: 2, key: 'learning2',
+    // Cooling sits next to freezing on purpose — same cabinet, same dial,
+    // different target temperature. The contrast IS the lesson.
+    methods: ['cooling', 'vacuum', 'pickling'],
+    showStationLabels: true, showMethodHintOnFood: true,
+    spoilRateMul: 0.5, spawnIntervalMs: 5600, maxActiveFoods: 2,
+    quizChance: 0, targetPreserved: 3,
+    shufflePositions: false, reshuffleMidStage: false, allowFactBook: true,
+  },
+  {
+    id: 3, key: 'learning3',
+    // Salting shares drying's mechanism (removes water) with a different
+    // action — reinforces "mechanism, not machine".
+    methods: ['salting', 'pasteurising'],
+    showStationLabels: true, showMethodHintOnFood: true,
+    spoilRateMul: 0.5, spawnIntervalMs: 5600, maxActiveFoods: 2,
+    quizChance: 0, targetPreserved: 2,
+    shufflePositions: false, reshuffleMidStage: false, allowFactBook: true,
+  },
+  {
+    id: 4, key: 'learning4',
+    methods: ['smoking', 'canning'],
+    showStationLabels: true, showMethodHintOnFood: true,
+    spoilRateMul: 0.5, spawnIntervalMs: 5600, maxActiveFoods: 2,
+    quizChance: 0, targetPreserved: 2,
+    shufflePositions: false, reshuffleMidStage: false, allowFactBook: true,
+  },
+];
+
+/**
+ * LEARNING mode scoring — correctness-weighted, not combo/speed-weighted, so
+ * a leaderboard built on it reflects "how many methods do you actually know."
+ * `maxPossible` deliberately excludes the time bonus: 100% is reachable by
+ * being fully correct, the time bonus is a tiebreaker on top of that.
+ */
+export const LEARNING_SCORING = {
+  firstAttemptBonus: 100,   // correct station, no wrong try first, for this food
+  lateCorrectBonus: 50,     // correct eventually, after a wrong-station try
+  quizCorrect: 50,          // one-shot, no retry credit
+  timeBonusMax: 5,          // per method, capped, tiebreak-only
+  maxPossible: 9 * (100 + 50), // = 1350
+};
+
 export const SCORING = {
   base: 100,
   perfectInteractionBonus: 50,   // clean execution of the station mini-game
@@ -487,6 +549,18 @@ export function validateCurriculum() {
     for (const id of st.methods) {
       if (!METHODS[id]?.playable) problems.push(`STAGES[${st.id}] lists non-playable method "${id}"`);
     }
+  }
+  for (const st of LEARNING_STAGES) {
+    for (const id of st.methods) {
+      if (!METHODS[id]?.playable) problems.push(`LEARNING_STAGES[${st.id}] lists non-playable method "${id}"`);
+    }
+  }
+  // Learning mode's premise is "every playable method appears exactly once."
+  const learningMethods = LEARNING_STAGES.flatMap((st) => st.methods);
+  const allPlayable = Object.values(METHODS).filter((m) => m.playable).map((m) => m.id);
+  for (const id of allPlayable) {
+    const n = learningMethods.filter((x) => x === id).length;
+    if (n !== 1) problems.push(`LEARNING_STAGES: method "${id}" appears ${n} times, expected exactly 1`);
   }
   return problems;
 }

@@ -20,7 +20,7 @@ import { FOODS, FOOD_METHODS, METHODS } from '../content/curriculum.js';
 let _uid = 0;
 
 export class Food {
-  constructor(foodId, { spoilRate = 0.055, showHint = false } = {}) {
+  constructor(foodId, { spoilRate = 0.055, showHint = false, hintMethodId = null } = {}) {
     this.uid = ++_uid;
     this.foodId = foodId;
     this.def = FOODS[foodId];
@@ -30,6 +30,13 @@ export class Food {
     this.state = 'idle';
     this.preservedBy = null;
     this.showHint = showHint;
+    // The method the hint badge names — usually the food's usual primary,
+    // but Learning mode overrides it to whichever method THIS spawn is
+    // teaching (some methods, e.g. cooling, are never anyone's primary).
+    this.hintMethodId = hintMethodId || this.def.primary;
+    // Learning mode: did a wrong station get tried before the correct one?
+    // Drives the first-attempt vs. late-correct scoring split.
+    this._wrongStationTried = false;
     this._t = Math.random() * 10;
 
     this.group = new THREE.Group();
@@ -120,7 +127,7 @@ export class Food {
 
     let by = 12;
     if (this.showHint) {
-      const m = METHODS[this.def.primary];
+      const m = METHODS[this.hintMethodId];
       const hex = `#${m.colour.toString(16).padStart(6, '0')}`;
       ctx.fillStyle = hex;
       ctx.beginPath(); ctx.roundRect(8, 6, W - 16, 60, 28); ctx.fill();
