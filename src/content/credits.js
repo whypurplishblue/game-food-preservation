@@ -46,6 +46,14 @@ export const CREDITS = [
     license: 'CC BY 4.0',
     licenseUrl: 'http://creativecommons.org/licenses/by/4.0/',
   },
+  {
+    file: 'sounds/creatorshome-turn-a-page-336933.mp3',
+    title: 'Turn a Page',
+    author: 'CreatorsHome',
+    sourceUrl: 'https://pixabay.com/sound-effects/film-special-effects-turn-a-page-336933/',
+    license: 'Pixabay Content License',
+    licenseUrl: 'https://pixabay.com/service/license-summary/',
+  },
 ];
 
 // Authored in-house — confirmed by the project owner (2026-08-18). No

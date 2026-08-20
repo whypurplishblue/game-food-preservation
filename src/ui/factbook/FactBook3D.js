@@ -792,7 +792,7 @@ export class FactBook3D {
     this.tTurn.cancel();
     this.tTurn.value = 0;
     this._applyTurn();
-    sfx('ui.tap');
+    sfx('book.turn');
   }
 
   /** Push `turn` into the book and keep the panel in step (§42, §43). */
@@ -850,7 +850,6 @@ export class FactBook3D {
       this.state = this._inspecting ? 'food' : 'reading';
       this._prefetch();
     });
-    sfx(commit ? 'ui.open' : 'ui.back');
   }
 
   _progressFor(i) {
