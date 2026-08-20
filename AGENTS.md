@@ -19,8 +19,18 @@ The Credits screen (`Screens.js` → `credits()`) renders `CREDITS` directly —
 ## The 3D Fact Book (`src/ui/factbook/`)
 
 The Fact Book is a physical animated book with its own WebGL context, opened by
-`Game.openFactBook()`. `Screens.factBook()` is still there as the flat fallback
-if that context cannot be created; it teaches exactly the same material.
+`Game.openFactBook()`. It arrives shut, is held there for a beat (`AUTO_OPEN_MS`
+in `FactBook3D.js`) and then opens itself; a tap, click, Enter or Space during
+that beat opens it early. Shut, it is presented centre stage and larger than
+life; opening walks it across into the book zone, so the panel's half of the
+screen is only claimed once there is something to put in it. Both framings are
+computed in `_frameBook()` and cross-faded by `openness` — the size back early,
+the position late.
+
+The 3D book is the **preservation methods chapter**: methods divider → playable
+methods → Fact-Book-only methods → why preservation matters. Spoilage
+(`spoilage.*`) is taught by `Screens.factBook()`, the flat fallback used when
+the WebGL context cannot be created.
 
 It is a **presentation layer only**. Nothing educational is decided inside it:
 

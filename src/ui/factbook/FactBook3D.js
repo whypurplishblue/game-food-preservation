@@ -35,6 +35,10 @@ const easeOutCubic = (x) => 1 - Math.pow(1 - x, 3);
 const easeInOutCubic = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
 const smooth = (x, a, b) => THREE.MathUtils.smoothstep(x, a, b);
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+const lerp = (a, b, t) => a + (b - a) * t;
+
+/** How long the shut book is held on screen before it opens itself (§38). */
+const AUTO_OPEN_MS = 1000;
 
 const el = (tag, cls, text) => {
   const e = document.createElement(tag);
@@ -89,6 +93,8 @@ export class FactBook3D {
     this._shownIndex = -1;
     this._built = false;
     this._raf = 0;
+    this._openTimer = 0;
+    this._framedAt = -1;     // openness the camera framing was last built for
     this._elapsed = 0;
     this._cardEls = [];
     this._modelCache = new Map();   // methodId -> built model, current spread +/- 1
@@ -137,7 +143,7 @@ export class FactBook3D {
     wrap.appendChild(this.closeBtn);
 
     this.tabs = el('nav', 'pp-fb__tabs');
-    this.tabs.setAttribute('aria-label', t('ui.methodBadges'));
+    this.tabs.setAttribute('aria-label', t('ui.factBookMethods'));
     wrap.appendChild(this.tabs);
 
     this.live = el('p', 'pp-sr');
@@ -211,11 +217,7 @@ export class FactBook3D {
   _headings() {
     return {
       chapter: t('ui.chapter'),
-      contents: t('ui.contents'),
       howItWorks: t('ui.howItWorks'),
-      signs: t('ui.signsOfSpoilage'),
-      senses: t('ui.usingOurSenses'),
-      safety: t('ui.foodSafety'),
       inThisChapter: t('ui.inThisChapter'),
       theEnd: t('ui.theEnd'),
       referenceOnly: t('ui.referenceOnly'),
@@ -525,9 +527,6 @@ export class FactBook3D {
 
   _sectionLead(s) {
     switch (s.kind) {
-      case 'contents': return s.subtitle;
-      case 'spoilage-a': return s.why;
-      case 'spoilage-b': return s.unsafe;
       case 'divider': return s.note || '';
       default: return '';
     }
@@ -535,19 +534,10 @@ export class FactBook3D {
 
   _sectionList(s) {
     switch (s.kind) {
-      case 'spoilage-a': return { label: t('ui.signsOfSpoilage'), items: s.signs, ordered: false };
-      case 'spoilage-b': return {
-        label: t('ui.usingOurSenses'), ordered: false,
-        items: s.senses.map((x) => `${x.name} — ${x.text}`),
-      };
       case 'importance': return { label: s.title, items: s.items, ordered: true };
       case 'divider': return {
         label: t('ui.inThisChapter'), ordered: false,
         items: s.methods.map((m) => `${m.name} — ${m.mechLabel}`),
-      };
-      case 'contents': return {
-        label: t('ui.inThisChapter'), ordered: false,
-        items: s.sections.map((x) => x.label),
       };
       default: return null;
     }
@@ -702,6 +692,15 @@ export class FactBook3D {
       if (this.state !== 'closed') return;
       if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
       e.preventDefault();
+      this.openBook();
+    });
+
+    // While it is shut the book stands centre stage, over ground the book zone
+    // does not own. Anywhere but the ✕ opens it, so no part of the book it is
+    // showing you is dead to the touch.
+    this.wrap.addEventListener('pointerdown', (e) => {
+      if (!this.isOpen || this.state !== 'closed') return;
+      if (e.target.closest('.pp-fb__close')) return;
       this.openBook();
     });
 
@@ -916,22 +915,26 @@ export class FactBook3D {
     this.book.setOpenness(0);
     this.book.apply();
     this.state = 'closed';
+    this._framedAt = -1;          // centre stage until it opens
     this._describeBookZone();
     this._resize();
 
-    // The book arrives SHUT and waits. Opening it is the reader's move — the
-    // cover cracks on hover and commits on click (§38) — and it is the same
-    // object that then swings open, never a second one faded in.
+    // The book arrives SHUT, is held there for a beat so the reader sees the
+    // object they are about to open, then opens itself. It is the same object
+    // throughout — never a second one faded in (§38).
     this._prefetch();
     this._last = performance.now();
     if (!this._raf) this._loop();
-    // The shut book IS the control: it is focusable, it says what it does, and
-    // Enter, Space, a click or a tap all open it.
+    // A tap, a click, Enter or Space during that beat opens it early; the shut
+    // book is still the control, it just does not wait to be asked.
     requestAnimationFrame(() => this.bookZone.focus({ preventScroll: true }));
+    clearTimeout(this._openTimer);
+    this._openTimer = setTimeout(() => this.openBook(), AUTO_OPEN_MS);
   }
 
   openBook() {
-    if (this.state !== 'closed') return;
+    clearTimeout(this._openTimer);
+    if (this.state !== 'closed' || !this.isOpen) return;
     this.state = 'opening';
     this._describeBookZone();
     sfx('ui.open');
@@ -945,6 +948,7 @@ export class FactBook3D {
 
   close() {
     if (!this.isOpen || this.state === 'closing') return;
+    clearTimeout(this._openTimer);
     this.state = 'closing';
     sfx('ui.back');
     this.wrap.classList.remove('is-open');
@@ -988,6 +992,11 @@ export class FactBook3D {
       this.book.setOpenness(v);
     }
 
+    // The book is presented centre stage while shut and slides into its zone as
+    // it opens — late enough that the cover is visibly moving first, and
+    // finished as the pages settle. Closing walks it back to the middle.
+    if (this.tOpen.value !== this._framedAt) { this._framedAt = this.tOpen.value; this._frameBook(); }
+
     if (this.tTurn.active) { this.tTurn.update(dt); this._applyTurn(); }
     if (this.tProgress.active) this.book.setProgress(this.tProgress.update(dt));
     this.book.apply();
@@ -1003,24 +1012,56 @@ export class FactBook3D {
     const w = this.wrap.clientWidth || window.innerWidth;
     const h = this.wrap.clientHeight || window.innerHeight;
     this.renderer.setSize(w, h, false);
-    this._frameBook(w, h);
+    this._measureFrame(w, h);
+    this._frameBook();
   }
 
   /**
-   * Frame the book inside the book ZONE rather than the whole canvas, with an
-   * off-centre frustum. The book keeps a natural perspective and does not have
-   * to be shrunk to pay for the panel (§10).
+   * Where the book zone is, in canvas pixels. Read on resize only: `_frameBook`
+   * runs every frame while the book is opening, and a layout read per frame is
+   * exactly the kind of thing that turns a smooth open into a stutter.
    */
-  _frameBook(w, h) {
+  _measureFrame(w, h) {
     const zr = this.bookZone.getBoundingClientRect();
     const cr = this.canvas.getBoundingClientRect();
     const zw = Math.max(80, zr.width);
     const zh = Math.max(80, zr.height);
-    const cx = zr.left - cr.left + zw / 2;
-    // Biased downward: at the middle of a page turn the sheet stands on end and
-    // is taller than the whole open book. Centring the book exactly would send
-    // it off the top of the frame.
-    const cy = zr.top - cr.top + zh * 0.55;
+    this._frame = {
+      w, h,
+      cx: zr.left - cr.left + zw / 2,
+      // Biased downward: at the middle of a page turn the sheet stands on end
+      // and is taller than the whole open book. Centring the book exactly would
+      // send it off the top of the frame.
+      cy: zr.top - cr.top + zh * 0.55,
+      fw: THREE.MathUtils.clamp(zw / w, 0.2, 1),
+      fh: THREE.MathUtils.clamp(zh / h, 0.2, 1),
+    };
+  }
+
+  /**
+   * Frame the book, with an off-centre frustum so it keeps a natural
+   * perspective instead of being shrunk to pay for the panel (§10).
+   *
+   * The shut book is presented centre stage and larger than life; as it opens
+   * it walks across into the book ZONE, making room for its own contents. Two
+   * curves, both driven by the opening:
+   *
+   *   POSITION travels late and lands with the pages — the cover is visibly
+   *     moving before the book starts crossing the screen.
+   *   SIZE gives that magnification back early, before the cover is a third
+   *     of the way up. A half-open book stands on end and is the tallest this
+   *     thing ever gets; any extra scale in that pose overflows the frame.
+   */
+  _frameBook() {
+    const f = this._frame;
+    if (!f) return;
+    const { w, h } = f;
+    const o = this.tOpen.value;
+    // How much of the "presented" pose is left, and how far across it has come.
+    const pres = 1 - smooth(o, 0.02, 0.30);
+    const s = smooth(o, 0.30, 0.95);
+    const cx = lerp(w / 2, f.cx, s);
+    const cy = lerp(h * 0.5, f.cy, s);
 
     const cam = this.camera;
     cam.aspect = w / h;
@@ -1031,13 +1072,20 @@ export class FactBook3D {
     // book is more than twice as wide as it is tall on screen, and fitting a
     // sphere around it left it small in the middle of a large empty zone.
     const elev = THREE.MathUtils.degToRad(64);
-    const halfW = PAGE_W * 1.09;
-    const halfV = (PAGE_H * 0.5) * Math.sin(elev) + 0.2 * Math.cos(elev);
     const vFov = THREE.MathUtils.degToRad(cam.fov);
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * cam.aspect);
-    const fw = THREE.MathUtils.clamp(zw / w, 0.2, 1);
-    const fh = THREE.MathUtils.clamp(zh / h, 0.2, 1);
-    const dist = Math.max(halfV / Math.tan((vFov / 2) * fh), halfW / Math.tan((hFov / 2) * fw)) * 1.08;
+    const fit = (halfW, halfV, fw, fh) => Math.max(
+      halfV / Math.tan((vFov / 2) * fh),
+      halfW / Math.tan((hFov / 2) * fw)) * 1.08;
+
+    // Reading: the open book, fitted to the book zone. Presented: the shut
+    // block, fitted to the whole canvas.
+    const reading = fit(PAGE_W * 1.09, (PAGE_H * 0.5) * Math.sin(elev) + 0.2 * Math.cos(elev), f.fw, f.fh);
+    // Shut, the block hangs a whole cover to the LEFT of the spine, which is the
+    // origin the camera aims at — so its half-width is a full cover, not half of
+    // one. Understate it and a narrow screen crops the fore-edge.
+    const presented = fit(PAGE_W * 1.12, PAGE_H * 0.62, 0.96, Math.max(f.fh, 0.86));
+    const dist = lerp(reading, presented, pres);
 
     cam.position.set(0, Math.sin(elev) * dist, Math.cos(elev) * dist);
     cam.lookAt(0, 0.02, 0);
@@ -1134,6 +1182,7 @@ export class FactBook3D {
     window.removeEventListener('resize', this._onResize);
     window.removeEventListener('keydown', this._onKey);
     clearTimeout(this._prefetchTimer);
+    clearTimeout(this._openTimer);
     this._disposeInspected();
     for (const e of this._modelCache.values()) e.dispose?.();
     this._modelCache.clear();

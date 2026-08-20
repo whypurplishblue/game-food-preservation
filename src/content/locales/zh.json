@@ -79,8 +79,9 @@
     "inspectFood": "查看{food}",
     "prevPage": "上一页",
     "nextPage": "下一页",
+    "factBookMethods": "食物保存方法",
     "factBookMore": "更多保存方法",
-    "factBookPlayableNote": "你在游戏中使用的方法。",
+    "factBookPlayableNote": "微生物要生长，需要水分、温暖、空气和温和的环境。这里的每一种方法都拿走其中一项，食物就能安全食用更久。",
     "factBookExtraNote": "笔记中的其他方法，游戏中没有对应的机器。",
     "contents": "目录",
     "openBook": "翻开书本"

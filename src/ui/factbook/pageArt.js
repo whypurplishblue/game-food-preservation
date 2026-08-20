@@ -471,8 +471,6 @@ export function iconForMethod(mv) {
   }
 }
 
-const SENSE_ICON = { sight: 'eye', smell: 'nose', taste: 'tongue', touch: 'hand' };
-
 /**
  * Stand-in illustration for a food the notes name but the game has no model
  * for (§26 — rendang, jam, bananas, apples, oranges, tomatoes). Drawn rather
@@ -873,161 +871,23 @@ function drawDiagram(ctx, mv, box) {
 }
 
 // ---------------------------------------------------------------- page bodies
-function pageContentsLeft(ctx, s) {
-  const cy = PH * 0.34;
-  ctx.textAlign = 'center';
-  label(ctx, s.label, PW / 2, cy - 130, { size: 20, align: 'center' });
-  ctx.textAlign = 'left';
-  display(ctx, s.title, M, cy, COL, { size: 78 });
-  ctx.textAlign = 'center';
-  setFont(ctx, 700, 26, SANS);
-  ctx.fillStyle = ORANGE;
-  ctx.fillText(String(s.subtitle || '').toUpperCase(), PW / 2, cy + 60);
-  ctx.textAlign = 'left';
-  ornament(ctx, PW / 2, cy + 130);
-  drawIcon(ctx, 'sun', PW / 2 - 150, cy + 260, 44, '#f0b429');
-  drawIcon(ctx, 'snowflake', PW / 2 - 50, cy + 260, 44, '#4a9fe0');
-  drawIcon(ctx, 'jar', PW / 2 + 50, cy + 260, 44, '#5aa35e');
-  drawIcon(ctx, 'droplet', PW / 2 + 150, cy + 260, 44, '#3d8fb8');
-}
-
-function pageContentsRight(ctx, s, headings) {
-  let y = M + 108;
-  display(ctx, headings.contents, M, y, COL, { size: 54 });
-  y += 46;
-  rule(ctx, M, y, 120, rgba(ORANGE, 0.9), 4);
-  y += 62;
-  setFont(ctx, 400, 24, SERIF);
-  for (const sec of s.sections) {
-    ctx.fillStyle = INK;
-    setFont(ctx, 700, 27, SERIF);
-    ctx.fillText(sec.label, M, y);
-    ctx.fillStyle = INK_FAINT;
-    setFont(ctx, 700, 20, SANS);
-    ctx.textAlign = 'right';
-    ctx.fillText(String(sec.n), PW - M, y);
-    ctx.textAlign = 'left';
-    y += 12;
-    rule(ctx, M, y, COL, RULE_SOFT, 1.5);
-    y += 44;
-  }
-  y += 22;
-  label(ctx, s.sections[1] ? s.sections[1].label : '', M, y, { size: 17 });
-  y += 34;
-  const colW = COL / 2 - 14;
-  let col = 0, cy = y;
-  for (const mv of s.methods) {
-    const x = M + col * (colW + 28);
-    drawIcon(ctx, iconForMethod(mv), x + 15, cy - 8, 15, hexOf(mv.colour));
-    setFont(ctx, mv.playable ? 700 : 400, 23, SERIF);
-    ctx.fillStyle = mv.playable ? INK : INK_SOFT;
-    ctx.fillText(mv.name, x + 42, cy);
-    cy += 42;
-    if (cy > PH - M - 70) { col = 1; cy = y; }
-  }
-}
-
-function pageSpoilageALeft(ctx, s) {
-  let y = M + 118;
-  display(ctx, s.title, M, y, COL, { size: 78 });
-  y += 34;
-  rule(ctx, M, y, 130, rgba(ORANGE, 0.9), 4);
-  y += 74;
-  y = paragraph(ctx, s.what, M, y, COL, { size: 30, lh: 1.5 });
-  y += 54;
-  ctx.fillStyle = rgba('#16294d', 0.05);
-  const boxTop = y - 40;
-  y = paragraph(ctx, s.why, M + 26, y, COL - 52, { size: 27, weight: 700, lh: 1.5 });
-  ctx.save();
-  ctx.fillStyle = rgba(ORANGE, 0.9);
-  ctx.fillRect(M, boxTop, 5, y - boxTop + 18);
-  ctx.restore();
-  y += 62;
-  y = paragraph(ctx, s.grow, M, y, COL, { size: 26, lh: 1.55, colour: INK_SOFT });
-}
-
-function pageSpoilageARight(ctx, s, headings) {
-  let y = M + 96;
-  label(ctx, headings.signs, M, y, { size: 21, colour: ORANGE });
-  y += 22;
-  rule(ctx, M, y, COL, RULE_SOFT, 2);
-  y += 74;
-  const icons = ['nose', 'tongue', 'eye', 'hand', 'microbe'];
-  s.signs.forEach((sign, i) => {
-    const r = 27;
-    ctx.fillStyle = rgba('#16294d', 0.06);
-    ctx.beginPath(); ctx.arc(M + r, y - 10, r + 12, 0, Math.PI * 2); ctx.fill();
-    drawIcon(ctx, icons[i % icons.length], M + r, y - 10, r * 0.8, ORANGE);
-    paragraph(ctx, sign, M + 92, y, COL - 92, { size: 28, lh: 1.4, maxLines: 2 });
-    y += 92;
-  });
-  y += 20;
-  drawIcon(ctx, 'microbe', PW / 2 - 90, y + 80, 46, rgba('#c94a3f', 0.5));
-  drawIcon(ctx, 'microbe', PW / 2 + 20, y + 110, 32, rgba('#c94a3f', 0.35));
-  drawIcon(ctx, 'microbe', PW / 2 + 96, y + 62, 24, rgba('#c94a3f', 0.25));
-}
-
-function pageSpoilageBLeft(ctx, s, headings) {
-  let y = M + 96;
-  label(ctx, headings.senses, M, y, { size: 21, colour: ORANGE });
-  y += 22;
-  rule(ctx, M, y, COL, RULE_SOFT, 2);
-  y += 70;
-  for (const sense of s.senses) {
-    const top = y - 46;
-    ctx.fillStyle = rgba('#2f6fae', 0.1);
-    ctx.beginPath(); ctx.arc(M + 36, y + 6, 36, 0, Math.PI * 2); ctx.fill();
-    drawIcon(ctx, SENSE_ICON[sense.key] || 'eye', M + 36, y + 6, 28, hexOf(0x2f6fae));
-    setFont(ctx, 800, 28, SANS);
-    ctx.fillStyle = INK;
-    ctx.fillText(String(sense.name).toUpperCase(), M + 96, y - 8);
-    paragraph(ctx, sense.text, M + 96, y + 40, COL - 100, { size: 28, lh: 1.4, colour: INK_SOFT, maxLines: 2 });
-    y += 158;
-    rule(ctx, M, top + 142, COL, RULE_SOFT, 1.5);
-  }
-}
-
-function pageSpoilageBRight(ctx, s, headings) {
-  let y = M + 96;
-  label(ctx, headings.safety, M, y, { size: 21, colour: '#c0392b' });
-  y += 22;
-  rule(ctx, M, y, COL, RULE_SOFT, 2);
-  y += 60;
-  const boxH = 200;
-  ctx.fillStyle = rgba('#c0392b', 0.08);
-  roundRect(ctx, M, y, COL, boxH, 22); ctx.fill();
-  ctx.strokeStyle = rgba('#c0392b', 0.4); ctx.lineWidth = 3; ctx.stroke();
-  drawIcon(ctx, 'warning', M + 70, y + 84, 40, '#c0392b');
-  paragraph(ctx, s.unsafe, M + 132, y + 74, COL - 172, { size: 30, weight: 700, lh: 1.4, colour: '#96261a' });
-  y += boxH + 84;
-  paragraph(ctx, s.grow, M, y, COL, { size: 26, lh: 1.55, colour: INK_SOFT });
-  y += 120;
-  ornament(ctx, PW / 2, y);
-  const chips = s.signs.slice(0, 5);
-  y += 70;
-  let cx = M;
-  setFont(ctx, 700, 21, SANS);
-  for (const chip of chips) {
-    const w = ctx.measureText(chip).width + 34;
-    if (cx + w > PW - M) { cx = M; y += 56; }
-    ctx.fillStyle = rgba('#16294d', 0.055);
-    roundRect(ctx, cx, y - 26, w, 44, 22); ctx.fill();
-    ctx.strokeStyle = RULE_SOFT; ctx.lineWidth = 2; ctx.stroke();
-    ctx.fillStyle = INK_SOFT;
-    ctx.fillText(chip, cx + 17, y + 2);
-    cx += w + 14;
-  }
-}
-
 function pageDividerLeft(ctx, s) {
-  const cy = PH * 0.42;
+  const cy = PH * 0.38;
   ctx.textAlign = 'center';
-  label(ctx, s.group === 'extra' ? s.label : s.label, PW / 2, cy - 150, { size: 20, align: 'center' });
+  // The running head already carries the label; only print it here when it
+  // says something the title does not.
+  if (s.label !== s.title) label(ctx, s.label, PW / 2, cy - 150, { size: 20, align: 'center' });
   ctx.textAlign = 'left';
   display(ctx, s.title, M, cy, COL, { size: 72 });
   rule(ctx, PW / 2 - 70, cy + 40, 140, rgba(ORANGE, 0.9), 4);
-  if (s.note) paragraph(ctx, s.note, M + 40, cy + 110, COL - 80, { size: 26, colour: INK_SOFT, align: 'center', lh: 1.5 });
-  ornament(ctx, PW / 2, cy + 230);
+  // The note carries the chapter's idea, not a caption, so it is allowed to run
+  // to several lines and the ornament follows wherever it ends.
+  let y = cy + 116;
+  if (s.note) {
+    y = paragraph(ctx, s.note, M + 24, y, COL - 48,
+      { size: 27, colour: INK_SOFT, align: 'center', lh: 1.55 });
+  }
+  ornament(ctx, PW / 2, y + 96);
 }
 
 function pageDividerRight(ctx, s, headings) {
@@ -1213,9 +1073,6 @@ export function renderPage(ctx, spread, side, folio, headings) {
 
   const L = side === 'left';
   switch (spread.kind) {
-    case 'contents': L ? pageContentsLeft(ctx, spread) : pageContentsRight(ctx, spread, headings); break;
-    case 'spoilage-a': L ? pageSpoilageALeft(ctx, spread) : pageSpoilageARight(ctx, spread, headings); break;
-    case 'spoilage-b': L ? pageSpoilageBLeft(ctx, spread, headings) : pageSpoilageBRight(ctx, spread, headings); break;
     case 'divider': L ? pageDividerLeft(ctx, spread) : pageDividerRight(ctx, spread, headings); break;
     case 'method': L ? pageMethodLeft(ctx, spread, headings) : pageMethodRight(ctx, spread, headings); break;
     case 'importance': L ? pageImportanceLeft(ctx, spread) : pageImportanceRight(ctx, spread, headings); break;

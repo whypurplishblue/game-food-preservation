@@ -1,5 +1,6 @@
 /**
- * Visual harness for the 3D Fact Book.
+
+* Visual harness for the 3D Fact Book.
  *
  * Captures the opening animation frame by frame, every kind of spread, a page
  * turn at quarter points, food inspection and the closing animation — the
@@ -58,11 +59,15 @@ await page.click('[data-act="fact"]');
 await sleep(120);
 await page.waitForFunction(() => window.__pp.game.factBook?.isOpen, null, { timeout: 10000 });
 
-await sleep(700);
+// The book opens itself after a beat; on software GL a screenshot can outlast
+// that beat, so the shut pose is pinned rather than raced for. factbooktest.mjs
+// is what proves the timer actually fires.
+await page.evaluate(() => clearTimeout(window.__pp.game.factBook._openTimer));
+await sleep(300);
 await shot('00-shut');
 
 // 1-5 the opening, as one continuous physical animation
-await page.click('.pp-fb__bookzone');
+await page.evaluate(() => window.__pp.game.factBook.openBook());
 for (const [i, v] of [0, 0.25, 0.5, 0.75, 1].entries()) {
   await poseOpen(v);
   await sleep(120);
@@ -74,7 +79,7 @@ await page.evaluate(() => {
   fb.wrap.classList.add('is-open');
 });
 await sleep(200);
-await shot('06-contents');
+await shot('06-methods-divider');
 
 const settle = () => page.waitForFunction(
   () => ['reading', 'food'].includes(window.__pp.game.factBook.state), null, { timeout: 20000 });
@@ -84,10 +89,6 @@ const jump = async (i) => {
   await sleep(500);
 };
 const methodIndex = (id) => page.evaluate((m) => window.__pp.game.factBook.model.spreadOfMethod.get(m), id);
-
-await jump(1); await shot('07-spoilage-a');
-await jump(2); await shot('08-spoilage-b');
-await jump(3); await shot('09-divider');
 
 await jump(await methodIndex('drying'));
 await sleep(500);
@@ -127,6 +128,9 @@ await jump(await methodIndex('cooling')); await shot('15b-cooling');
 await jump(await methodIndex('vacuum')); await shot('15c-vacuum');
 await jump(await methodIndex('canning')); await shot('15d-canning');
 await jump(await methodIndex('pasteurising')); await shot('15-pasteurising');
+await jump(await page.evaluate(
+  () => window.__pp.game.factBook.model.spreads.findIndex((s) => s.kind === 'divider' && s.group === 'extra')));
+await shot('16a-extra-divider');
 await jump(await methodIndex('boiling')); await shot('16-nonplayable');
 await jump(await page.evaluate(() => window.__pp.game.factBook.model.spreads.length - 1));
 await shot('17-importance');

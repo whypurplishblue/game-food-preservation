@@ -80,8 +80,9 @@
     "inspectFood": "Inspect {food}",
     "prevPage": "Previous page",
     "nextPage": "Next page",
+    "factBookMethods": "Food Preservation Methods",
     "factBookMore": "More preservation methods",
-    "factBookPlayableNote": "The methods you use in the game.",
+    "factBookPlayableNote": "Microbes need water, warmth, air and a mild environment to grow. Every method here takes one of those away, so the food stays safe to eat for much longer.",
     "factBookExtraNote": "Extra methods from the notes. These do not have a machine in the game.",
     "contents": "Contents",
     "openBook": "Open the book"

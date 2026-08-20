@@ -87,8 +87,10 @@ export function methodView(m) {
 /**
  * Build the whole book.
  *
- * Spread order mirrors the flat Fact Book it replaces (§5):
- *   contents → spoilage → playable methods → extra methods → importance.
+ * The book is the methods chapter and nothing else: it opens on the methods
+ * divider, walks the playable methods, then the Fact-Book-only ones, and ends
+ * on why preservation matters. Spoilage is taught by the flat Fact Book
+ * (`Screens.factBook()`), which still carries the whole `spoilage.*` branch.
  */
 export function buildFactBook() {
   const all = Object.values(METHODS);
@@ -100,55 +102,15 @@ export function buildFactBook() {
   const push = (s) => { s.index = spreads.length; spreads.push(s); return s; };
 
   push({
-    kind: 'contents',
-    label: t('ui.factBook'),
-    title: t('ui.title'),
-    subtitle: t('ui.subtitle'),
-    sections: [
-      { label: t('spoilage.title'), n: 1 },
-      { label: t('ui.methodBadges'), n: playable.length },
-      { label: t('importance.title'), n: 1 },
-    ],
-    methods,
-  });
-
-  push({
-    kind: 'spoilage-a',
-    label: t('spoilage.title'),
-    title: t('spoilage.title'),
-    what: t('spoilage.what'),
-    why: t('spoilage.why'),
-    grow: t('spoilage.grow'),
-    signs: tList('spoilage.signs'),
-    unsafe: t('spoilage.unsafe'),
-  });
-
-  push({
-    kind: 'spoilage-b',
-    label: t('spoilage.title'),
-    title: t('spoilage.title'),
-    senses: ['sight', 'smell', 'taste', 'touch'].map((k) => ({
-      key: k,
-      // The sense names themselves are UI furniture, not curriculum prose; the
-      // description is the localised curriculum line.
-      name: opt(`spoilage.senseNames.${k}`) || k[0].toUpperCase() + k.slice(1),
-      text: t(`spoilage.senses.${k}`),
-    })),
-    signs: tList('spoilage.signs'),
-    unsafe: t('spoilage.unsafe'),
-    grow: t('spoilage.grow'),
-  });
-
-  push({
     kind: 'divider',
     group: 'playable',
-    label: t('ui.methodBadges'),
-    title: t('ui.methodBadges'),
+    label: t('ui.factBookMethods'),
+    title: t('ui.factBookMethods'),
     note: opt('ui.factBookPlayableNote'),
     methods: playable,
   });
   for (const mv of playable) {
-    push({ kind: 'method', label: t('ui.methodBadges'), title: mv.name, method: mv });
+    push({ kind: 'method', label: t('ui.factBookMethods'), title: mv.name, method: mv });
   }
 
   if (extra.length) {
