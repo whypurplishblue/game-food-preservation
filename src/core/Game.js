@@ -60,7 +60,7 @@ export class Game {
     this.stations = new Map();
     this.mode = 'menu';           // menu | brief | playing | paused | quiz | result
     this.gameMode = 'arcade';     // arcade | learning — which content/scoring track
-    this.settings = { sound: true, music: true, reducedMotion: false };
+    this.settings = { sound: true, music: true, sfxVolume: 1, musicVolume: 0.6, reducedMotion: false };
 
     this._tmpVec = new THREE.Vector3();
     this._builtStations = new Set();
@@ -144,7 +144,9 @@ export class Game {
     this.savedStage ||= { arcade: 1, learning: 1 };
     this.bestScores ||= { arcade: {}, learning: {} };
     audio.setEnabled(this.settings.sound);
-    audio.musicOn = this.settings.music;
+    audio.setSfxVolume(this.settings.sfxVolume);
+    audio.setMusicVolume(this.settings.musicVolume);
+    audio.setMusic(this.settings.music);
   }
 
   _save() {
@@ -162,6 +164,8 @@ export class Game {
     this.settings[key] = value;
     if (key === 'sound') audio.setEnabled(value);
     if (key === 'music') audio.setMusic(value);
+    if (key === 'sfxVolume') audio.setSfxVolume(value);
+    if (key === 'musicVolume') audio.setMusicVolume(value);
     this._save();
   }
 
@@ -310,7 +314,6 @@ export class Game {
       this.mode = 'playing';
       this.input.setEnabled(true);
       this.stage3d.setCameraFraming('play', { instant: false });
-      audio.startMusic();
       this._save();
     });
   }
@@ -875,7 +878,6 @@ export class Game {
     this.mode = 'result';
     this.input.setEnabled(false);
     this.panel.stop();
-    audio.stopMusic();
     this.stage3d.setCameraFraming('hero', { instant: false });
 
     if (this.gameMode === 'learning') {

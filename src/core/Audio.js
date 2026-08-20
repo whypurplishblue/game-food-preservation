@@ -1,24 +1,33 @@
 /**
- * Sound hooks, synthesised with WebAudio.
+ * Sound hooks, mostly synthesised with WebAudio.
  *
- * No audio files: the whole soundtrack is generated, so the game ships with
- * zero audio payload, works offline, and never blocks loading. Every hook is a
- * named event (`sfx('preserve.freezing')`) so real recorded assets can be
- * swapped in later behind the same call sites.
+ * Almost the whole soundtrack is generated, so the game ships with tiny audio
+ * payload, works offline, and never blocks loading. Every hook is a named
+ * event (`sfx('preserve.freezing')`) so real recorded assets can be swapped
+ * in later behind the same call sites. Background music and a couple of UI
+ * cues are recorded samples, played through their own bus so their volume
+ * can be set independently of sound effects.
  *
  * Each station has its OWN success sound. That is deliberate — an audio cue
  * tied to a method is another recall channel, and children pick these up fast.
  */
 
 const isFiniteNum = (n) => typeof n === 'number' && Number.isFinite(n);
+const clamp01 = (n) => Math.min(1, Math.max(0, n));
+
+const MUSIC_TRACK = 'assets/sounds/ncone-chiptune-garden-fight-535721.mp3';
 
 class AudioEngine {
   constructor() {
     this.ctx = null;
     this.enabled = true;
     this.musicOn = true;
+    this.sfxVolume = 1;
+    this.musicVolume = 0.6;
     this.master = null;
-    this._musicNodes = null;
+    this.sfxGain = null;
+    this.musicGain = null;
+    this._musicSource = null;
     this._buffers = new Map();
   }
 
@@ -35,6 +44,18 @@ class AudioEngine {
     comp.threshold.value = -12;
     comp.ratio.value = 8;
     this.master.connect(comp).connect(this.ctx.destination);
+
+    // Separate buses so sound effects and music can be muted/scaled apart.
+    this.sfxGain = this.ctx.createGain();
+    this.sfxGain.connect(this.master);
+    this.musicGain = this.ctx.createGain();
+    this.musicGain.connect(this.master);
+    this._applyVolumes();
+  }
+
+  _applyVolumes() {
+    if (this.sfxGain) this.sfxGain.gain.value = this.enabled ? this.sfxVolume : 0;
+    if (this.musicGain) this.musicGain.gain.value = this.musicOn ? this.musicVolume : 0;
   }
 
   /** Fetch + decode a recorded sample once, then cache the AudioBuffer. */
@@ -48,7 +69,7 @@ class AudioEngine {
     return p;
   }
 
-  /** Play a recorded sample through the shared master bus. */
+  /** Play a recorded sample through the sound-effects bus. */
   _sample(url, { peak = 0.5, rate = 1 } = {}) {
     if (!this.ctx || !this.enabled) return;
     this.resume();
@@ -59,13 +80,15 @@ class AudioEngine {
       src.playbackRate.value = rate;
       const g = this.ctx.createGain();
       g.gain.value = peak;
-      src.connect(g).connect(this.master);
+      src.connect(g).connect(this.sfxGain);
       src.start();
     });
   }
 
   resume() { if (this.ctx?.state === 'suspended') this.ctx.resume(); }
-  setEnabled(v) { this.enabled = v; if (this.master) this.master.gain.value = v ? 0.55 : 0; }
+  setEnabled(v) { this.enabled = v; this._applyVolumes(); }
+  setSfxVolume(v) { this.sfxVolume = clamp01(v); this._applyVolumes(); }
+  setMusicVolume(v) { this.musicVolume = clamp01(v); this._applyVolumes(); }
 
   _env(node, { attack = 0.005, decay = 0.18, peak = 0.4, sustain = 0, release = 0.05 } = {}) {
     const t = this.ctx.currentTime;
@@ -74,7 +97,7 @@ class AudioEngine {
     g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + attack);
     g.gain.exponentialRampToValueAtTime(Math.max(0.0002, sustain || 0.0002), t + attack + decay);
     if (release) g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay + release);
-    node.connect(g).connect(this.master);
+    node.connect(g).connect(this.sfxGain);
     return g;
   }
 
@@ -90,7 +113,7 @@ class AudioEngine {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(peak, t + 0.008);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g).connect(this.master);
+    o.connect(g).connect(this.sfxGain);
     o.start(t);
     o.stop(t + dur + 0.05);
   }
@@ -110,7 +133,7 @@ class AudioEngine {
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(peak, t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    src.connect(f).connect(g).connect(this.master);
+    src.connect(f).connect(g).connect(this.sfxGain);
     src.start(t);
   }
 
@@ -165,40 +188,28 @@ class AudioEngine {
     freqs.forEach((f, i) => this._tone(f, { type: 'triangle', dur, peak: 0.13, delay: delay + i * 0.035 }));
   }
 
-  /** Light ambient bed — a slow two-note pulse, low enough to ignore. */
+  /** Looping background track, played through the music bus. */
   startMusic() {
-    if (!this.ctx || this._musicNodes || !this.musicOn) return;
-    const g = this.ctx.createGain();
-    g.gain.value = 0.05;
-    g.connect(this.master);
-    const notes = [130.81, 164.81, 196.0, 164.81];
-    let i = 0;
-    const step = () => {
-      if (!this._musicNodes) return;
-      const t = this.ctx.currentTime;
-      const o = this.ctx.createOscillator();
-      o.type = 'sine';
-      o.frequency.value = notes[i++ % notes.length];
-      const eg = this.ctx.createGain();
-      eg.gain.setValueAtTime(0.0001, t);
-      eg.gain.exponentialRampToValueAtTime(0.5, t + 0.6);
-      eg.gain.exponentialRampToValueAtTime(0.0001, t + 2.4);
-      o.connect(eg).connect(g);
-      o.start(t); o.stop(t + 2.5);
-      this._musicNodes.timer = setTimeout(step, 2400);
-    };
-    this._musicNodes = { g, timer: null };
-    step();
+    if (!this.ctx || !this.musicOn || this._musicSource) return;
+    this._loadBuffer(MUSIC_TRACK).then((buffer) => {
+      if (!buffer || !this.ctx || !this.musicOn || this._musicSource) return;
+      const src = this.ctx.createBufferSource();
+      src.buffer = buffer;
+      src.loop = true;
+      src.connect(this.musicGain);
+      src.start();
+      this._musicSource = src;
+    });
   }
 
   stopMusic() {
-    if (!this._musicNodes) return;
-    clearTimeout(this._musicNodes.timer);
-    this._musicNodes.g.disconnect();
-    this._musicNodes = null;
+    if (!this._musicSource) return;
+    try { this._musicSource.stop(); } catch { /* already stopped */ }
+    this._musicSource.disconnect();
+    this._musicSource = null;
   }
 
-  setMusic(on) { this.musicOn = on; if (on) this.startMusic(); else this.stopMusic(); }
+  setMusic(on) { this.musicOn = on; this._applyVolumes(); if (on) this.startMusic(); else this.stopMusic(); }
 }
 
 export const audio = new AudioEngine();
