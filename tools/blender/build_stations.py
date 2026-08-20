@@ -248,7 +248,9 @@ def face_front(obj):
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.transform_apply(rotation=True, scale=True)
+    # location=True is Blender's default. Explicitly disable it here because
+    # movers have already had their origins placed on a hinge by set_pivot().
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
     bm = bmesh.new()
     bm.from_mesh(obj.data)
     for v in bm.verts:
@@ -644,22 +646,41 @@ def export_machine(name, groups):
         face_front(merged)
         built[gname] = merged
 
-    # Drop the machine so its base sits at z=0, then bake that offset in.
+    # Drop the machine so its base sits at z=0, but preserve object locations.
+    # Mover geometry is local to the hinge origin established by set_pivot();
+    # baking locations here would put those coordinates back into the vertices.
+    # The game re-parents movers onto equivalent procedural pivots, so baked
+    # coordinates would apply every mover's placement twice.
     all_objs = list(built.values())
     lo = min(min((o.matrix_world @ v.co).z for v in o.data.vertices) for o in all_objs)
     for o in all_objs:
         o.location.z -= lo
+
+    # Fail the build if a later refactor silently bakes mover locations again.
+    # face_front() mirrors Blender Y, while the base drop changes only Z.
+    for gname, pivot in PIVOTS.get(name, {}).items():
+        obj = built.get(gname)
+        if obj is None:
+            continue
+        expected = Vector((pivot[0], -pivot[1], pivot[2] - lo))
+        if (obj.location - expected).length > 1e-4:
+            raise RuntimeError(
+                "%s.%s lost its pivot: expected %s, got %s"
+                % (name, gname, tuple(expected), tuple(obj.location)))
+
     bpy.ops.object.select_all(action="DESELECT")
     for o in all_objs:
         o.select_set(True)
     bpy.context.view_layer.objects.active = all_objs[0]
-    bpy.ops.object.transform_apply(location=True)
 
     kwargs = dict(
         filepath=path,
         export_format="GLB",
         use_selection=True,
-        export_apply=True,           # bake modifiers
+        # join() has already converted every object to a mesh, so modifiers are
+        # baked. Keeping this false is essential: Blender's glTF "apply" option
+        # also folds node transforms into vertex data and destroys mover pivots.
+        export_apply=False,
         export_yup=True,             # Blender Z-up -> glTF/three.js Y-up
         export_cameras=False,
         export_lights=False,
