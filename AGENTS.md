@@ -1,4 +1,96 @@
+# Agent Routing
 
+## Default
+
+Use Sonnet as the main implementation agent.
+
+Keep implementation, testing, debugging, and iteration in the main
+conversation when those steps share context.
+
+Do not create subagents unless delegation provides a clear benefit through
+parallelism, context isolation, or independent review.
+
+## Explore
+
+Use Claude Code's built-in Explore agent for read-only codebase research.
+
+When invoking Explore:
+- use Haiku for quick, narrow, well-defined searches
+- use Haiku for file discovery, reference lookup, and simple code tracing
+- use Sonnet for broad, ambiguous, or very thorough exploration
+- do not replace or override the built-in Explore agent
+
+Keep exploration targeted. Return only findings relevant to the task.
+
+## Subagents
+
+Use Haiku for short, narrow, checkable work such as:
+- locating files or references
+- gathering facts
+- checking implementation status
+- examining logs
+- simple verification
+
+Use Sonnet for substantial independent work such as:
+- feature implementation
+- refactoring
+- debugging
+- tests
+- complex code changes
+
+Prefer keeping related implementation and iteration with the same Sonnet
+agent instead of repeatedly starting fresh agents.
+
+Run agents in parallel only when their work is genuinely independent.
+
+Avoid multiple agents modifying the same files.
+
+## Opus Advisor
+
+Consult Opus when stronger reasoning is likely to materially improve the result:
+
+- architecture decisions
+- ambiguous or conflicting requirements
+- difficult root-cause analysis
+- repeated failed approaches
+- major design decisions
+- security-sensitive decisions
+- final review of high-impact or complex changes
+
+Do not consult Opus for routine coding, repository searches, or simple checks.
+
+## Escalation
+
+Use the lowest-cost model that can reliably perform the task.
+
+Haiku -> Sonnet -> Opus
+
+Escalate rather than repeatedly retrying a failing approach.
+
+## Quality Loop
+
+For substantial changes:
+
+implement -> test -> review -> fix -> retest
+
+Continue only while concrete defects remain.
+
+Stop when:
+- acceptance criteria are satisfied
+- relevant tests pass
+- identified defects are fixed
+- no material issue remains
+
+Do not create unnecessary review loops for small changes.
+
+## Expensive Modes
+
+Do not use Agent Teams, large fan-outs, or Ultracode by default.
+
+Use them only when the task has enough independent work to justify their
+additional token and coordination cost.
+
+# Reference documents
 Learning syllabus docs/y6-sci-u8.md
 
 ## 3D model attribution
