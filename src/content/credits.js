@@ -61,6 +61,14 @@ export const AUDIO_CREDITS = [
     license: 'Pixabay Content License',
     licenseUrl: 'https://pixabay.com/service/license-summary/',
   },
+  {
+    file: 'assets/sounds/ncone-chiptune-garden-fight-535721.mp3',
+    title: 'Chiptune Garden Fight',
+    author: 'ncone',
+    sourceUrl: 'https://pixabay.com/music/video-games-chiptune-garden-fight-535721/',
+    license: 'Pixabay Content License',
+    licenseUrl: 'https://pixabay.com/service/license-summary/',
+  },
 ];
 
 // Reserve a separate home for visual, educational, or other inspiration
