@@ -155,7 +155,7 @@ export class Screens {
         ${learnedHtml}
         ${this._scoreSubmitHtml(isFinalLevel)}
         <div class="pp-result__actions">
-          ${passed ? `<button class="pp-btn pp-btn--big pp-btn--primary" data-act="next">${t('ui.nextStage')}</button>` : ''}
+          ${passed && !isFinalLevel ? `<button class="pp-btn pp-btn--big pp-btn--primary" data-act="next">${t('ui.nextStage')}</button>` : ''}
           <button class="pp-btn pp-btn--big" data-act="retry">${t('ui.retry')}</button>
           <button class="pp-btn" data-act="board">🏆 ${t('ui.viewLeaderboard')}</button>
           <button class="pp-btn" data-act="menu">${t('ui.quit')}</button>
@@ -234,7 +234,7 @@ export class Screens {
         </div>
         ${this._scoreSubmitHtml(isFinalLevel)}
         <div class="pp-result__actions">
-          ${passed ? `<button class="pp-btn pp-btn--big pp-btn--primary" data-act="next">${t('ui.nextStage')}</button>` : ''}
+          ${passed && !isFinalLevel ? `<button class="pp-btn pp-btn--big pp-btn--primary" data-act="next">${t('ui.nextStage')}</button>` : ''}
           <button class="pp-btn pp-btn--big" data-act="retry">${t('ui.retry')}</button>
           <button class="pp-btn" data-act="board">🏆 ${t('ui.viewLeaderboard')}</button>
           <button class="pp-btn" data-act="menu">${t('ui.quit')}</button>
