@@ -133,7 +133,7 @@ export class Screens {
   }
 
   // ---------------------------------------------------------------- results
-  results({ stage, score, stars, preserved, target, spoilt, accuracy, bestCombo, learned, passed, onNext, onRetry, onMenu, onSubmitScore, onViewLeaderboard }) {
+  results({ stage, score, stars, preserved, target, spoilt, accuracy, bestCombo, learned, passed, runScore, isFinalLevel, onNext, onRetry, onMenu, onSubmitScore, onViewLeaderboard }) {
     const starHtml = [0, 1, 2].map((i) =>
       `<span class="pp-result__star${i < stars ? ' is-on' : ''}" style="--d:${i * 0.18}s">★</span>`).join('');
     const learnedHtml = learned.length
@@ -146,13 +146,14 @@ export class Screens {
         <div class="pp-result__stars">${starHtml}</div>
         <div class="pp-result__grid">
           <div><span>${t('ui.score')}</span><b>${score.toLocaleString()}</b></div>
+          <div><span>${t('ui.runScore')}</span><b>${(runScore || 0).toLocaleString()}</b></div>
           <div><span>${t('ui.preserved')}</span><b>${preserved}/${target}</b></div>
           <div><span>${t('ui.spoilt')}</span><b>${spoilt}</b></div>
           <div><span>${t('ui.accuracy')}</span><b>${Math.round(accuracy * 100)}%</b></div>
           <div><span>${t('ui.bestCombo')}</span><b>x${bestCombo.toFixed(bestCombo % 1 ? 2 : 0)}</b></div>
         </div>
         ${learnedHtml}
-        ${this._scoreSubmitHtml()}
+        ${this._scoreSubmitHtml(isFinalLevel)}
         <div class="pp-result__actions">
           ${passed ? `<button class="pp-btn pp-btn--big pp-btn--primary" data-act="next">${t('ui.nextStage')}</button>` : ''}
           <button class="pp-btn pp-btn--big" data-act="retry">${t('ui.retry')}</button>
@@ -168,8 +169,16 @@ export class Screens {
     if (passed) sfx('stage.win'); else sfx('stage.lose');
   }
 
-  /** Shared name-entry + submit control used by both results screens. */
-  _scoreSubmitHtml() {
+  /**
+   * Shared name-entry + submit control used by both results screens.
+   * Submission is only offered on the run's final level/stage — a
+   * leaderboard entry represents a completed playthrough, not a single
+   * level. Earlier levels show a hint instead.
+   */
+  _scoreSubmitHtml(isFinalLevel) {
+    if (!isFinalLevel) {
+      return `<p class="pp-result__submitHint">${t('ui.finishToSubmit')}</p>`;
+    }
     return `
       <div class="pp-result__submit">
         <input type="text" maxlength="20" placeholder="${t('ui.yourName')}" data-el="name" />
@@ -200,7 +209,7 @@ export class Screens {
   }
 
   // -------------------------------------------------------- learning results
-  learningResults({ stage, score, maxScore, timeBonus, passed, spoilt, breakdown, onNext, onRetry, onMenu, onSubmitScore, onViewLeaderboard }) {
+  learningResults({ stage, score, maxScore, timeBonus, passed, spoilt, breakdown, runScore, isFinalLevel, onNext, onRetry, onMenu, onSubmitScore, onViewLeaderboard }) {
     const correctnessScore = score - timeBonus;
     const percent = maxScore ? Math.round((correctnessScore / maxScore) * 100) : 0;
     const rows = breakdown.map((b) => {
@@ -214,6 +223,7 @@ export class Screens {
         <h2>${passed ? t('ui.stageComplete') : t('ui.stageFailed')}</h2>
         <div class="pp-result__grid">
           <div><span>${t('ui.score')}</span><b>${score.toLocaleString()}</b></div>
+          <div><span>${t('ui.runScore')}</span><b>${(runScore || 0).toLocaleString()}</b></div>
           <div><span>${t('ui.accuracy')}</span><b>${percent}%</b></div>
           <div><span>${t('ui.timeBonus')}</span><b>+${timeBonus}</b></div>
           <div><span>${t('ui.spoilt')}</span><b>${spoilt}</b></div>
@@ -222,7 +232,7 @@ export class Screens {
           <h4>${t('ui.pointsBreakdown')}</h4>
           <ul class="pp-result__breakdown">${rows}</ul>
         </div>
-        ${this._scoreSubmitHtml()}
+        ${this._scoreSubmitHtml(isFinalLevel)}
         <div class="pp-result__actions">
           ${passed ? `<button class="pp-btn pp-btn--big pp-btn--primary" data-act="next">${t('ui.nextStage')}</button>` : ''}
           <button class="pp-btn pp-btn--big" data-act="retry">${t('ui.retry')}</button>

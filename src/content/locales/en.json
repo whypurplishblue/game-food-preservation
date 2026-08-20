@@ -110,7 +110,9 @@
     "lateAttempt": "Got there after a wrong guess",
     "quizBonus": "Quiz bonus",
     "timeBonus": "Speed bonus",
-    "pointsBreakdown": "How you scored"
+    "pointsBreakdown": "How you scored",
+    "runScore": "Run total",
+    "finishToSubmit": "Finish the last level to submit your score"
   },
   "station": {
     "drying": {

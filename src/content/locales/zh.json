@@ -109,7 +109,9 @@
     "lateAttempt": "猜错一次后答对了",
     "quizBonus": "问答加分",
     "timeBonus": "速度加分",
-    "pointsBreakdown": "得分明细"
+    "pointsBreakdown": "得分明细",
+    "runScore": "总分",
+    "finishToSubmit": "完成最后一关才能提交分数"
   },
   "station": {
     "drying": {
