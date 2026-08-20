@@ -51,7 +51,12 @@ export class Cannery extends Station {
 
     // The seamer head on the gantry: descends and spins during the twist.
     const head = new THREE.Group();
-    head.position.set(0, 2.34, 0.18);
+    this._headRestY = 2.34;
+    // Can rim: can.y (1.20) + wall height (0.90) = 2.10. The lid is centred
+    // 0.045 above that rim and sits -0.02 below the head origin, so a sealed
+    // head belongs at 2.165 — not deep inside the container.
+    this._headSealY = 2.165;
+    head.position.set(0, this._headRestY, 0.18);
     head.add(mesh(cyl(0.2, 0.2, 0.5, 14), steelDark, { y: 0.25 }));
     const lid = new THREE.Group();
     lid.add(mesh(cyl(0.56, 0.56, 0.09, 26), steel));
@@ -139,7 +144,7 @@ export class Cannery extends Station {
     } else if (index === 2) {
       // The head comes down and screws the lid on as the child turns.
       this._sealT = progress;
-      this.head.position.y = 2.34 - progress * 0.72;
+      this.head.position.y = THREE.MathUtils.lerp(this._headRestY, this._headSealY, progress);
       this.lid.rotation.y = progress * Math.PI * 4;
       if (this.food) this.food.swarm.setActivity(Math.max(0, 0.1 - progress * 0.1));
     }
@@ -170,7 +175,7 @@ export class Cannery extends Station {
     this._heat = 0;
     this._sealT = 0;
     this._loading = false;
-    this.head.position.y = 2.34;
+    this.head.position.y = this._headRestY;
     this.lid.rotation.y = 0;
     this.fill.visible = false;
     this.fill.scale.set(1, 0.4, 1);
