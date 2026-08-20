@@ -41,7 +41,11 @@
   position: absolute; inset: 0;
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(330px, 1fr);
-  gap: clamp(12px, 2vw, 34px);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "book   panel"
+    "nav    panel";
+  gap: 10px clamp(12px, 2vw, 34px);
   padding:
     calc(18px + var(--safe-t)) calc(clamp(16px, 2.4vw, 40px) + var(--safe-r))
     calc(96px + var(--safe-b)) calc(clamp(16px, 2.4vw, 40px) + var(--safe-l));
@@ -49,6 +53,7 @@
 
 /* ------------------------------------------------------------ book zone --- */
 .pp-fb__bookzone {
+  grid-area: book;
   position: relative;
   touch-action: none;
   cursor: grab;
@@ -60,16 +65,18 @@
 
 /* The panel and the tab strip belong to the OPEN book: while the cover is still
    shut or swinging they are not there to read. */
-.pp-fb__panel, .pp-fb__tabs {
+.pp-fb__panel, .pp-fb__tabs, .pp-fb__nav {
   opacity: 0;
   transition: opacity 0.32s ease;
   pointer-events: none;
 }
 .pp-fb.is-open .pp-fb__panel,
-.pp-fb.is-open .pp-fb__tabs { opacity: 1; pointer-events: auto; }
+.pp-fb.is-open .pp-fb__tabs,
+.pp-fb.is-open .pp-fb__nav { opacity: 1; pointer-events: auto; }
 
 /* ---------------------------------------------------------------- panel --- */
 .pp-fb__panel {
+  grid-area: panel;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -291,12 +298,13 @@
   color: rgba(22, 41, 77, 0.42);
 }
 
-/* ------------------------------------------------------------ panel nav --- */
+/* ------------------------------------------------------------- page nav --- */
+/* Lives under the book, not the panel: freeing the whole panel column for
+   content is the point of putting it here. */
 .pp-fb__nav {
-  flex: 0 0 auto;
+  grid-area: nav;
   display: flex; align-items: center; gap: 12px;
-  padding: 10px 2px 0;
-  border-top: 1px solid var(--fb-line);
+  padding: 4px 6px 0;
 }
 .pp-fb__navbtn {
   width: 44px; height: 44px; flex: 0 0 44px;
@@ -399,12 +407,27 @@
   .pp-fb__title { font-size: clamp(26px, 3.6vw, 40px); }
 }
 
+/* Short / landscape tablet: width is enough for the two-column layout, but
+   height is not enough for the panel's usual rhythm to fit foods and the exam
+   note in the same view as the 3D model. The model stays first — it's what
+   draws the eye on open — but shrinks and the panel's spacing tightens so the
+   rest of the page still lands in view, rather than each answer needing
+   the reader to scroll (the whole point of the "under the book" nav move). */
+@media (max-height: 820px) and (min-width: 700px) {
+  .pp-fb__title { font-size: clamp(22px, 2.6vw, 32px); }
+  .pp-fb__lead { margin-bottom: 10px; }
+  .pp-fb__seclabel { margin: 10px 0 6px; }
+  .pp-fb__viewer { aspect-ratio: 16 / 6.5; }
+  .pp-fb__hint { display: none; }
+}
+
 /* Narrow / portrait: the book takes the top half and the panel reads below it,
    rather than shrinking desktop type until it is unreadable (§52). */
 @media (max-width: 860px), (orientation: portrait) and (max-width: 1000px) {
   .pp-fb__body {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(160px, 36vh) minmax(0, 1fr);
+    grid-template-rows: minmax(160px, 36vh) auto minmax(0, 1fr);
+    grid-template-areas: "book" "nav" "panel";
     padding-bottom: calc(84px + var(--safe-b));
   }
   .pp-fb__viewer { aspect-ratio: 16 / 8; }
