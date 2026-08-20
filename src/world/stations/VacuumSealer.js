@@ -11,12 +11,15 @@
 import * as THREE from 'three';
 import { Station } from './Station.js';
 import { PALETTE } from '../Palette.js';
-import { plastic, metal, matte, glass, roundedBox, cyl, sphere, torus, mesh, clearcoatFor } from '../Materials.js';
+import { plastic, metal, matte, glass, roundedBox, cyl, sphere, torus, mesh } from '../Materials.js';
 
 export class VacuumSealer extends Station {
   build() {
-    const shell = plastic(0xeef1f6, { rough: 0.32, clearcoat: 0.75 });
-    const accent = plastic(PALETTE.vacuum, { rough: 0.4, clearcoat: 0.6 });
+    // Broad pale surfaces used to catch the environment like polished ceramic,
+    // washing out their seams under the kitchen key light. A satin response
+    // keeps the low-poly bevels readable without making the machine look dull.
+    const shell = plastic(0xeef1f6, { rough: 0.5, clearcoat: 0.22 });
+    const accent = plastic(PALETTE.vacuum, { rough: 0.54, clearcoat: 0.2 });
 
     // Low, wide machine body — deliberately a different silhouette from the
     // tall freezer so the two never get confused once labels are off.
@@ -29,7 +32,9 @@ export class VacuumSealer extends Station {
     const lidPanel = new THREE.Group();
     lidPanel.position.z = 0.72;
     lidPanel.add(mesh(roundedBox(2.2, 0.24, 1.44, 0.1), shell));
-    lidPanel.add(mesh(roundedBox(1.5, 0.06, 0.9, 0.04), glass(0xe4d4f5, { opacity: 0.4 }), { y: 0.12 }));
+    lidPanel.add(mesh(roundedBox(1.5, 0.06, 0.9, 0.04), glass(0xe4d4f5, {
+      opacity: 0.3, rough: 0.3, clearcoat: 0.1,
+    }), { y: 0.12 }));
     lidPanel.add(mesh(roundedBox(1.62, 0.05, 1.0, 0.04), accent, { y: 0.09 }));
     lidPanel.add(mesh(cyl(0.05, 0.05, 1.0, 10), metal(PALETTE.steel), { y: 0.2, z: 0.6, rz: Math.PI / 2 }));
     lid.add(lidPanel);
@@ -43,10 +48,11 @@ export class VacuumSealer extends Station {
     this.body.add(this.sealBar);
 
     // The bag. Built as a box we squash on the Y and Z axes during the pump.
-    const bagMat = new THREE.MeshPhysicalMaterial({
-      color: 0xe8eef5, roughness: 0.1, transparent: true, opacity: 0.42,
-      clearcoat: clearcoatFor(1), clearcoatRoughness: 0.05, side: THREE.DoubleSide, metalness: 0,
-    });
+    // Clone because opacity changes while pumping; the factory returns the
+    // cheaper Standard shader on mobile and the glossy Physical shader on high.
+    const bagMat = glass(0xe8eef5, {
+      opacity: 0.36, rough: 0.28, clearcoat: 0.08,
+    }).clone();
     this.bag = mesh(roundedBox(1.25, 0.62, 0.95, 0.16), bagMat, { y: 1.32, z: 0.12, cast: false });
     this.bag.visible = false;
     this.body.add(this.bag);
@@ -82,27 +88,38 @@ export class VacuumSealer extends Station {
     pump.add(mesh(cyl(0.32, 0.32, 0.09, 16), metal(PALETTE.steelDark), { y: 0.54 }));
     for (let i = 0; i < 7; i++) {
       pump.add(mesh(torus(0.075, 0.028, 6, 12), matte(0x4a3f55, 0.7), {
-        x: -0.18 - i * 0.1, y: 0.34 - i * 0.035, rx: Math.PI / 2, rz: 0.35,
+        x: -0.18 - i * 0.1, y: 0.34 - i * 0.035, rx: Math.PI / 2, rz: 0.35, cast: false,
       }));
     }
     this.pumpBody = pump;
     this.body.add(pump);
 
     // Air particles streaming out of the bag toward the pump.
-    this.airBits = [];
-    const airMat = new THREE.MeshBasicMaterial({ color: 0xd9c7ee, transparent: true, opacity: 0, toneMapped: false, depthWrite: false });
-    for (let i = 0; i < 16; i++) {
-      const a = mesh(sphere(0.05, 8, 6), airMat.clone(), { cast: false, receive: false });
-      a.visible = false;
-      this.body.add(a);
-      this.airBits.push({ mesh: a, t: 1 });
-    }
+    this.airBits = Array.from({ length: 12 }, (_, i) => ({ t: 1, phase: i * 1.91 }));
+    this.airMesh = new THREE.InstancedMesh(
+      sphere(0.05, 6, 4),
+      new THREE.MeshBasicMaterial({
+        color: 0xd9c7ee, transparent: true, opacity: 0.72,
+        toneMapped: false, depthWrite: false,
+      }),
+      this.airBits.length);
+    this.airMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.airMesh.castShadow = false;
+    this.airMesh.receiveShadow = false;
+    this.airMesh.visible = false;
+    this.body.add(this.airMesh);
+    this._airDummy = new THREE.Object3D();
 
     this._lidOpen = 0.45; this._targetLid = 0.45; this._air = 1;   // ajar at rest
     this._pumpPower = 0;
   }
 
-  _drawGauge(v = 1) {
+  _drawGauge(v = 1, force = false) {
+    // The needle supplies continuous feedback. Updating the canvas texture only
+    // when the displayed 5% step changes avoids a 256×256 GPU upload per frame.
+    const gaugeStep = Math.round(v * 20);
+    if (!force && gaugeStep === this._lastGaugeStep) return;
+    this._lastGaugeStep = gaugeStep;
     const ctx = this._gaugeCtx;
     const S = 256, C = S / 2;
     ctx.clearRect(0, 0, S, S);
@@ -155,7 +172,12 @@ export class VacuumSealer extends Station {
 
     for (let i = 0; i < Math.floor(progress * this.airBits.length); i++) {
       const a = this.airBits[i];
-      if (a.t >= 1) { a.t = 0; a.y = 1.1 + Math.random() * 0.4; a.x = (Math.random() - 0.5) * 0.8; }
+      if (a.t >= 1) {
+        a.t = 0;
+        a.cycle = (a.cycle || 0) + 1;
+        a.y = 1.26 + Math.sin(a.phase + a.cycle) * 0.18;
+        a.x = Math.cos(a.phase * 0.7 + a.cycle * 1.3) * 0.4;
+      }
     }
     if (this.food) {
       this.food.model.scale.setScalar(this.food.baseScale * (1 - progress * 0.08));
@@ -183,7 +205,9 @@ export class VacuumSealer extends Station {
     this.bag.scale.set(1, 1, 1);
     this.needle.rotation.z = -Math.PI * 0.75;
     this.pumpBody.rotation.y = 0;
-    this._drawGauge(1);
+    this._drawGauge(1, true);
+    for (const bit of this.airBits) bit.t = 1;
+    this.airMesh.visible = false;
     this.sealBar.material.emissive.setHex(0x000000);
   }
 
@@ -198,20 +222,30 @@ export class VacuumSealer extends Station {
       this.sealBar.material.emissiveIntensity = 2.5;
     }
 
-    for (const a of this.airBits) {
-      if (a.t >= 1) { a.mesh.visible = false; continue; }
+    let airVisible = false;
+    for (const [i, a] of this.airBits.entries()) {
+      if (a.t >= 1) {
+        this._airDummy.position.set(0, -2, 0);
+        this._airDummy.scale.setScalar(0.001);
+        this._airDummy.updateMatrix();
+        this.airMesh.setMatrixAt(i, this._airDummy.matrix);
+        continue;
+      }
       a.t += dt * 1.8;
-      a.mesh.visible = true;
+      airVisible = true;
       const p = a.t;
       // arc from the bag toward the pump inlet
-      a.mesh.position.set(
+      this._airDummy.position.set(
         THREE.MathUtils.lerp(a.x, 0.85, p),
         THREE.MathUtils.lerp(a.y, 1.3, p) + Math.sin(p * Math.PI) * 0.25,
         THREE.MathUtils.lerp(0.12, 0.5, p)
       );
-      a.mesh.scale.setScalar(1 - p * 0.6);
-      a.mesh.material.opacity = 0.75 * Math.sin(p * Math.PI);
+      this._airDummy.scale.setScalar(Math.max(0.001, Math.sin(Math.min(1, p) * Math.PI)) * (1 - p * 0.35));
+      this._airDummy.updateMatrix();
+      this.airMesh.setMatrixAt(i, this._airDummy.matrix);
     }
+    this.airMesh.visible = airVisible;
+    if (airVisible) this.airMesh.instanceMatrix.needsUpdate = true;
 
     if (this._loading && this.food) {
       const target = this.root.localToWorld(new THREE.Vector3(0, 1.32, 0.12));

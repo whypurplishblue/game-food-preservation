@@ -112,6 +112,68 @@ Other external creative work belongs in its own category list, such as `AUDIO_CR
 
 The Credits screen (`Screens.js` → `credits()`) renders `CREDIT_CATEGORIES` directly — there is no separate copy to keep in sync, so updating `credits.js` is the only step needed.
 
+## Procedural station models (`src/world/stations/`)
+
+The procedural station class is the canonical model for both gameplay and the
+Fact Book. Improve a method's machine in
+`src/world/stations/<StationName>.js`; do not create separate Fact Book
+geometry. `src/ui/factbook/models.js` resolves `METHODS[id].station` and
+instantiates the same class, while `StationAutoplay` replays that class's real
+interaction callbacks.
+
+Keep the full station behaviour in the existing contract:
+
+- `getSteps()` describes the controls.
+- `onStepProgress()` and `onStepDone()` drive visible state from the current
+  interaction.
+- `playSuccess()`, `resetVisuals()` and `tick()` own the flourish, cleanup and
+  continuous motion.
+- Every animation must still work when `station.food` is absent: Fact Book
+  autoplay demonstrates the machine without docking an ingredient.
+
+Store every animated `THREE.Object3D` on the station instance (`this.lid`,
+`this.needle`, etc.). `Station.batchStatic()` discovers those references and
+keeps them out of the static merge; an unreferenced animated mesh may be merged
+and become impossible to move. Prefer bounded, time-based animation over
+cumulative per-input rotation so results do not depend on frame or pointer
+event frequency.
+
+Visual and mobile rules:
+
+- Judge silhouette and mechanism readability at the kitchen's normal gameplay
+  distance before adding close-up detail.
+- Reuse materials, keep transparent surfaces scarce, and use modest cylinder
+  and sphere segment counts. Static geometry is batched by material.
+- Preserve the station envelope expected by the shared plinth and signage.
+- Check both presentations: the busy kitchen-wide mobile view and the centred,
+  close, three-point-lit Fact Book viewer. Different cameras and lighting are
+  allowed; the underlying station geometry and animation are not.
+
+Station GLBs in `public/assets/models/stations/` are experimental and remain
+opt-in through `?models=1`. Do not enable one by default until it beats the
+procedural station in both gameplay and the Fact Book. When working on an
+opt-in GLB:
+
+- rebuild one station with `PP_ONLY=<StationName>` and
+  `tools/blender/build_stations.py`;
+- keep `shell` plus explicitly named mover nodes in `MOVER_BINDINGS`;
+- set each mover origin on its hinge and never bake object locations afterward
+  (`transform_apply(location=False, ...)` and `export_apply=False`);
+- ensure GLB and procedural pieces do not duplicate or overlap.
+
+Verification loop for a station visual change:
+
+```
+npm run build
+npm run test:notes
+npm run test:factbook     # requires npm run preview on port 4173
+```
+
+Also inspect idle and complete interaction frames in a landscape-phone kitchen
+view and in the Fact Book. Confirm animated parts remain inside the station
+bounds and that the browser reports no errors. Run `npm run test:credits` when
+adding, replacing or removing a `.glb`.
+
 ## The 3D Fact Book (`src/ui/factbook/`)
 
 The Fact Book is a physical animated book with its own WebGL context, opened by

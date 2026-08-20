@@ -155,6 +155,10 @@ export function buildMethodModel(mv) {
     // gameplay, and the panel already says which method this is.
     station.setLabelsVisible(false);
     if (station.ring) station.ring.visible = false;
+    // The viewer uses the same procedural station as gameplay, but it still
+    // needs gameplay's one-time static batching. Without this, a method page
+    // submits every authored screw, slat and trim piece as a separate draw.
+    station.batchStatic();
     const object = station.root;
     return {
       object,

@@ -99,6 +99,16 @@ export class Game {
     this._builtStations.add(stationId);
   }
 
+  /**
+   * Perform the one-time model swap/static merge while the loading cover is
+   * still visible, rather than making the first visit to each stage pay for it.
+   * Returns the roots so Stage3D can compile their material variants as well.
+   */
+  prepareStations() {
+    for (const id of this.stations.keys()) this._ensureStationBuilt(id);
+    return [...this.stations.values()].map((station) => station.root);
+  }
+
   /** The method this station would apply to this food, or null if it cannot. */
   _methodFor(station, food) {
     return methodAtStation(station.stationId, food.foodId, this.stage?.methods || null);

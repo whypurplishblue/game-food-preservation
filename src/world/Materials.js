@@ -32,17 +32,24 @@ export function clearcoatFor(v) { return _quality === 'high' ? v : 0; }
 export function plastic(colour, { rough = 0.42, clearcoat = 0.55, emissive = 0, emissiveIntensity = 0 } = {}) {
   clearcoat = clearcoatFor(clearcoat);
   return memo(`plastic:${colour}:${rough}:${clearcoat}:${emissive}:${emissiveIntensity}:${_quality}`, () =>
-    new THREE.MeshPhysicalMaterial({
-      color: colour, roughness: rough, metalness: 0.0,
-      clearcoat, clearcoatRoughness: 0.35,
-      emissive, emissiveIntensity,
-    }));
+    _quality === 'high'
+      ? new THREE.MeshPhysicalMaterial({
+        color: colour, roughness: rough, metalness: 0.0,
+        clearcoat, clearcoatRoughness: 0.35,
+        emissive, emissiveIntensity,
+      })
+      : new THREE.MeshStandardMaterial({
+        color: colour, roughness: rough, metalness: 0.0,
+        emissive, emissiveIntensity,
+      }));
 }
 
 /** Brushed metal — hinges, pipes, trays. */
 export function metal(colour = PALETTE.steel, { rough = 0.32, metalness = 0.85 } = {}) {
-  return memo(`metal:${colour}:${rough}:${metalness}`, () =>
-    new THREE.MeshPhysicalMaterial({ color: colour, roughness: rough, metalness }));
+  return memo(`metal:${colour}:${rough}:${metalness}:${_quality}`, () =>
+    _quality === 'high'
+      ? new THREE.MeshPhysicalMaterial({ color: colour, roughness: rough, metalness })
+      : new THREE.MeshStandardMaterial({ color: colour, roughness: rough, metalness }));
 }
 
 /** Painted matte — wood, walls, cloth. */
@@ -52,14 +59,21 @@ export function matte(colour, rough = 0.85) {
 }
 
 /** Transmissive glass — jars, freezer window, bag film. */
-export function glass(colour = PALETTE.glass, { opacity = 0.32, rough = 0.06, ior = 1.45 } = {}) {
-  const clearcoat = clearcoatFor(1);
-  return memo(`glass:${colour}:${opacity}:${rough}:${_quality}`, () =>
-    new THREE.MeshPhysicalMaterial({
-      color: colour, roughness: rough, metalness: 0, transmission: 0.0,
-      transparent: true, opacity, ior, clearcoat, clearcoatRoughness: 0.05,
-      depthWrite: false, side: THREE.DoubleSide,
-    }));
+export function glass(colour = PALETTE.glass, {
+  opacity = 0.32, rough = 0.06, ior = 1.45, clearcoat: requestedClearcoat = 1,
+} = {}) {
+  const clearcoat = clearcoatFor(requestedClearcoat);
+  return memo(`glass:${colour}:${opacity}:${rough}:${clearcoat}:${_quality}`, () =>
+    _quality === 'high'
+      ? new THREE.MeshPhysicalMaterial({
+        color: colour, roughness: rough, metalness: 0, transmission: 0.0,
+        transparent: true, opacity, ior, clearcoat, clearcoatRoughness: 0.05,
+        depthWrite: false, side: THREE.DoubleSide,
+      })
+      : new THREE.MeshStandardMaterial({
+        color: colour, roughness: Math.max(0.16, rough), metalness: 0,
+        transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide,
+      }));
 }
 
 /** Self-lit panel — indicator lights, screens, glowing rims. */
@@ -82,11 +96,15 @@ export function hot(colour, intensity = 1.2) {
  * which is the "changes colour / changes texture" signal from §2 of the notes.
  */
 export function foodMaterial(baseColour, { rough = 0.55, sheen = 0.25 } = {}) {
-  const m = new THREE.MeshPhysicalMaterial({
-    color: baseColour, roughness: rough, metalness: 0.02,
-    sheen: clearcoatFor(sheen), sheenRoughness: 0.6, sheenColor: new THREE.Color(0xffffff),
-    clearcoat: clearcoatFor(0.15), clearcoatRoughness: 0.6,
-  });
+  const m = _quality === 'high'
+    ? new THREE.MeshPhysicalMaterial({
+      color: baseColour, roughness: rough, metalness: 0.02,
+      sheen: clearcoatFor(sheen), sheenRoughness: 0.6, sheenColor: new THREE.Color(0xffffff),
+      clearcoat: clearcoatFor(0.15), clearcoatRoughness: 0.6,
+    })
+    : new THREE.MeshStandardMaterial({
+      color: baseColour, roughness: rough, metalness: 0.02,
+    });
   m.userData.baseColour = new THREE.Color(baseColour);
   return m;
 }
@@ -154,7 +172,9 @@ export function mesh(geometry, material, { x = 0, y = 0, z = 0, rx = 0, ry = 0, 
   const m = new THREE.Mesh(geometry, material);
   m.position.set(x, y, z);
   m.rotation.set(rx, ry, rz);
-  m.castShadow = cast;
+  // Transparent shadows require another alpha-shaded shadow-map draw and are
+  // barely visible in this stylised scene. Keep them only on the high tier.
+  m.castShadow = cast && (_quality === 'high' || !material?.transparent);
   m.receiveShadow = receive;
   if (name) m.name = name;
   return m;

@@ -13,7 +13,7 @@
 import * as THREE from 'three';
 import { Station } from './Station.js';
 import { PALETTE } from '../Palette.js';
-import { plastic, metal, matte, glass, roundedBox, cyl, sphere, torus, mesh, clearcoatFor } from '../Materials.js';
+import { plastic, metal, matte, glass, roundedBox, cyl, sphere, torus, mesh } from '../Materials.js';
 
 const SOLUTION_LOOK = {
   vinegar:        { colour: 0xf2e18a, bottle: 0xd9c15a, fizz: 0xfff6c4 },
@@ -24,88 +24,133 @@ const SOLUTION_LOOK = {
 export class PicklingJar extends Station {
   build() {
     const wood = matte(PALETTE.woodDark, 0.8);
-    const green = plastic(PALETTE.pickling, { rough: 0.4, clearcoat: 0.6 });
+    const green = plastic(PALETTE.pickling, { rough: 0.56, clearcoat: 0.18 });
+    const deepGreen = plastic(PALETTE.picklingDeep, { rough: 0.58, clearcoat: 0.12 });
+    const cream = plastic(0xfff4d6, { rough: 0.64, clearcoat: 0.06 });
 
-    // Bench with a green splash-back — colour identity carries at a distance.
-    this.body.add(mesh(roundedBox(2.3, 0.9, 1.5, 0.1), wood, { y: 0.66 }));
+    // Low cabinet + open bottle rack. The old solid green splash-back swallowed
+    // the transparent jar, leaving a blank counter at gameplay distance.
+    this.body.add(mesh(roundedBox(2.3, 0.82, 1.5, 0.1), wood, { y: 0.62 }));
     this.body.add(mesh(roundedBox(2.35, 0.14, 1.55, 0.06), green, { y: 1.16 }));
-    this.body.add(mesh(roundedBox(2.3, 1.1, 0.12, 0.05), green, { y: 1.72, z: -0.7 }));
-
-    // THE JAR — the hero object. Big, glassy, centre stage.
-    const jar = new THREE.Group();
-    jar.position.set(0, 1.18, 0.2);
-    jar.scale.setScalar(1.12);
-    const jarGlass = new THREE.MeshPhysicalMaterial({
-      color: 0xdff0e8, roughness: 0.04, transparent: true, opacity: 0.28,
-      clearcoat: clearcoatFor(1), clearcoatRoughness: 0.02, side: THREE.DoubleSide, metalness: 0, ior: 1.5,
-    });
-    jar.add(mesh(cyl(0.46, 0.44, 1.05, 28, true), jarGlass, { y: 0.52, cast: false }));
-    jar.add(mesh(cyl(0.44, 0.44, 0.04, 24), jarGlass, { y: 0.02, cast: false }));
-    jar.add(mesh(torus(0.46, 0.045, 8, 26), jarGlass, { y: 1.03, rx: Math.PI / 2, cast: false }));
-    // ribbed neck
-    for (let i = 0; i < 3; i++) {
-      jar.add(mesh(torus(0.44, 0.022, 6, 22), jarGlass, { y: 0.9 + i * 0.05, rx: Math.PI / 2, cast: false }));
+    this.body.add(mesh(roundedBox(2.04, 0.1, 0.18, 0.035), deepGreen, { y: 1.28, z: -0.66 }));
+    for (const x of [-0.98, 0.98]) {
+      this.body.add(mesh(roundedBox(0.1, 0.78, 0.16, 0.035), deepGreen, { x, y: 1.64, z: -0.66 }));
     }
+    this.body.add(mesh(roundedBox(2.04, 0.12, 0.2, 0.04), green, { y: 2.02, z: -0.66 }));
+
+    // THE JAR — an oversized glass vessel with opaque rings and a label, so its
+    // silhouette survives both the busy kitchen and an empty/transparent state.
+    const jar = new THREE.Group();
+    jar.position.set(0, 1.18, 0.19);
+    this._jarScale = 1.18;
+    jar.scale.setScalar(this._jarScale);
+    const jarGlass = glass(0xdff0e8, {
+      opacity: 0.34, rough: 0.3, clearcoat: 0.08,
+    });
+    jar.add(mesh(cyl(0.48, 0.43, 1.04, 20, true), jarGlass, { y: 0.54, cast: false }));
+    jar.add(mesh(cyl(0.43, 0.43, 0.045, 18), jarGlass, { y: 0.035, cast: false }));
+    jar.add(mesh(torus(0.45, 0.042, 6, 20), deepGreen, { y: 0.08, rx: Math.PI / 2, cast: false }));
+    jar.add(mesh(torus(0.48, 0.05, 6, 20), deepGreen, { y: 1.04, rx: Math.PI / 2, cast: false }));
+    jar.add(mesh(roundedBox(0.055, 0.72, 0.025, 0.012), cream,
+      { x: -0.31, y: 0.56, z: 0.43, cast: false }));
+
+    // A small cream label and colour-changing solution seal make the otherwise
+    // empty jar readable without printing language-dependent text on the prop.
+    jar.add(mesh(roundedBox(0.52, 0.31, 0.035, 0.055), cream,
+      { y: 0.53, z: 0.45, cast: false }));
+    this.badgeMat = new THREE.MeshStandardMaterial({ color: PALETTE.pickling, roughness: 0.45 });
+    this.solutionBadge = mesh(cyl(0.115, 0.115, 0.04, 12), this.badgeMat,
+      { y: 0.53, z: 0.48, rx: Math.PI / 2, cast: false });
+    jar.add(this.solutionBadge);
 
     // Liquid — a cylinder whose height and colour we animate.
-    this.liquidMat = new THREE.MeshPhysicalMaterial({
-      color: 0xdff0e8, roughness: 0.08, transparent: true, opacity: 0.72,
-      transmission: 0, clearcoat: clearcoatFor(1), metalness: 0,
+    this.liquidMat = new THREE.MeshStandardMaterial({
+      color: 0xdff0e8, roughness: 0.38, transparent: true, opacity: 0.66,
+      metalness: 0, depthWrite: false,
     });
-    this.liquid = mesh(cyl(0.42, 0.41, 1.0, 24), this.liquidMat, { y: 0.5, cast: false });
+    this.liquid = mesh(cyl(0.425, 0.40, 0.96, 18), this.liquidMat, { y: 0.5, cast: false });
     this.liquid.scale.y = 0.001;
     jar.add(this.liquid);
 
-    // Lid, screwed on in the final step.
+    // Lid, screwed on in the final step. Instanced straight ribs replace twenty
+    // separate rounded boxes: one draw call and a fraction of the triangles.
     const lid = new THREE.Group();
     lid.position.y = 1.12;
-    lid.add(mesh(cyl(0.5, 0.5, 0.16, 26), plastic(PALETTE.picklingDeep, { rough: 0.35 })));
-    for (let i = 0; i < 20; i++) {
-      const a = (i / 20) * Math.PI * 2;
-      lid.add(mesh(roundedBox(0.035, 0.15, 0.035, 0.012), plastic(0x2f6b34),
-        { x: Math.cos(a) * 0.49, z: Math.sin(a) * 0.49, cast: false }));
+    lid.add(mesh(cyl(0.51, 0.51, 0.16, 20), deepGreen));
+    const ribCount = 12;
+    const ribs = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(0.045, 0.14, 0.035), plastic(0x285d30, { rough: 0.46 }), ribCount);
+    const ribDummy = new THREE.Object3D();
+    for (let i = 0; i < ribCount; i++) {
+      const a = (i / ribCount) * Math.PI * 2;
+      ribDummy.position.set(Math.cos(a) * 0.5, 0, Math.sin(a) * 0.5);
+      ribDummy.rotation.y = -a;
+      ribDummy.updateMatrix();
+      ribs.setMatrixAt(i, ribDummy.matrix);
     }
-    lid.add(mesh(cyl(0.42, 0.42, 0.03, 22), metal(PALETTE.brass), { y: 0.09 }));
+    ribs.castShadow = false;
+    lid.add(ribs);
+    lid.add(mesh(cyl(0.42, 0.42, 0.035, 18), metal(PALETTE.brass), { y: 0.095 }));
     lid.visible = false;
     jar.add(lid);
     this.lid = lid;
     this.jar = jar;
     this.body.add(jar);
 
-    // Three solution bottles on the shelf. All three are correct answers.
+    // Three chunky, opaque solution bottles on the rack. The earlier glass
+    // miniatures disappeared at mobile size and were merged before they could
+    // animate; bottleList explicitly protects these groups from batching.
     this.bottles = {};
+    this.bottleList = [];
     const ids = Object.keys(SOLUTION_LOOK);
     ids.forEach((id, i) => {
       const b = new THREE.Group();
-      b.position.set(-0.78 + i * 0.78, 1.26, -0.72);
-      b.scale.setScalar(0.9);
+      b.position.set(-0.72 + i * 0.72, 1.33, -0.62);
+      b.scale.setScalar(0.96);
       const look = SOLUTION_LOOK[id];
-      b.add(mesh(cyl(0.14, 0.16, 0.46, 14), glass(look.bottle, { opacity: 0.55 }), { y: 0.23 }));
-      b.add(mesh(cyl(0.15, 0.15, 0.3, 14), new THREE.MeshStandardMaterial({ color: look.colour, roughness: 0.2 }), { y: 0.18 }));
-      b.add(mesh(cyl(0.06, 0.09, 0.16, 10), glass(look.bottle, { opacity: 0.55 }), { y: 0.53 }));
-      b.add(mesh(cyl(0.07, 0.07, 0.07, 10), plastic(0x8d6e63), { y: 0.63 }));
+      b.add(mesh(cyl(0.14, 0.17, 0.43, 10), plastic(look.bottle, { rough: 0.38 }), { y: 0.23 }));
+      b.add(mesh(cyl(0.145, 0.145, 0.13, 10), cream, { y: 0.22, cast: false }));
+      b.add(mesh(cyl(0.065, 0.095, 0.17, 8), plastic(look.bottle, { rough: 0.38 }), { y: 0.52, cast: false }));
+      b.add(mesh(cyl(0.075, 0.075, 0.07, 8), deepGreen, { y: 0.64, cast: false }));
+      b.userData.home = b.position.clone();
       this.body.add(b);
       this.bottles[id] = b;
+      this.bottleList.push(b);
     });
 
-    // Pour stream + fizz particles.
+    // Pour stream follows the selected bottle's real spout to the jar mouth.
     this.stream = mesh(cyl(0.055, 0.075, 1.0, 10), new THREE.MeshBasicMaterial({
-      color: 0xf2e18a, transparent: true, opacity: 0, toneMapped: false,
-    }), { y: 1.95, z: 0.12, cast: false });
+      color: 0xf2e18a, transparent: true, opacity: 0.86, toneMapped: false,
+    }), { cast: false });
+    this.stream.visible = false;
     this.body.add(this.stream);
 
-    this.fizz = [];
-    for (let i = 0; i < 14; i++) {
-      const f = mesh(sphere(0.035, 8, 6), new THREE.MeshBasicMaterial({
-        color: 0xffffff, transparent: true, opacity: 0, toneMapped: false, depthWrite: false,
-      }), { cast: false, receive: false });
-      f.visible = false;
-      jar.add(f);
-      this.fizz.push({ mesh: f, t: 1 });
-    }
+    // Ten bubbles in one instanced draw call.
+    this.fizz = Array.from({ length: 10 }, (_, i) => ({ t: 1, cycle: 0, phase: i * 2.17 }));
+    this.fizzMesh = new THREE.InstancedMesh(
+      sphere(0.035, 6, 4),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff, transparent: true, opacity: 0.75,
+        toneMapped: false, depthWrite: false,
+      }),
+      this.fizz.length);
+    this.fizzMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.fizzMesh.castShadow = false;
+    this.fizzMesh.receiveShadow = false;
+    this.fizzMesh.visible = false;
+    jar.add(this.fizzMesh);
 
     this._fill = 0;
     this._chosen = null;
+    this._success = 0;
+    this._tmpFizz = new THREE.Object3D();
+    this._spout = new THREE.Vector3();
+    this._mouth = new THREE.Vector3();
+    this._streamDir = new THREE.Vector3();
+    this._streamMid = new THREE.Vector3();
+    this._up = new THREE.Vector3(0, 1, 0);
+    this._foodScale = new THREE.Vector3();
+    this._dockTarget = new THREE.Vector3();
   }
 
   getSteps() {
@@ -136,12 +181,15 @@ export class PicklingJar extends Station {
       this._fill = progress;
       this.liquid.scale.y = Math.max(0.001, progress);
       this.liquid.position.y = 0.5 * progress + 0.02;
-      this.stream.material.opacity = progress > 0.98 ? 0 : 0.85;
-      this.stream.scale.y = 0.6;
       // Bubbles rise as the solution takes hold.
       for (let i = 0; i < Math.floor(progress * this.fizz.length); i++) {
         const f = this.fizz[i];
-        if (f.t >= 1) { f.t = 0; f.x = (Math.random() - 0.5) * 0.6; f.z = (Math.random() - 0.5) * 0.6; }
+        if (f.t >= 1) {
+          f.t = 0;
+          f.cycle++;
+          f.x = Math.sin(f.phase + f.cycle * 1.31) * 0.3;
+          f.z = Math.cos(f.phase * 0.73 + f.cycle) * 0.3;
+        }
       }
       if (this.food) {
         // Food settles down into the liquid.
@@ -157,34 +205,88 @@ export class PicklingJar extends Station {
       const look = SOLUTION_LOOK[value] || SOLUTION_LOOK.vinegar;
       this.liquidMat.color.setHex(look.colour);
       this.stream.material.color.setHex(look.colour);
-      for (const f of this.fizz) f.mesh.material.color.setHex(look.fizz);
+      this.fizzMesh.material.color.setHex(look.fizz);
+      this.badgeMat.color.setHex(look.bottle);
       // Lift the chosen bottle so the choice is acknowledged physically.
       this._pouringBottle = this.bottles[value];
     }
-    if (index === 2) this.stream.material.opacity = 0;
-    if (index === 3) { this.lid.visible = true; this._sealing = 0; }
+    if (index === 2) this.stream.visible = false;
+    if (index === 3) {
+      this.lid.visible = true;
+      this.lid.position.y = 1.28;
+      this._sealing = 0;
+    }
   }
 
   async playSuccess() {
+    this._success = 1;
     await new Promise((r) => setTimeout(r, 650));
   }
 
   resetVisuals() {
     this._fill = 0; this._chosen = null; this._loading = false;
+    this._success = 0;
     this.liquid.scale.y = 0.001;
     this.liquid.position.y = 0.02;
+    this.liquidMat.color.setHex(0xdff0e8);
+    this.badgeMat.color.setHex(PALETTE.pickling);
     this.lid.visible = false;
     this.lid.rotation.y = 0;
     this.lid.position.y = 1.12;
     this._sealing = null;
-    this.stream.material.opacity = 0;
-    if (this._pouringBottle) { this._pouringBottle.rotation.z = 0; this._pouringBottle.position.y = 1.28; }
+    this.stream.visible = false;
+    this.fizzMesh.visible = false;
+    for (const [i, f] of this.fizz.entries()) {
+      f.t = 1;
+      this._tmpFizz.position.set(0, -2, 0);
+      this._tmpFizz.scale.setScalar(0.001);
+      this._tmpFizz.updateMatrix();
+      this.fizzMesh.setMatrixAt(i, this._tmpFizz.matrix);
+    }
+    this.fizzMesh.instanceMatrix.needsUpdate = true;
+    for (const bottle of this.bottleList) {
+      bottle.position.copy(bottle.userData.home);
+      bottle.rotation.z = 0;
+    }
     this._pouringBottle = null;
+    this.jar.scale.setScalar(this._jarScale);
+  }
+
+  _updatePourStream() {
+    const bottle = this._pouringBottle;
+    const visible = bottle && this._fill > 0.015 && this._fill < 0.985;
+    this.stream.visible = !!visible;
+    if (!visible) return;
+
+    // Convert both endpoints to body-local coordinates, so the stream remains
+    // attached while the bottle and the jar's subtle idle turn both move.
+    this.body.updateWorldMatrix(true, true);
+    this._spout.set(0, 0.69, 0);
+    bottle.localToWorld(this._spout);
+    this.body.worldToLocal(this._spout);
+    this._mouth.set(0, 1.06, 0);
+    this.jar.localToWorld(this._mouth);
+    this.body.worldToLocal(this._mouth);
+
+    this._streamDir.subVectors(this._mouth, this._spout);
+    const length = this._streamDir.length();
+    this._streamMid.copy(this._spout).add(this._mouth).multiplyScalar(0.5);
+    this.stream.position.copy(this._streamMid);
+    this.stream.scale.set(1, length, 1);
+    this.stream.quaternion.setFromUnitVectors(this._up, this._streamDir.normalize());
   }
 
   tick(dt, elapsed) {
-    // Idle: gentle glass glint via a slow rotation of the jar's highlights.
+    // Idle: a tiny turn catches the opaque rim and label without making a jar
+    // full of food look as if it is spinning on the counter.
     this.jar.rotation.y = Math.sin(elapsed * 0.4) * 0.05;
+    if (this._success > 0) {
+      this._success = Math.max(0, this._success - dt * 1.45);
+      const bounce = Math.sin((1 - this._success) * Math.PI * 3) * 0.035 * this._success;
+      this.jar.scale.setScalar(this._jarScale * (1 + bounce));
+    } else {
+      this.jar.scale.setScalar(this._jarScale);
+    }
 
     // Lid screws itself down once tapped.
     if (this._sealing !== undefined && this._sealing !== null && this._sealing < 1) {
@@ -193,26 +295,43 @@ export class PicklingJar extends Station {
       this.lid.position.y = 1.12 - this._sealing * 0.06;
     }
 
-    if (this._pouringBottle) {
-      const want = this._fill > 0 && this._fill < 1;
-      this._pouringBottle.rotation.z = THREE.MathUtils.lerp(this._pouringBottle.rotation.z, want ? -1.9 : 0, 1 - Math.pow(0.004, dt));
-      this._pouringBottle.position.y = THREE.MathUtils.lerp(this._pouringBottle.position.y, want ? 2.0 : 1.28, 1 - Math.pow(0.004, dt));
-      this._pouringBottle.position.x = THREE.MathUtils.lerp(this._pouringBottle.position.x, want ? 0.25 : this._pouringBottle.position.x, 1 - Math.pow(0.02, dt));
+    const pourK = 1 - Math.pow(0.004, dt);
+    for (const bottle of this.bottleList) {
+      const pouring = bottle === this._pouringBottle && this._fill > 0.015 && this._fill < 0.985;
+      const home = bottle.userData.home;
+      bottle.rotation.z = THREE.MathUtils.lerp(bottle.rotation.z, pouring ? -1.15 : 0, pourK);
+      bottle.position.x = THREE.MathUtils.lerp(bottle.position.x, pouring ? -0.58 : home.x, pourK);
+      bottle.position.y = THREE.MathUtils.lerp(bottle.position.y, pouring ? 2.02 : home.y, pourK);
+      bottle.position.z = THREE.MathUtils.lerp(bottle.position.z, pouring ? 0.12 : home.z, pourK);
     }
+    this._updatePourStream();
 
-    for (const f of this.fizz) {
-      if (f.t >= 1) { f.mesh.visible = false; continue; }
+    let fizzing = false;
+    for (const [i, f] of this.fizz.entries()) {
+      if (f.t >= 1) {
+        this._tmpFizz.position.set(0, -2, 0);
+        this._tmpFizz.scale.setScalar(0.001);
+        this._tmpFizz.updateMatrix();
+        this.fizzMesh.setMatrixAt(i, this._tmpFizz.matrix);
+        continue;
+      }
       f.t += dt * 1.1;
-      f.mesh.visible = true;
-      f.mesh.position.set(f.x, 0.08 + f.t * 0.9 * Math.max(0.2, this._fill), f.z);
-      f.mesh.scale.setScalar(0.6 + f.t * 0.9);
-      f.mesh.material.opacity = 0.8 * Math.sin(f.t * Math.PI);
+      fizzing = true;
+      this._tmpFizz.position.set(f.x, 0.08 + f.t * 0.9 * Math.max(0.2, this._fill), f.z);
+      const fizzScale = Math.max(0.001, Math.sin(Math.min(1, f.t) * Math.PI)) * (0.7 + f.t * 0.7);
+      this._tmpFizz.scale.setScalar(fizzScale);
+      this._tmpFizz.updateMatrix();
+      this.fizzMesh.setMatrixAt(i, this._tmpFizz.matrix);
     }
+    this.fizzMesh.visible = fizzing;
+    if (fizzing) this.fizzMesh.instanceMatrix.needsUpdate = true;
 
     if (this._loading && this.food) {
-      const target = this.root.localToWorld(new THREE.Vector3(0, 1.62, 0.12));
-      this.food.group.position.lerp(target, 1 - Math.pow(0.004, dt));
-      this.food.model.scale.lerp(new THREE.Vector3().setScalar(this.food.baseScale * 0.72), 1 - Math.pow(0.02, dt));
+      this._dockTarget.set(0, 1.62, 0.12);
+      this.root.localToWorld(this._dockTarget);
+      this.food.group.position.lerp(this._dockTarget, 1 - Math.pow(0.004, dt));
+      this._foodScale.setScalar(this.food.baseScale * 0.72);
+      this.food.model.scale.lerp(this._foodScale, 1 - Math.pow(0.02, dt));
     }
   }
 }

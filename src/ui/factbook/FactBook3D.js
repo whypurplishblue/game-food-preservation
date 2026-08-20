@@ -159,15 +159,16 @@ export class FactBook3D {
 
     // ---------------------------------------------------------------- three
     this.renderer = new THREE.WebGLRenderer({
-      canvas: this.canvas, antialias: this.quality !== 'low', alpha: true,
+      canvas: this.canvas, antialias: this.quality === 'high', alpha: true,
       powerPreference: 'high-performance', stencil: false,
     });
-    this.renderer.setPixelRatio(Math.min(this.quality === 'low' ? 1.25 : 2, window.devicePixelRatio || 1));
+    const maxDpr = this.quality === 'high' ? 2 : this.quality === 'medium' ? 1.5 : 1.15;
+    this.renderer.setPixelRatio(Math.min(maxDpr, window.devicePixelRatio || 1));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.95;
     this.renderer.autoClear = false;
-    this.renderer.shadowMap.enabled = this.quality !== 'low';
+    this.renderer.shadowMap.enabled = this.quality === 'high';
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
     const pmrem = new THREE.PMREMGenerator(this.renderer);
@@ -232,7 +233,7 @@ export class FactBook3D {
     // kitchen's, so the page stays paper-coloured instead of white.
     const key = new THREE.DirectionalLight(0xfff3dd, 1.55);
     key.position.set(-2.6, 4.4, 3.2);
-    key.castShadow = this.quality !== 'low';
+    key.castShadow = this.quality === 'high';
     const s = this.quality === 'high' ? 1024 : 512;
     key.shadow.mapSize.set(s, s);
     key.shadow.camera.near = 0.5;

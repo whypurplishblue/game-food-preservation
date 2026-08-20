@@ -102,10 +102,17 @@ async function boot() {
     stage3d.renderer.setPixelRatio(stage3d._pixelRatio());
     if (import.meta.env?.DEV) console.info('[assets] slow network detected, downgrading to medium quality');
   }
+  setMaterialQuality(finalQuality);
   if (import.meta.env?.DEV && assets.report.length) console.info('[assets]', assets.report.join(', '));
 
   const input = new Input(canvas, stage3d, {});
   const game = new Game({ stage3d, kitchen, hud, panel, quiz, screens, particles, popups, input });
+  const stationRoots = game.prepareStations();
+  await stage3d.warmup(stationRoots);
+  // Allocate post-processing targets and compile their shaders while the boot
+  // cover still masks the canvas. This affects startup smoothness, not the
+  // steady-state render budget addressed by batching/material quality above.
+  stage3d.render(0);
 
   // Audio must be created inside a user gesture.
   const unlock = () => {
