@@ -2,6 +2,7 @@
  * Entry point: boot the renderer, wire the systems, run a fixed-ish loop.
  */
 import * as THREE from 'three';
+import { inject } from '@vercel/analytics';
 import { initLang, t, methodName } from './content/i18n.js';
 import * as CURRICULUM from './content/curriculum.js';
 import * as QUIZ from './content/quiz.js';
@@ -21,6 +22,11 @@ import { QuizCard } from './ui/QuizCard.js';
 import { Screens } from './ui/Screens.js';
 import { audio } from './core/Audio.js';
 import './ui/styles.css';
+
+// This is a Vite/vanilla-JS app, so the generic injector is the equivalent of
+// rendering <Analytics /> in a Next.js or React layout. Vercel's insights
+// endpoint only exists on deployments, so local development stays offline.
+if (!['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)) inject();
 
 // Food's hint badge needs a localised method name before the module graph is
 // fully wired; exposing it avoids a circular import between Food and i18n.
