@@ -3,12 +3,6 @@ import { isCleanName } from '../../src/shared/nameFilter.js';
 
 const MODES = new Set(['arcade', 'learning']);
 const NAME_MAX = 20;
-// Learning mode's score is a fixed, well-defined ceiling for a full run (all
-// 9 methods, once each). Arcade's combo multiplier has no hard cap in
-// principle and now accumulates across all 8 stages of a run, so this is a
-// generous sanity bound against garbage/overflow submissions, not a precise
-// validator.
-const SCORE_MAX = { learning: 1350 + 9 * 5, arcade: 150000 };
 const ROUTE = '/api/leaderboard/submit';
 
 function requestId(req) {
@@ -68,10 +62,10 @@ export default async function handler(req, res) {
     res.status(400).json({ ok: false, error: 'invalid name' });
     return;
   }
-  if (!Number.isFinite(score) || score < 0 || score > SCORE_MAX[mode]) {
+  if (!Number.isFinite(score) || score < 0) {
     writeLog('warn', 'leaderboard submission rejected', req, startedAt, {
       reason: 'invalid_score', mode, name: cleanedName, scoreType: typeof score,
-      score: Number.isFinite(score) ? score : null, allowedMax: SCORE_MAX[mode],
+      score: Number.isFinite(score) ? score : null,
     });
     res.status(400).json({ ok: false, error: 'invalid score' });
     return;
