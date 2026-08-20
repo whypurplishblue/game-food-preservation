@@ -109,7 +109,9 @@
     "lateAttempt": "Berjaya selepas tekaan yang salah",
     "quizBonus": "Bonus kuiz",
     "timeBonus": "Bonus kelajuan",
-    "pointsBreakdown": "Cara anda mendapat markah"
+    "pointsBreakdown": "Cara anda mendapat markah",
+    "runScore": "Jumlah keseluruhan",
+    "finishToSubmit": "Selesaikan tahap terakhir untuk menghantar skor anda"
   },
   "station": {
     "drying": {

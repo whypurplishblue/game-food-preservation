@@ -13,7 +13,7 @@ import {
   STATION_METHODS, stationsFor, methodAtStation,
   LEARNING_STAGES, LEARNING_SCORING,
 } from '../content/curriculum.js';
-import { t, methodName, foodName, mechShort, methodMechShort } from '../content/i18n.js';
+import { t, methodName, foodName, mechShort, methodMechShort, onLangChange } from '../content/i18n.js';
 import { makeQuestion } from '../content/quiz.js';
 import { PALETTE } from '../world/Palette.js';
 import { slotsFor, PREP_CENTRE, PREP_RADIUS } from '../world/Kitchen.js';
@@ -65,6 +65,10 @@ export class Game {
     this._tmpVec = new THREE.Vector3();
     this._builtStations = new Set();
     this._buildAllStations();
+    this._unsubLang = onLangChange(() => {
+      for (const station of this.stations.values()) station.refreshLabels();
+      for (const food of this.foods) food.refreshLabel();
+    });
     this._wireInput();
     this._loadSettings();
 
@@ -189,8 +193,12 @@ export class Game {
     });
   }
 
-  startArcade(id) { this.gameMode = 'arcade'; this.startStage(id); }
-  startLearning(id) { this.gameMode = 'learning'; this.startStage(id); }
+  // Starting fresh from level 1 begins a new "run" for the leaderboard — its
+  // cumulative score resets here, then accumulates across stages in
+  // _endStage as the player advances via onNext, so a submission always
+  // reflects a full playthrough, not a single stage/level.
+  startArcade(id) { this.gameMode = 'arcade'; if (id === 1) this.runScore = 0; this.startStage(id); }
+  startLearning(id) { this.gameMode = 'learning'; if (id === 1) this.runScore = 0; this.startStage(id); }
 
   openCredits(back) {
     const wasPlaying = this.mode === 'playing';
@@ -884,15 +892,21 @@ export class Game {
       const key = `l${this.stageId}`;
       this.bestScores.learning[key] = Math.max(this.bestScores.learning[key] || 0, this.learningScore || 0);
       if (passed) this.savedStage.learning = Math.min(LEARNING_STAGES.length, this.stageId + 1);
+      // Only a completed level's score counts toward the run total — a
+      // failed attempt is about to be retried from zero, so it shouldn't
+      // double-count if the retry then passes.
+      if (passed) this.runScore = (this.runScore || 0) + (this.learningScore || 0);
+      const isFinalLevel = this.stageId === LEARNING_STAGES.length;
       this._save();
       this.screens.learningResults({
         stage: this.stage, score: this.learningScore || 0, maxScore: LEARNING_SCORING.maxPossible,
         timeBonus: this.learningTimeBonus || 0, passed, spoilt: this.spoiltCount,
         breakdown: this._learningBreakdown,
+        runScore: this.runScore || 0, isFinalLevel,
         onNext: () => { this.screens.close(); this.startStage(this.stageId + 1); },
         onRetry: () => { this.screens.close(); this.startStage(this.stageId); },
         onMenu: () => { this.screens.close(); this.showMenu(); },
-        onSubmitScore: (name) => this._submitLeaderboardScore('learning', name, this.learningScore || 0),
+        onSubmitScore: isFinalLevel ? (name) => this._submitLeaderboardScore('learning', name, this.runScore || 0) : null,
         onViewLeaderboard: () => this.openLeaderboard('learning'),
       });
       return;
@@ -902,6 +916,8 @@ export class Game {
     const key = `s${this.stageId}`;
     this.bestScores.arcade[key] = Math.max(this.bestScores.arcade[key] || 0, this.score);
     if (passed) this.savedStage.arcade = Math.min(STAGES.length, this.stageId + 1);
+    if (passed) this.runScore = (this.runScore || 0) + (this.score || 0);
+    const isFinalStage = this.stageId === STAGES.length;
     this._save();
 
     this.screens.results({
@@ -911,10 +927,11 @@ export class Game {
       accuracy: this.attempts ? this.correctAttempts / this.attempts : 1,
       bestCombo: this.bestCombo,
       learned: [...this.methodsUsed],
+      runScore: this.runScore || 0, isFinalLevel: isFinalStage,
       onNext: () => { this.screens.close(); this.startStage(this.stageId + 1); },
       onRetry: () => { this.screens.close(); this.startStage(this.stageId); },
       onMenu: () => { this.screens.close(); this.showMenu(); },
-      onSubmitScore: (name) => this._submitLeaderboardScore('arcade', name, this.score),
+      onSubmitScore: isFinalStage ? (name) => this._submitLeaderboardScore('arcade', name, this.runScore || 0) : null,
       onViewLeaderboard: () => this.openLeaderboard('arcade'),
     });
   }

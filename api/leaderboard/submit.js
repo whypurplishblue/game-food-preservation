@@ -3,10 +3,12 @@ import { isCleanName } from '../../src/shared/nameFilter.js';
 
 const MODES = new Set(['arcade', 'learning']);
 const NAME_MAX = 20;
-// Learning mode's score is a fixed, well-defined ceiling. Arcade's combo
-// multiplier has no hard cap in principle, so this is a generous sanity
-// bound against garbage/overflow submissions, not a precise validator.
-const SCORE_MAX = { learning: 1350 + 9 * 5, arcade: 20000 };
+// Learning mode's score is a fixed, well-defined ceiling for a full run (all
+// 9 methods, once each). Arcade's combo multiplier has no hard cap in
+// principle and now accumulates across all 8 stages of a run, so this is a
+// generous sanity bound against garbage/overflow submissions, not a precise
+// validator.
+const SCORE_MAX = { learning: 1350 + 9 * 5, arcade: 150000 };
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
