@@ -19,6 +19,10 @@ const el = (tag, cls, html) => {
   return e;
 };
 const hex = (n) => `#${n.toString(16).padStart(6, '0')}`;
+// Leaderboard names come from other players via the API and are rendered
+// through innerHTML — escape before interpolation or a submitted name can
+// inject markup/script that runs for everyone who views the board.
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export class Screens {
   constructor(root) {
@@ -244,7 +248,7 @@ export class Screens {
         : !entries?.length
           ? `<p class="pp-leaderboard__status">${t('ui.noScoresYet')}</p>`
           : `<ol class="pp-leaderboard__list">${
-              entries.map((e) => `<li><span class="pp-leaderboard__rank">${e.rank}</span><span class="pp-leaderboard__name">${e.name}</span><b>${e.score.toLocaleString()}</b></li>`).join('')
+              entries.map((e) => `<li><span class="pp-leaderboard__rank">${e.rank}</span><span class="pp-leaderboard__name">${esc(e.name)}</span><b>${e.score.toLocaleString()}</b></li>`).join('')
             }</ol>`;
     const node = this._open(`
       <div class="pp-fact pp-leaderboard">

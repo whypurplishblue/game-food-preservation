@@ -25,7 +25,10 @@ export default async function handler(req, res) {
     return;
   }
   const cleanedName = String(name || '').trim().slice(0, NAME_MAX);
-  if (!cleanedName || !isCleanName(cleanedName)) {
+  // Defense in depth: the leaderboard screen escapes names before rendering,
+  // but reject HTML metacharacters here too so bad data never lands in KV in
+  // the first place, regardless of what renders it later.
+  if (!cleanedName || /[<>&"']/.test(cleanedName) || !isCleanName(cleanedName)) {
     res.status(400).json({ ok: false, error: 'invalid name' });
     return;
   }
