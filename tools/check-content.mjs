@@ -29,7 +29,7 @@ await new Promise((r) => setTimeout(r, 1500));
 
 const results = await page.evaluate(() => {
   const { content, game } = window.__pp;
-  const { METHODS, FOODS, STAGES, STATION_METHODS, buildFullBank, i18n } = content;
+  const { METHODS, FOODS, STAGES, LEARNING_STAGES, STATION_METHODS, buildFullBank, i18n } = content;
   const out = {};
 
   out.validation = window.__ppValidation || [];
@@ -79,6 +79,7 @@ const results = await page.evaluate(() => {
   }
   for (const f of Object.keys(FOODS)) need.push(`foods.${f}`);
   for (const st of STAGES) need.push(`stages.${st.key}.name`, `stages.${st.key}.brief`);
+  for (const st of LEARNING_STAGES) need.push(`stages.${st.key}.name`, `stages.${st.key}.brief`, `stages.${st.key}.tagline`);
   const before = i18n.getLang();
   for (const lang of i18n.AVAILABLE_LANGS) {
     i18n.setLang(lang);

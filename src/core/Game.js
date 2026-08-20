@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import {
   STAGES, METHODS, FOODS, FOOD_METHODS, SCORING, isTaughtPairing,
   STATION_METHODS, stationsFor, methodAtStation,
+  LEARNING_STAGES, LEARNING_SCORING,
 } from '../content/curriculum.js';
 import { t, methodName, foodName, mechShort, methodMechShort } from '../content/i18n.js';
 import { makeQuestion } from '../content/quiz.js';
@@ -39,7 +40,9 @@ const STATION_CLASSES = {
   Smokehouse, Cannery,
 };
 
-const SAVE_KEY = 'pp.progress.v1';
+// Bumped to v2 for the namespaced {arcade, learning} save shape — no
+// migration shim, there is no real save data yet to preserve.
+const SAVE_KEY = 'pp.progress.v2';
 
 export class Game {
   constructor({ stage3d, kitchen, hud, panel, quiz, screens, particles, popups, input }) {
@@ -56,6 +59,7 @@ export class Game {
     this.foods = [];
     this.stations = new Map();
     this.mode = 'menu';           // menu | brief | playing | paused | quiz | result
+    this.gameMode = 'arcade';     // arcade | learning — which content/scoring track
     this.settings = { sound: true, music: true, reducedMotion: false };
 
     this._tmpVec = new THREE.Vector3();
@@ -132,12 +136,13 @@ export class Game {
       if (raw) {
         const d = JSON.parse(raw);
         Object.assign(this.settings, d.settings || {});
-        this.savedStage = d.stage || 1;
-        this.bestScores = d.bestScores || {};
+        this.savedStage = { arcade: d.savedStage?.arcade || 1, learning: d.savedStage?.learning || 1 };
+        this.bestScores = { arcade: d.bestScores?.arcade || {}, learning: d.bestScores?.learning || {} };
         this.misses = d.misses || {};
       }
     } catch { /* private mode — play without a save */ }
-    this.bestScores ||= {};
+    this.savedStage ||= { arcade: 1, learning: 1 };
+    this.bestScores ||= { arcade: {}, learning: {} };
     audio.setEnabled(this.settings.sound);
     audio.musicOn = this.settings.music;
   }
@@ -146,7 +151,7 @@ export class Game {
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({
         settings: this.settings,
-        stage: this.stageId,
+        savedStage: this.savedStage,
         bestScores: this.bestScores,
         misses: this.misses || {},
       }));
@@ -168,13 +173,20 @@ export class Game {
     this.hud.setVisible(false);
     this.input.setEnabled(false);
     this.screens.title({
-      hasSave: !!this.savedStage && this.savedStage > 1,
-      onPlay: () => this.startStage(1),
-      onContinue: () => this.startStage(this.savedStage),
+      hasSaveArcade: this.savedStage.arcade > 1,
+      hasSaveLearning: this.savedStage.learning > 1,
+      onPlayArcade: () => this.startArcade(1),
+      onContinueArcade: () => this.startArcade(this.savedStage.arcade),
+      onPlayLearning: () => this.startLearning(1),
+      onContinueLearning: () => this.startLearning(this.savedStage.learning),
       onFactBook: () => this.openFactBook(() => this.showMenu()),
       onCredits: () => this.openCredits(() => this.showMenu()),
+      onLeaderboard: (mode) => this.openLeaderboard(mode, () => this.showMenu()),
     });
   }
+
+  startArcade(id) { this.gameMode = 'arcade'; this.startStage(id); }
+  startLearning(id) { this.gameMode = 'learning'; this.startStage(id); }
 
   openCredits(back) {
     const wasPlaying = this.mode === 'playing';
@@ -254,12 +266,18 @@ export class Game {
 
   // ------------------------------------------------------------------ stages
   startStage(id) {
-    this.stageId = THREE.MathUtils.clamp(id, 1, STAGES.length);
-    this.stage = STAGES[this.stageId - 1];
+    const stages = this.gameMode === 'learning' ? LEARNING_STAGES : STAGES;
+    this.stageId = THREE.MathUtils.clamp(id, 1, stages.length);
+    this.stage = stages[this.stageId - 1];
     this._teardownStage();
     this._setupStations();
 
     this.score = 0;
+    this.learningScore = 0;
+    this.learningTimeBonus = 0;
+    this._learningBreakdown = [];
+    this._learningMethodsDone = new Set();
+    this._learningQuizzed = new Set();
     this.combo = 1;
     this.comboStreak = 0;
     this.bestCombo = 1;
@@ -275,11 +293,13 @@ export class Game {
     this.elapsed = 0;
     this._shuffleCounter = 0;
 
+    const isLearning = this.gameMode === 'learning';
     this.hud.setVisible(true);
-    this.hud.applyStage(this.stage, this.stage.methods);
+    this.hud.applyStage(this.stage, this.stage.methods, this.gameMode);
     this.hud.setScore(0);
-    this.hud.setGoal(0, this.stage.targetPreserved);
+    this.hud.setGoal(0, isLearning ? this.stage.methods.length : this.stage.targetPreserved);
     this.hud.setStars(0);
+    this.hud.setArcadeUIVisible(!isLearning);
     this._syncCombo();
 
     this.mode = 'brief';
@@ -372,6 +392,7 @@ export class Game {
   }
 
   _spawn() {
+    if (this.gameMode === 'learning') { this._spawnLearning(); return; }
     const pool = this._spawnableFoods();
     if (!pool.length) return;
     // Avoid immediate repeats so the child meets the whole food set.
@@ -386,6 +407,47 @@ export class Game {
       spoilRate: 0.05 * this.stage.spoilRateMul,
       showHint: this.stage.showMethodHintOnFood,
     });
+    food._spawnedAt = this.elapsed;
+    this._placeSpawnedFood(food);
+  }
+
+  /**
+   * Learning mode spawns deliberately, one food per not-yet-completed method,
+   * rather than drawing randomly from every unlocked method's food list. This
+   * sidesteps a real gap in the curriculum data: cooling, smoking and canning
+   * have no food for which they are the PRIMARY method (see FOODS in
+   * curriculum.js), so the ordinary primary-gated hint filter in
+   * `_spawnableFoods()` would never select a food for them and those methods
+   * could never be completed. Passing an explicit `hintMethodId` to Food
+   * keeps the hint badge honest for the method actually being taught here,
+   * independent of that food's usual primary.
+   */
+  _spawnLearning() {
+    const remaining = this.stage.methods.filter((id) => !this._learningMethodsDone.has(id));
+    if (!remaining.length) return;
+    const activeMethods = new Set(
+      this.foods.filter((f) => f.state === 'idle' || f.state === 'held').map((f) => f._learningMethodId)
+    );
+    const next = remaining.find((id) => !activeMethods.has(id));
+    if (!next) return;
+    // A method's taught .foods list can include reference-only foods (e.g.
+    // smoking teaches bananas per the notes) that have no FOODS entry and
+    // never spawn on the counter — filter down to what can actually spawn.
+    const candidates = METHODS[next].foods.filter((fid) => FOODS[fid]);
+    if (!candidates.length) return;
+    const fid = candidates[(Math.random() * candidates.length) | 0];
+    const food = new Food(fid, {
+      spoilRate: 0.05 * this.stage.spoilRateMul,
+      showHint: true,
+      hintMethodId: next,
+    });
+    food._learningMethodId = next;
+    food._spawnedAt = this.elapsed;
+    this._placeSpawnedFood(food);
+  }
+
+  /** Shared placement/animation for a freshly-spawned food, regardless of mode. */
+  _placeSpawnedFood(food) {
     // Even angular placement around the table. Random angles clustered items
     // on top of each other and stacked their labels into an unreadable pile.
     this._slotAngle = ((this._slotAngle ?? 0) + Math.PI * 2 * 0.41) % (Math.PI * 2);
@@ -424,6 +486,10 @@ export class Game {
 
     if (!methodId) {
       this.wrongDrops = (this.wrongDrops || 0) + 1;
+      // Learning mode: this food no longer qualifies for the first-attempt
+      // bonus once it gets to a right station, even though no flat penalty
+      // applies here (see below).
+      food._wrongStationTried = true;
       this._breakCombo();
       // Teach on the spot: name what this machine actually does. Where the
       // station serves two methods, name both.
@@ -431,7 +497,11 @@ export class Game {
         .filter((id) => this.stage.methods.includes(id))
         .map((id) => `${methodName(id)} → ${methodMechShort(id, METHODS[id].mechanism)}`)
         .join('   ·   ');
-      this._addScore(SCORING.wrongStationPenalty, food.group.position, `${SCORING.wrongStationPenalty}`, PALETTE.danger);
+      // Learning mode has no flat wrong-station penalty — the half-credit
+      // rule on the eventual correct pairing already prices the mistake in.
+      if (this.gameMode !== 'learning') {
+        this._addScore(SCORING.wrongStationPenalty, food.group.position, `${SCORING.wrongStationPenalty}`, PALETTE.danger);
+      }
       sfx('wrong');
       this.stage3d.shake(0.22, 200);
       this.hud.flash(`${t('ui.wrongStation')}  ${taught}`, { kind: 'bad', ms: 1800 });
@@ -439,8 +509,9 @@ export class Game {
       this._noteMiss(station.methods?.[0] || station.methodId);
       this._returnFood(food);
       // A mistake is the highest-value moment to ask a question — the child is
-      // already attending to the thing they got wrong.
-      if (Math.random() < 0.35 && this.stage.quizChance > 0) {
+      // already attending to the thing they got wrong. Arcade only: learning
+      // mode's quizzing is deterministic (one per method, on first success).
+      if (this.gameMode !== 'learning' && Math.random() < 0.35 && this.stage.quizChance > 0) {
         setTimeout(() => {
           if (this.mode !== 'playing') return;
           // Ask about THIS food, not about a method that was never used.
@@ -503,15 +574,25 @@ export class Game {
     // and named. Marking a true pairing wrong teaches a child to distrust what
     // they know; saying nothing lets the exam answer slip.
     const taught = isTaughtPairing(methodId, food.foodId);
-    this._bumpCombo();
-    const base = (SCORING.base + (quality > 0.95 ? SCORING.perfectInteractionBonus : 0))
-      * (taught ? 1 : SCORING.alsoWorksFactor);
-    const gained = Math.round(base * this.combo);
-    this._addScore(gained, pos, `+${gained}`, m.colour);
-    if (quality > 0.95) {
-      const perfectPos = new THREE.Vector3().copy(pos);
-      perfectPos.y += 0.7;
-      this.popups.show(perfectPos, t('ui.perfect'), { colour: '#ffd54f', size: 62, scale: 0.8 });
+
+    if (this.gameMode === 'learning') {
+      const firstAttempt = !food._wrongStationTried;
+      const timeMs = (this.elapsed - (food._spawnedAt ?? this.elapsed)) * 1000;
+      this._addLearningPoints(methodId, { firstAttempt, timeMs, pos, colour: m.colour });
+      this._learningMethodsDone.add(methodId);
+      this.hud.setGoal(this._learningMethodsDone.size, this.stage.methods.length);
+    } else {
+      this._bumpCombo();
+      const base = (SCORING.base + (quality > 0.95 ? SCORING.perfectInteractionBonus : 0))
+        * (taught ? 1 : SCORING.alsoWorksFactor);
+      const gained = Math.round(base * this.combo);
+      this._addScore(gained, pos, `+${gained}`, m.colour);
+      if (quality > 0.95) {
+        const perfectPos = new THREE.Vector3().copy(pos);
+        perfectPos.y += 0.7;
+        this.popups.show(perfectPos, t('ui.perfect'), { colour: '#ffd54f', size: 62, scale: 0.8 });
+      }
+      this.hud.setGoal(this.preserved, this.stage.targetPreserved);
     }
 
     // The teaching beat: name the method and its mechanism, every time. For the
@@ -530,7 +611,6 @@ export class Game {
       this.hud.say(note);
       bannerClearMs = 1600 + 2600;
     }
-    this.hud.setGoal(this.preserved, this.stage.targetPreserved);
 
     // Preserved food leaves the counter after a beat.
     setTimeout(() => this._retireFood(food), 1400);
@@ -542,6 +622,19 @@ export class Game {
 
     station.release();
     this.stage3d.setCameraFraming('play', { instant: false });
+
+    if (this.gameMode === 'learning') {
+      // Exactly one quiz per method, the first time it is correctly used —
+      // deterministic, not the arcade's probabilistic quizChance roll.
+      if (!this._learningQuizzed.has(methodId)) {
+        this._learningQuizzed.add(methodId);
+        setTimeout(() => this._askQuiz(methodId, food.foodId), bannerClearMs);
+      } else {
+        this.input.setEnabled(true);
+        this._checkStageEnd();
+      }
+      return;
+    }
 
     if (Math.random() < this.stage.quizChance) {
       // Bias toward whatever this child keeps getting wrong, not always the
@@ -570,7 +663,13 @@ export class Game {
     sfx('wrong');
     this._breakCombo();
     this._noteMiss(methodId);
-    this._addScore(SCORING.wrongStationPenalty, food.group.position, `${SCORING.wrongStationPenalty}`, PALETTE.danger);
+    if (this.gameMode === 'learning') {
+      // No flat penalty, but the botched attempt still costs the
+      // first-attempt bonus on the eventual correct execution.
+      food._wrongStationTried = true;
+    } else {
+      this._addScore(SCORING.wrongStationPenalty, food.group.position, `${SCORING.wrongStationPenalty}`, PALETTE.danger);
+    }
 
     let msg;
     if (reason === 'dial') {
@@ -623,10 +722,19 @@ export class Game {
       if (correct) {
         this.quizRight++;
         this._noteHit(q.methodId);
-        this._bumpCombo();
-        const gained = Math.round(SCORING.quizCorrect * this.combo);
         const p = new THREE.Vector3(0, 4.2, 2);
-        this._addScore(gained, p, `+${gained}`, PALETTE.gold);
+        if (this.gameMode === 'learning') {
+          const gained = LEARNING_SCORING.quizCorrect;
+          this.learningScore = (this.learningScore || 0) + gained;
+          this._learningBreakdown.push({ methodId: q.methodId, quiz: true, base: gained, timeBonus: 0 });
+          this.hud.setScore(this.learningScore);
+          const popupPos = new THREE.Vector3(p.x, p.y + 0.4, p.z);
+          this.popups.show(popupPos, `+${gained}`, { colour: `#${PALETTE.gold.toString(16).padStart(6, '0')}`, size: 92 });
+        } else {
+          this._bumpCombo();
+          const gained = Math.round(SCORING.quizCorrect * this.combo);
+          this._addScore(gained, p, `+${gained}`, PALETTE.gold);
+        }
         this.particles.burst(p, { count: 26, colours: [PALETTE.gold, 0xffffff, PALETTE.success], speed: 4, life: 1.1 });
       } else {
         this._breakCombo();
@@ -653,6 +761,29 @@ export class Game {
       });
     }
     this._updateStars();
+  }
+
+  /**
+   * Learning mode's scoring: correctness-weighted (first-attempt vs.
+   * late-correct), plus a small capped time bonus that exists only to break
+   * leaderboard ties — it can never outweigh the 50-point first/late gap.
+   */
+  _addLearningPoints(methodId, { firstAttempt, timeMs, pos, colour }) {
+    const base = firstAttempt ? LEARNING_SCORING.firstAttemptBonus : LEARNING_SCORING.lateCorrectBonus;
+    const timeBonus = Math.max(0, LEARNING_SCORING.timeBonusMax - Math.floor(Math.max(0, timeMs) / 1000 / 4));
+    const gained = base + timeBonus;
+    this.learningScore = (this.learningScore || 0) + gained;
+    this.learningTimeBonus = (this.learningTimeBonus || 0) + timeBonus;
+    this._learningBreakdown.push({ methodId, firstAttempt, base, timeBonus, quiz: false });
+    this.hud.setScore(this.learningScore);
+    if (pos) {
+      const popupPos = new THREE.Vector3().copy(pos);
+      popupPos.y += 0.4;
+      this.popups.show(popupPos, `+${gained}`, {
+        colour: `#${(colour ?? PALETTE.gold).toString(16).padStart(6, '0')}`,
+        size: 92,
+      });
+    }
   }
 
   _bumpCombo() {
@@ -710,7 +841,12 @@ export class Game {
   _onSpoilt(food) {
     this.spoiltCount++;
     this._breakCombo();
-    this._addScore(SCORING.spoiledPenalty, food.group.position, `${SCORING.spoiledPenalty}`, PALETTE.danger);
+    // Learning mode has no flat spoil penalty (only the 5-spoil fail-out,
+    // handled in _checkStageEnd) — and _addScore writes to the arcade
+    // `score` field, which would otherwise clobber the learning HUD display.
+    if (this.gameMode !== 'learning') {
+      this._addScore(SCORING.spoiledPenalty, food.group.position, `${SCORING.spoiledPenalty}`, PALETTE.danger);
+    }
     sfx('food.spoil');
     this.stage3d.shake(0.35, 320);
     this._tmpVec.copy(food.group.position);
@@ -725,6 +861,11 @@ export class Game {
   }
 
   _checkStageEnd() {
+    if (this.gameMode === 'learning') {
+      if (this._learningMethodsDone.size >= this.stage.methods.length) this._endStage(true);
+      else if (this.spoiltCount >= 5) this._endStage(false);
+      return;
+    }
     if (this.preserved >= this.stage.targetPreserved) this._endStage(true);
     else if (this.spoiltCount >= 5) this._endStage(false);
   }
@@ -735,13 +876,32 @@ export class Game {
     this.input.setEnabled(false);
     this.panel.stop();
     audio.stopMusic();
+    this.stage3d.setCameraFraming('hero', { instant: false });
+
+    if (this.gameMode === 'learning') {
+      const key = `l${this.stageId}`;
+      this.bestScores.learning[key] = Math.max(this.bestScores.learning[key] || 0, this.learningScore || 0);
+      if (passed) this.savedStage.learning = Math.min(LEARNING_STAGES.length, this.stageId + 1);
+      this._save();
+      this.screens.learningResults({
+        stage: this.stage, score: this.learningScore || 0, maxScore: LEARNING_SCORING.maxPossible,
+        timeBonus: this.learningTimeBonus || 0, passed, spoilt: this.spoiltCount,
+        breakdown: this._learningBreakdown,
+        onNext: () => { this.screens.close(); this.startStage(this.stageId + 1); },
+        onRetry: () => { this.screens.close(); this.startStage(this.stageId); },
+        onMenu: () => { this.screens.close(); this.showMenu(); },
+        onSubmitScore: (name) => this._submitLeaderboardScore('learning', name, this.learningScore || 0),
+        onViewLeaderboard: () => this.openLeaderboard('learning'),
+      });
+      return;
+    }
+
     const stars = this._updateStars();
     const key = `s${this.stageId}`;
-    this.bestScores[key] = Math.max(this.bestScores[key] || 0, this.score);
-    if (passed) this.savedStage = Math.min(STAGES.length, this.stageId + 1);
+    this.bestScores.arcade[key] = Math.max(this.bestScores.arcade[key] || 0, this.score);
+    if (passed) this.savedStage.arcade = Math.min(STAGES.length, this.stageId + 1);
     this._save();
 
-    this.stage3d.setCameraFraming('hero', { instant: false });
     this.screens.results({
       stage: this.stage, score: this.score, stars, passed,
       preserved: this.preserved, target: this.stage.targetPreserved,
@@ -752,7 +912,42 @@ export class Game {
       onNext: () => { this.screens.close(); this.startStage(this.stageId + 1); },
       onRetry: () => { this.screens.close(); this.startStage(this.stageId); },
       onMenu: () => { this.screens.close(); this.showMenu(); },
+      onSubmitScore: (name) => this._submitLeaderboardScore('arcade', name, this.score),
+      onViewLeaderboard: () => this.openLeaderboard('arcade'),
     });
+  }
+
+  // ------------------------------------------------------------- leaderboard
+  async openLeaderboard(mode, back) {
+    const wasPlaying = this.mode === 'playing';
+    if (wasPlaying) this.mode = 'paused';
+    this.input.setEnabled(false);
+    const done = () => {
+      if (back) back();
+      else if (wasPlaying) { this.screens.close(); this.mode = 'playing'; this.input.setEnabled(true); }
+      else this.showMenu();
+    };
+    this.screens.leaderboard({ mode, loading: true, onClose: done });
+    try {
+      const res = await fetch(`/api/leaderboard/top?mode=${mode}&limit=10`);
+      const data = await res.json();
+      this.screens.leaderboard({ mode, entries: data.entries || [], onClose: done });
+    } catch {
+      this.screens.leaderboard({ mode, entries: [], error: true, onClose: done });
+    }
+  }
+
+  async _submitLeaderboardScore(mode, name, score) {
+    try {
+      const res = await fetch('/api/leaderboard/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, name, score }),
+      });
+      return await res.json();
+    } catch {
+      return { ok: false, error: 'network' };
+    }
   }
 
   // ------------------------------------------------------------------ update

@@ -51,9 +51,22 @@ export class Screens {
   get isOpen() { return !this.el.hidden; }
 
   // ------------------------------------------------------------------ title
-  title({ onPlay, onFactBook, hasSave, onContinue, onCredits }) {
+  title(opts) {
+    const {
+      onPlayArcade, onContinueArcade, hasSaveArcade,
+      onPlayLearning, onContinueLearning, hasSaveLearning,
+      onFactBook, onCredits, onLeaderboard,
+    } = opts;
     const langs = AVAILABLE_LANGS.map((l) =>
       `<button class="pp-lang${l === getLang() ? ' is-on' : ''}" data-lang="${l}">${l.toUpperCase()}</button>`).join('');
+    const modeCard = (kind, { name, desc, hasSave, playAct, continueAct, boardAct }) => `
+      <div class="pp-title__mode">
+        <h3>${name}</h3>
+        <p>${desc}</p>
+        ${hasSave ? `<button class="pp-btn" data-act="${continueAct}">${t('ui.continue')}</button>` : ''}
+        <button class="pp-btn pp-btn--big pp-btn--primary" data-act="${playAct}">${t('ui.play')}</button>
+        <button class="pp-btn" data-act="${boardAct}">🏆 ${t('ui.leaderboard')}</button>
+      </div>`;
     const node = this._open(`
       <div class="pp-title">
         <div class="pp-title__logo">
@@ -61,9 +74,17 @@ export class Screens {
           <span class="pp-title__word2">Panic!</span>
         </div>
         <p class="pp-title__sub">${t('ui.subtitle')}</p>
+        <div class="pp-title__actions pp-title__modes">
+          ${modeCard('learning', {
+            name: t('ui.learningMode'), desc: t('ui.learningModeDesc'), hasSave: hasSaveLearning,
+            playAct: 'playLearning', continueAct: 'continueLearning', boardAct: 'boardLearning',
+          })}
+          ${modeCard('arcade', {
+            name: t('ui.arcadeMode'), desc: t('ui.arcadeModeDesc'), hasSave: hasSaveArcade,
+            playAct: 'playArcade', continueAct: 'continueArcade', boardAct: 'boardArcade',
+          })}
+        </div>
         <div class="pp-title__actions">
-          ${hasSave ? `<button class="pp-btn pp-btn--big" data-act="continue">${t('ui.continue')}</button>` : ''}
-          <button class="pp-btn pp-btn--big pp-btn--primary" data-act="play">${t('ui.play')}</button>
           <button class="pp-btn" data-act="fact">📖 ${t('ui.factBook')}</button>
         </div>
         <div class="pp-title__langs">${langs}</div>
@@ -71,15 +92,19 @@ export class Screens {
         <button class="pp-title__credits" data-act="credits">© ${t('ui.credits')}</button>
       </div>`, { cls: 'is-title' });
 
-    node.querySelector('[data-act="play"]').addEventListener('click', () => { sfx('ui.tap'); onPlay(); });
+    node.querySelector('[data-act="playArcade"]').addEventListener('click', () => { sfx('ui.tap'); onPlayArcade(); });
+    node.querySelector('[data-act="playLearning"]').addEventListener('click', () => { sfx('ui.tap'); onPlayLearning(); });
+    node.querySelector('[data-act="continueArcade"]')?.addEventListener('click', () => { sfx('ui.tap'); onContinueArcade(); });
+    node.querySelector('[data-act="continueLearning"]')?.addEventListener('click', () => { sfx('ui.tap'); onContinueLearning(); });
+    node.querySelector('[data-act="boardArcade"]').addEventListener('click', () => { sfx('ui.open'); onLeaderboard('arcade'); });
+    node.querySelector('[data-act="boardLearning"]').addEventListener('click', () => { sfx('ui.open'); onLeaderboard('learning'); });
     node.querySelector('[data-act="fact"]').addEventListener('click', () => { sfx('ui.open'); onFactBook(); });
-    node.querySelector('[data-act="continue"]')?.addEventListener('click', () => { sfx('ui.tap'); onContinue(); });
     node.querySelector('[data-act="credits"]').addEventListener('click', () => { sfx('ui.open'); onCredits(); });
     for (const b of node.querySelectorAll('.pp-lang')) {
       b.addEventListener('click', () => {
         setLang(b.dataset.lang);
         sfx('ui.tap');
-        this.title({ onPlay, onFactBook, hasSave, onContinue, onCredits });
+        this.title(opts);
       });
     }
   }
@@ -104,7 +129,7 @@ export class Screens {
   }
 
   // ---------------------------------------------------------------- results
-  results({ stage, score, stars, preserved, target, spoilt, accuracy, bestCombo, learned, passed, onNext, onRetry, onMenu }) {
+  results({ stage, score, stars, preserved, target, spoilt, accuracy, bestCombo, learned, passed, onNext, onRetry, onMenu, onSubmitScore, onViewLeaderboard }) {
     const starHtml = [0, 1, 2].map((i) =>
       `<span class="pp-result__star${i < stars ? ' is-on' : ''}" style="--d:${i * 0.18}s">★</span>`).join('');
     const learnedHtml = learned.length
@@ -123,16 +148,113 @@ export class Screens {
           <div><span>${t('ui.bestCombo')}</span><b>x${bestCombo.toFixed(bestCombo % 1 ? 2 : 0)}</b></div>
         </div>
         ${learnedHtml}
+        ${this._scoreSubmitHtml()}
         <div class="pp-result__actions">
           ${passed ? `<button class="pp-btn pp-btn--big pp-btn--primary" data-act="next">${t('ui.nextStage')}</button>` : ''}
           <button class="pp-btn pp-btn--big" data-act="retry">${t('ui.retry')}</button>
+          <button class="pp-btn" data-act="board">🏆 ${t('ui.viewLeaderboard')}</button>
           <button class="pp-btn" data-act="menu">${t('ui.quit')}</button>
         </div>
       </div>`, { cls: 'is-result' });
     node.querySelector('[data-act="next"]')?.addEventListener('click', () => { sfx('ui.tap'); onNext(); });
     node.querySelector('[data-act="retry"]').addEventListener('click', () => { sfx('ui.tap'); onRetry(); });
+    node.querySelector('[data-act="board"]').addEventListener('click', () => { sfx('ui.open'); onViewLeaderboard(); });
     node.querySelector('[data-act="menu"]').addEventListener('click', () => { sfx('ui.back'); onMenu(); });
+    this._wireScoreSubmit(node, onSubmitScore);
     if (passed) sfx('stage.win'); else sfx('stage.lose');
+  }
+
+  /** Shared name-entry + submit control used by both results screens. */
+  _scoreSubmitHtml() {
+    return `
+      <div class="pp-result__submit">
+        <input type="text" maxlength="20" placeholder="${t('ui.yourName')}" data-el="name" />
+        <button class="pp-btn" data-act="submit">🏆 ${t('ui.submitScore')}</button>
+        <span class="pp-result__submitMsg" data-el="msg"></span>
+      </div>`;
+  }
+
+  _wireScoreSubmit(node, onSubmitScore) {
+    const btn = node.querySelector('[data-act="submit"]');
+    const input = node.querySelector('[data-el="name"]');
+    const msg = node.querySelector('[data-el="msg"]');
+    if (!btn || !onSubmitScore) return;
+    btn.addEventListener('click', async () => {
+      const name = (input.value || '').trim();
+      if (!name) { input.focus(); return; }
+      sfx('ui.tap');
+      btn.disabled = true;
+      const res = await onSubmitScore(name);
+      if (res?.ok) {
+        msg.textContent = t('ui.scoreSubmitted');
+        input.disabled = true;
+      } else {
+        msg.textContent = t('ui.leaderboardError');
+        btn.disabled = false;
+      }
+    });
+  }
+
+  // -------------------------------------------------------- learning results
+  learningResults({ stage, score, maxScore, timeBonus, passed, spoilt, breakdown, onNext, onRetry, onMenu, onSubmitScore, onViewLeaderboard }) {
+    const correctnessScore = score - timeBonus;
+    const percent = maxScore ? Math.round((correctnessScore / maxScore) * 100) : 0;
+    const rows = breakdown.map((b) => {
+      const m = METHODS[b.methodId];
+      const detail = b.quiz ? t('ui.quizBonus') : (b.firstAttempt ? t('ui.firstAttempt') : t('ui.lateAttempt'));
+      const pts = b.base + (b.timeBonus || 0);
+      return `<li style="--c:${hex(m.colour)}"><b>${methodName(b.methodId)}</b><span>${detail}</span><b>+${pts}</b></li>`;
+    }).join('');
+    const node = this._open(`
+      <div class="pp-result ${passed ? 'is-pass' : 'is-fail'}">
+        <h2>${passed ? t('ui.stageComplete') : t('ui.stageFailed')}</h2>
+        <div class="pp-result__grid">
+          <div><span>${t('ui.score')}</span><b>${score.toLocaleString()}</b></div>
+          <div><span>${t('ui.accuracy')}</span><b>${percent}%</b></div>
+          <div><span>${t('ui.timeBonus')}</span><b>+${timeBonus}</b></div>
+          <div><span>${t('ui.spoilt')}</span><b>${spoilt}</b></div>
+        </div>
+        <div class="pp-result__learned">
+          <h4>${t('ui.pointsBreakdown')}</h4>
+          <ul class="pp-result__breakdown">${rows}</ul>
+        </div>
+        ${this._scoreSubmitHtml()}
+        <div class="pp-result__actions">
+          ${passed ? `<button class="pp-btn pp-btn--big pp-btn--primary" data-act="next">${t('ui.nextStage')}</button>` : ''}
+          <button class="pp-btn pp-btn--big" data-act="retry">${t('ui.retry')}</button>
+          <button class="pp-btn" data-act="board">🏆 ${t('ui.viewLeaderboard')}</button>
+          <button class="pp-btn" data-act="menu">${t('ui.quit')}</button>
+        </div>
+      </div>`, { cls: 'is-result' });
+    node.querySelector('[data-act="next"]')?.addEventListener('click', () => { sfx('ui.tap'); onNext(); });
+    node.querySelector('[data-act="retry"]').addEventListener('click', () => { sfx('ui.tap'); onRetry(); });
+    node.querySelector('[data-act="board"]').addEventListener('click', () => { sfx('ui.open'); onViewLeaderboard(); });
+    node.querySelector('[data-act="menu"]').addEventListener('click', () => { sfx('ui.back'); onMenu(); });
+    this._wireScoreSubmit(node, onSubmitScore);
+    if (passed) sfx('stage.win'); else sfx('stage.lose');
+  }
+
+  // ----------------------------------------------------------- leaderboard
+  leaderboard({ mode, entries, loading, error, onClose }) {
+    const title = mode === 'learning' ? t('ui.learningMode') : t('ui.arcadeMode');
+    const body = loading
+      ? `<p class="pp-leaderboard__status">${t('ui.loading')}</p>`
+      : error
+        ? `<p class="pp-leaderboard__status">${t('ui.leaderboardError')}</p>`
+        : !entries?.length
+          ? `<p class="pp-leaderboard__status">${t('ui.noScoresYet')}</p>`
+          : `<ol class="pp-leaderboard__list">${
+              entries.map((e) => `<li><span class="pp-leaderboard__rank">${e.rank}</span><span class="pp-leaderboard__name">${e.name}</span><b>${e.score.toLocaleString()}</b></li>`).join('')
+            }</ol>`;
+    const node = this._open(`
+      <div class="pp-fact pp-leaderboard">
+        <header class="pp-fact__top">
+          <h2>🏆 ${t('ui.leaderboard')} — ${title}</h2>
+          <button class="pp-icon-btn" data-act="close" aria-label="${t('ui.close')}">✕</button>
+        </header>
+        <div class="pp-fact__scroll">${body}</div>
+      </div>`, { escapable: true, onEscape: onClose, cls: 'is-fact' });
+    node.querySelector('[data-act="close"]').addEventListener('click', () => { sfx('ui.back'); onClose(); });
   }
 
   // -------------------------------------------------------------- fact book

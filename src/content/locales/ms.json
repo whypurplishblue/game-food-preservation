@@ -89,7 +89,25 @@
     "factBookPlayableNote": "Mikrob perlukan air, kehangatan, udara dan persekitaran yang sederhana untuk membiak. Setiap kaedah di sini menyingkirkan salah satu daripadanya, jadi makanan kekal selamat dimakan lebih lama.",
     "factBookExtraNote": "Kaedah tambahan daripada nota. Kaedah ini tiada mesin dalam permainan.",
     "contents": "Kandungan",
-    "openBook": "Buka buku"
+    "openBook": "Buka buku",
+    "arcadeMode": "Arked",
+    "arcadeModeDesc": "Kelajuan penting. Peringkat meningkat, gabungan, bintang.",
+    "learningMode": "Belajar",
+    "learningModeDesc": "Penguasaan penting. Satu pusingan bersih setiap kaedah.",
+    "leaderboard": "Papan Pendahulu",
+    "viewLeaderboard": "Lihat papan pendahulu",
+    "submitScore": "Hantar ke papan pendahulu",
+    "yourName": "Nama anda",
+    "submit": "Hantar",
+    "scoreSubmitted": "Skor dihantar!",
+    "noScoresYet": "Belum ada skor — jadilah yang pertama!",
+    "leaderboardError": "Papan pendahulu gagal dimuatkan. Cuba lagi kemudian.",
+    "percentComplete": "{percent}% betul",
+    "firstAttempt": "Percubaan pertama",
+    "lateAttempt": "Berjaya selepas tekaan yang salah",
+    "quizBonus": "Bonus kuiz",
+    "timeBonus": "Bonus kelajuan",
+    "pointsBreakdown": "Cara anda mendapat markah"
   },
   "station": {
     "drying": {
@@ -172,6 +190,26 @@
       "name": "Seluruh Dapur",
       "tagline": "Semua mesin. Tiada label. Soalan setiap kali.",
       "brief": "Lapan mesin, tiada papan nama, dan ia berpindah semasa anda bekerja. Anda sudah tahu semuanya — tunjukkan."
+    },
+    "learning1": {
+      "name": "Pengeringan & Pembekuan",
+      "tagline": "Label kekal terbuka. Ambil masa anda.",
+      "brief": "Kenali pengeringan dan pembekuan. Semua label dan panduan kekal terbuka — ini tentang memahami setiap kaedah, bukan kelajuan."
+    },
+    "learning2": {
+      "name": "Penyejukan, Vakum & Jeruk",
+      "tagline": "Penyejukan terletak betul-betul di sebelah pembekuan.",
+      "brief": "Penyejukan berkongsi kabinet peti sejuk beku dengan pembekuan tetapi menggunakan tetapan yang lebih suam. Bandingkan kedua-duanya, kemudian kenali pembungkusan vakum dan penjerukan."
+    },
+    "learning3": {
+      "name": "Penggaraman & Pempasteuran",
+      "tagline": "Idea yang sama seperti pengeringan, tindakan berbeza.",
+      "brief": "Penggaraman menyingkirkan kelembapan sama seperti pengeringan, tetapi melalui cara yang berbeza. Pempasteuran memanaskan, kemudian menyejukkan — kedua-dua langkah penting."
+    },
+    "learning4": {
+      "name": "Pengasapan & Pengetinan",
+      "tagline": "Dua mesin terakhir.",
+      "brief": "Pengasapan mengeringkan makanan dengan asap, sebab yang sama seperti pengeringan berfungsi. Pengetinan memanaskan makanan untuk membunuh mikroorganisma, kemudian mengedapkannya."
     }
   },
   "mechanisms": {
