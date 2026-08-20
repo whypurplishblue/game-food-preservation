@@ -134,7 +134,8 @@ export class FactBook3D {
     this.bookZone.setAttribute('aria-label', t('a11y.bookArea'));
     this.bookZone.tabIndex = 0;
     this.panel = el('aside', 'pp-fb__panel');
-    body.append(this.bookZone, this.panel);
+    this.nav = el('footer', 'pp-fb__nav');
+    body.append(this.bookZone, this.nav, this.panel);
     wrap.appendChild(body);
 
     this.closeBtn = el('button', 'pp-fb__close', '✕');
@@ -340,17 +341,20 @@ export class FactBook3D {
           <ul class="pp-fb__list"></ul>
         </section>
         <p class="pp-fb__source"></p>
+      </div>`;
+
+    // The page nav lives under the book zone, not the panel, so the panel gets
+    // the full column height for content (§ the "X of Y" move).
+    this.nav.innerHTML = `
+      <button class="pp-fb__navbtn" data-nav="prev" type="button">&#8249;</button>
+      <div class="pp-fb__navmid">
+        <span class="pp-fb__count"></span>
+        <div class="pp-fb__dots"></div>
       </div>
-      <footer class="pp-fb__nav">
-        <button class="pp-fb__navbtn" data-nav="prev" type="button">&#8249;</button>
-        <div class="pp-fb__navmid">
-          <span class="pp-fb__count"></span>
-          <div class="pp-fb__dots"></div>
-        </div>
-        <button class="pp-fb__navbtn" data-nav="next" type="button">&#8250;</button>
-      </footer>`;
+      <button class="pp-fb__navbtn" data-nav="next" type="button">&#8250;</button>`;
 
     const q = (s) => this.panel.querySelector(s);
+    const qn = (s) => this.nav.querySelector(s);
     this.ui = {
       inner: q('.pp-fb__panelinner'),
       title: q('.pp-fb__title'),
@@ -375,10 +379,10 @@ export class FactBook3D {
       listLabel: q('.pp-fb__listsec .pp-fb__seclabel span'),
       list: q('.pp-fb__list'),
       source: q('.pp-fb__source'),
-      count: q('.pp-fb__count'),
-      dots: q('.pp-fb__dots'),
-      prev: q('[data-nav="prev"]'),
-      next: q('[data-nav="next"]'),
+      count: qn('.pp-fb__count'),
+      dots: qn('.pp-fb__dots'),
+      prev: qn('[data-nav="prev"]'),
+      next: qn('[data-nav="next"]'),
     };
     this.ui.prev.setAttribute('aria-label', t('ui.prevPage'));
     this.ui.next.setAttribute('aria-label', t('ui.nextPage'));
