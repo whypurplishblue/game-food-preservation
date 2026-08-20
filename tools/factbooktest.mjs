@@ -78,6 +78,12 @@ await session({ width: 1600, height: 900 }, async (page) => {
   check('the book carries no title or spoilage spread',
     await page.evaluate(() => window.__pp.game.factBook.model.spreads
       .every((s) => !['contents', 'spoilage-a', 'spoilage-b'].includes(s.kind))));
+  check('pagination starts with the first navigation page',
+    await page.evaluate(() => {
+      const count = document.querySelector('.pp-fb__count')?.textContent;
+      const total = window.__pp.game.factBook.model.spreads.length;
+      return count === `Page 1 of ${total}`;
+    }));
   check('book is fully open', Math.abs((await state(page)).open - 1) < 0.001);
 
   // --- a committed drag turns the page and never springs back
@@ -150,6 +156,18 @@ await session({ width: 1600, height: 900 }, async (page) => {
   check('reference-only foods are still taught', cards.length === 2 && cards.every((c) => c.disabled),
     cards.map((c) => c.name).join(', '));
 
+  await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    fb.jumpTo(fb.model.spreads.length - 1);
+  });
+  await settle(page);
+  check('pagination ends with the final navigation page',
+    await page.evaluate(() => {
+      const fb = window.__pp.game.factBook;
+      const total = fb.model.spreads.length;
+      return document.querySelector('.pp-fb__count')?.textContent === `Page ${total} of ${total}`;
+    }));
+
   // --- Escape closes, physically, and hands the game back
   await page.keyboard.press('Escape');
   await sleep(120);
@@ -213,6 +231,10 @@ await session({ width: 1600, height: 900 }, async (page) => {
     window.__pp.game.screens.isOpen && !window.__pp.game.quiz.isOpen));
   check('final learning results do not offer another level', await page.evaluate(() =>
     !document.querySelector('.pp-result [data-act="next"]')));
+  await page.click('.pp-result [data-act="menu"]');
+  await page.waitForFunction(() => !!document.querySelector('.pp-title'));
+  check('completed learning mode is not offered as resumable', await page.evaluate(() =>
+    !document.querySelector('[data-act="continueLearning"]')));
 });
 
 // ------------------------------------------------------------ narrow layout
@@ -266,6 +288,7 @@ await session({ width: 1600, height: 900 }, async (page) => {
   await settle(page);
   await sleep(400);
   const title = await page.$eval('.pp-fb__title', (n) => n.textContent);
+  const pageCount = await page.$eval('.pp-fb__count', (n) => n.textContent);
   const localizedFacts = await page.evaluate(() => {
     const fb = window.__pp.game.factBook;
     const salting = fb.model.methods.find((method) => method.id === 'salting');
@@ -281,6 +304,8 @@ await session({ width: 1600, height: 900 }, async (page) => {
     title !== 'Salting' && localizedFacts.name !== 'Salting' &&
       localizedFacts.detail.length > 0 && localizedFacts.exam.length > 0 &&
       !localizedFacts.foodNames.includes('Fish'), JSON.stringify(localizedFacts));
+  check('navigation-page numbering follows the chosen language',
+    pageCount.includes('页') && !pageCount.includes('Page'), pageCount);
   await page.screenshot({ path: `${OUT}/21-zh.png` });
 });
 
