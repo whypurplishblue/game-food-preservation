@@ -764,23 +764,37 @@ function drawDiagram(ctx, mv, box) {
       break;
     }
     case 'salting': {
+      // Two beats mirror the animation: cover the food, then see moisture
+      // leave it. Keeping the causal arrow between them avoids reading the
+      // salt and droplets as unrelated decorations.
+      const lx = cx - 132, rx = cx + 132;
+      for (const [x, colour] of [[lx, c], [rx, '#3d8fb8']]) {
+        ctx.fillStyle = rgba(colour, 0.1);
+        roundRect(ctx, x - 103, cy - 105, 206, 210, 22); ctx.fill();
+        ctx.strokeStyle = rgba(colour, 0.36); ctx.lineWidth = 3; ctx.stroke();
+      }
+
+      // Salt falling onto a plainly visible piece of food.
       ctx.fillStyle = '#c0693f';
-      ctx.beginPath(); ctx.ellipse(cx, cy + 40, 118, 52, 0, 0, Math.PI * 2); ctx.fill();
-      // salt heap
-      ctx.fillStyle = '#f2f5f8';
-      ctx.beginPath();
-      ctx.moveTo(cx - 130, cy + 6);
-      ctx.quadraticCurveTo(cx, cy - 96, cx + 130, cy + 6);
-      ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#dbe3ea';
-      for (let i = 0; i < 16; i++) {
-        const px = cx - 110 + (i * 71) % 220, py = cy - 40 + (i * 37) % 44;
-        ctx.fillRect(px, py, 7, 7);
+      ctx.beginPath(); ctx.ellipse(lx, cy + 46, 72, 31, 0, 0, Math.PI * 2); ctx.fill();
+      drawIcon(ctx, 'salt', lx, cy - 60, 34, shade(c, 0.15));
+      ctx.fillStyle = '#f7f8f3';
+      for (let i = 0; i < 11; i++) {
+        const px = lx - 42 + (i * 29) % 84, py = cy - 20 + (i * 23) % 58;
+        ctx.fillRect(px, py, 6, 6);
       }
-      for (let i = 0; i < 6; i++) {
-        drawIcon(ctx, 'droplet', cx + 96 + (i % 3) * 26, cy + 62 - Math.floor(i / 3) * 34, 10, rgba('#3d8fb8', 0.75));
+
+      arrow(lx + 112, cy, rx - 112, cy, INK_SOFT, false);
+
+      // The same food is now coated; large blue drops visibly leave it.
+      ctx.fillStyle = '#c0693f';
+      ctx.beginPath(); ctx.ellipse(rx - 15, cy + 20, 76, 34, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = rgba('#f7f8f3', 0.92);
+      ctx.beginPath(); ctx.ellipse(rx - 20, cy + 11, 62, 22, 0, 0, Math.PI * 2); ctx.fill();
+      for (const [dx, dy, size] of [[68, -34, 13], [82, 5, 11], [64, 42, 10]]) {
+        drawIcon(ctx, 'droplet', rx + dx, cy + dy, size, '#3d8fb8');
       }
-      arrow(cx + 108, cy + 44, cx + 188, cy - 10, rgba('#3d8fb8', 0.85));
+      arrow(rx + 48, cy + 18, rx + 92, cy + 18, rgba('#3d8fb8', 0.85));
       break;
     }
     case 'pasteurising': {
