@@ -213,7 +213,15 @@ export class Station {
       if (key === 'root' || key === 'body' || key === 'model' || key === '_procParts') continue;
       const v = this[key];
       if (v?.isObject3D) out.push(v);
-      else if (Array.isArray(v)) for (const e of v) if (e?.isObject3D) out.push(e);
+      else if (Array.isArray(v)) {
+        for (const e of v) {
+          if (e?.isObject3D) out.push(e);
+          // Particle state commonly wraps its render object as `{ mesh, t }`.
+          // Treat that mesh as dynamic too; otherwise static batching can leave
+          // the animation driving an object that is no longer in the scene.
+          else if (e?.mesh?.isObject3D) out.push(e.mesh);
+        }
+      }
     }
     return out;
   }

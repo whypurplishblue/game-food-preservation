@@ -62,14 +62,18 @@ export class Stage3D {
     this.frameHalfWidth = Stage3D.DEFAULT_HALF_WIDTH;
 
     this.renderer = new THREE.WebGLRenderer({
-      canvas, antialias: quality !== 'low', alpha: false,
+      // High-DPI mobile screens get edge smoothing from pixel density; MSAA on
+      // top of that multiplies fill cost. Reserve it for the high tier.
+      canvas, antialias: quality === 'high', alpha: false,
       powerPreference: 'high-performance', stencil: false,
     });
     this.renderer.setPixelRatio(this._pixelRatio());
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.92;
-    this.renderer.shadowMap.enabled = quality !== 'low';
+    // Every station already has a soft blob shadow. The real-time map costs a
+    // full extra draw for each caster, so it is a desktop/high-tier feature.
+    this.renderer.shadowMap.enabled = quality === 'high';
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this.scene = new THREE.Scene();
@@ -101,7 +105,7 @@ export class Stage3D {
     // Capping at 2 costs almost nothing visually and saves a huge amount of
     // fill rate on 3x phones — the single biggest mobile perf win available.
     if (this.quality === 'low') return Math.min(1.25, dpr);
-    if (this.quality === 'medium') return Math.min(1.6, dpr);
+    if (this.quality === 'medium') return Math.min(1.35, dpr);
     return Math.min(2, dpr);
   }
 
@@ -137,7 +141,7 @@ export class Stage3D {
     // Key — warm, from front-left-high. Owns the only shadow map.
     const key = new THREE.DirectionalLight(0xfff0d0, 1.75);
     key.position.set(-9, 15, 10);
-    key.castShadow = this.quality !== 'low';
+    key.castShadow = this.quality === 'high';
     const s = this._shadowMapSize();
     key.shadow.mapSize.set(s, s);
     key.shadow.camera.near = 1;
@@ -301,6 +305,24 @@ export class Stage3D {
     this.renderer.setSize(w, h, false);
     this.composer?.setSize(w, h);
     this.bloom?.setSize(w, h);
+  }
+
+  /** Compile station shaders behind the loading cover to avoid first-use hitching. */
+  async warmup(objects = []) {
+    const visibility = objects.map((object) => object.visible);
+    for (const object of objects) object.visible = true;
+    try {
+      const compile = this.renderer.compileAsync
+        ? this.renderer.compileAsync(this.scene, this.camera)
+        : Promise.resolve(this.renderer.compile(this.scene, this.camera));
+      // Shader compilation must never turn into an unbounded loading screen on
+      // a weak browser. Work already queued by compileAsync may finish later.
+      await Promise.race([compile, new Promise((resolve) => setTimeout(resolve, 1200))]);
+    } catch (error) {
+      if (import.meta.env?.DEV) console.warn('[render] shader warm-up skipped', error);
+    } finally {
+      objects.forEach((object, i) => { object.visible = visibility[i]; });
+    }
   }
 
   render(dt) {
