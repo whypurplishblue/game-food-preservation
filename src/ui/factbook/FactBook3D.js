@@ -524,9 +524,10 @@ export class FactBook3D {
     u.source.textContent = isMethod && mv.sourceRef ? t('ui.source', { ref: mv.sourceRef }) : '';
     u.source.hidden = !u.source.textContent;
 
-    u.count.textContent = isMethod
-      ? t('ui.methodOf', { n: s.methodOrdinal, total: s.methodTotal })
-      : `${this.index + 1} / ${this.model.spreads.length}`;
+    u.count.textContent = t('ui.pageOf', {
+      n: this.index + 1,
+      total: this.model.spreads.length,
+    });
     u.dots.textContent = '';
     for (let i = 0; i < this.model.spreads.length; i++) {
       u.dots.appendChild(el('i', `pp-fb__dot${i === this.index ? ' is-on' : ''}`));

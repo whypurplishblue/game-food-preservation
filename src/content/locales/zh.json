@@ -82,6 +82,7 @@
     "examNote": "考试要点",
     "source": "来源：{ref}",
     "methodOf": "第 {n} / {total} 种方法",
+    "pageOf": "第 {n} / {total} 页",
     "backToMethod": "返回方法",
     "inspectFood": "查看{food}",
     "prevPage": "上一页",

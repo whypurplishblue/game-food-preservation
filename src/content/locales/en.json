@@ -83,6 +83,7 @@
     "examNote": "Exam note",
     "source": "Source: {ref}",
     "methodOf": "Method {n} of {total}",
+    "pageOf": "Page {n} of {total}",
     "backToMethod": "Back to method",
     "inspectFood": "Inspect {food}",
     "prevPage": "Previous page",

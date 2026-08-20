@@ -181,8 +181,8 @@ export class Game {
     this.hud.setVisible(false);
     this.input.setEnabled(false);
     this.screens.title({
-      hasSaveArcade: this.savedStage.arcade > 1,
-      hasSaveLearning: this.savedStage.learning > 1,
+      hasSaveArcade: this.savedStage.arcade > 1 && this.savedStage.arcade <= STAGES.length,
+      hasSaveLearning: this.savedStage.learning > 1 && this.savedStage.learning <= LEARNING_STAGES.length,
       onPlayArcade: () => this.startArcade(1),
       onContinueArcade: () => this.startArcade(this.savedStage.arcade),
       onPlayLearning: () => this.startLearning(1),
@@ -905,7 +905,10 @@ export class Game {
     if (this.gameMode === 'learning') {
       const key = `l${this.stageId}`;
       this.bestScores.learning[key] = Math.max(this.bestScores.learning[key] || 0, this.learningScore || 0);
-      if (passed) this.savedStage.learning = Math.min(LEARNING_STAGES.length, this.stageId + 1);
+      // One past the final level is the completed-run sentinel. Clamping this
+      // to the final level made the title screen offer Continue forever and
+      // sent completed players back into that level.
+      if (passed) this.savedStage.learning = this.stageId + 1;
       // Only a completed level's score counts toward the run total — a
       // failed attempt is about to be retried from zero, so it shouldn't
       // double-count if the retry then passes.
@@ -929,7 +932,7 @@ export class Game {
     const stars = this._updateStars();
     const key = `s${this.stageId}`;
     this.bestScores.arcade[key] = Math.max(this.bestScores.arcade[key] || 0, this.score);
-    if (passed) this.savedStage.arcade = Math.min(STAGES.length, this.stageId + 1);
+    if (passed) this.savedStage.arcade = this.stageId + 1;
     if (passed) this.runScore = (this.runScore || 0) + (this.score || 0);
     const isFinalStage = this.stageId === STAGES.length;
     this._save();

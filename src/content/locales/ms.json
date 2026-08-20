@@ -82,6 +82,7 @@
     "examNote": "Nota peperiksaan",
     "source": "Sumber: {ref}",
     "methodOf": "Kaedah {n} daripada {total}",
+    "pageOf": "Halaman {n} daripada {total}",
     "backToMethod": "Kembali ke kaedah",
     "inspectFood": "Periksa {food}",
     "prevPage": "Halaman sebelumnya",
