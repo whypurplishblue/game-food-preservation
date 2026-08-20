@@ -248,6 +248,12 @@ await session({ width: 1400, height: 800 }, async (page) => {
 // ------------------------------------------------------- language + in-game
 await session({ width: 1600, height: 900 }, async (page) => {
   console.log('\n[localisation]');
+  // Build and close the reusable WebGL book in English first. This catches
+  // stale localized view models that a first-open-only test cannot see.
+  await openBook(page);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !window.__pp.game.factBook.isOpen, null, { timeout: 8000 });
+  await page.waitForFunction(() => !!document.querySelector('.pp-title'));
   await page.click('.pp-lang[data-lang="zh"]');
   await sleep(200);
   const stationLabels = await page.evaluate(() =>
@@ -260,7 +266,21 @@ await session({ width: 1600, height: 900 }, async (page) => {
   await settle(page);
   await sleep(400);
   const title = await page.$eval('.pp-fb__title', (n) => n.textContent);
-  check('the panel is localised', title !== 'Salting' && title.length > 0, title);
+  const localizedFacts = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    const salting = fb.model.methods.find((method) => method.id === 'salting');
+    return {
+      title: document.querySelector('.pp-fb__title')?.textContent || '',
+      name: salting?.name || '',
+      detail: salting?.detail || '',
+      exam: salting?.exam || '',
+      foodNames: salting?.foods.map((food) => food.name) || [],
+    };
+  });
+  check('the reused book rebuilds all facts in the chosen language',
+    title !== 'Salting' && localizedFacts.name !== 'Salting' &&
+      localizedFacts.detail.length > 0 && localizedFacts.exam.length > 0 &&
+      !localizedFacts.foodNames.includes('Fish'), JSON.stringify(localizedFacts));
   await page.screenshot({ path: `${OUT}/21-zh.png` });
 });
 

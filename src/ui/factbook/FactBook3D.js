@@ -116,9 +116,6 @@ export class FactBook3D {
     if (this._built) return;
     this._built = true;
 
-    this.model = buildFactBook();
-    this.headings = this._headings();
-
     // ------------------------------------------------------------------ DOM
     const wrap = el('div', 'pp-fb');
     wrap.setAttribute('role', 'dialog');
@@ -985,11 +982,21 @@ export class FactBook3D {
   // ================================================================= lifecycle
   open(onClose) {
     this._build();
+    // The Fact Book instance survives closing so its WebGL resources can be
+    // reused. Its prose must not: buildFactBook() resolves every curriculum
+    // string in the language that is active at the time it is called.
+    this.model = buildFactBook();
+    this.headings = this._headings();
+    this.wrap.setAttribute('aria-label', t('ui.factBook'));
+    this.closeBtn.setAttribute('aria-label', t('ui.close'));
+    this.tabs.setAttribute('aria-label', t('ui.factBookMethods'));
+    this.ui.prev.setAttribute('aria-label', t('ui.prevPage'));
+    this.ui.next.setAttribute('aria-label', t('ui.nextPage'));
+    this.ui.reset.setAttribute('aria-label', t('ui.resetView'));
     this.onClose = onClose;
     this.isOpen = true;
     this.wrap.hidden = false;
     this.wrap.classList.remove('is-open');
-    this.headings = this._headings();
     this.index = 0;
     this._shownIndex = -1;
     this._modelId = undefined;
