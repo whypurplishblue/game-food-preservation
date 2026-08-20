@@ -39,7 +39,7 @@ const FOOD_BASE = 'assets/models/foods/';
 export const MOVER_BINDINGS = {
   DryingRack:   { sun: 'sun' },
   Freezer:      { door: 'door', dial: 'dialKnob' },
-  VacuumSealer: { lid: 'lid', needle: 'needle' },
+  VacuumSealer: { lid: 'lid', needle: 'needle', pump: 'pumpBody' },
   PicklingJar:  { lid: 'lid' },
   SaltTable:    { scoop: 'scoop' },
   Pasteuriser:  {},
@@ -50,11 +50,13 @@ class Registry {
    * @param {string} base            url prefix for this registry's files
    * @param {() => string[]} available  ids the build found on disk
    * @param {boolean} optIn          require ?models=1, or load whenever present
+   * @param {string[]} defaultIds    approved models that may load without opt-in
    */
-  constructor(base, available, optIn = false) {
+  constructor(base, available, optIn = false, defaultIds = []) {
     this.base = base;
     this.available = available;
     this.optIn = optIn;
+    this.defaultIds = new Set(defaultIds);
     this.models = new Map();     // stationId -> gltf.scene (template)
     this.enabled = false;
     this.report = [];
@@ -76,17 +78,19 @@ class Registry {
    * probing at runtime would mean a red 404 per file on every boot.
    */
   async preload(ids) {
-    // Stations are opt-in, and deliberately so: the visual gauntlet judged the
-    // Blender shells against the procedural machines and the procedural ones
-    // won, because they carry canvas-drawn displays and gauges the exported
-    // meshes have no equivalent for. Foods went the other way.
-    if (this.optIn && !(typeof location !== 'undefined' &&
-        new URLSearchParams(location.search).get('models') === '1')) {
-      this.report.push('off (add ?models=1 to load Blender shells)');
-      return this.report;
-    }
+    // Most stations remain opt-in because the procedural versions won their
+    // visual comparison. A small approved-default list lets individually
+    // improved GLBs ship without enabling the older station set wholesale.
+    const optedIn = typeof location !== 'undefined' &&
+      new URLSearchParams(location.search).get('models') === '1';
     const present = new Set(this.available());
-    const wanted = ids.filter((id) => present.has(id));
+    const wanted = ids.filter((id) => present.has(id) &&
+      (!this.optIn || optedIn || this.defaultIds.has(id)));
+    if (this.optIn && !optedIn) {
+      this.report.push(wanted.length
+        ? `approved defaults: ${wanted.join(', ')}`
+        : 'off (add ?models=1 to load Blender shells)');
+    }
     if (!wanted.length) return this.report;
     const loader = this._loader();
     await Promise.all(wanted.map(async (id) => {
@@ -128,7 +132,8 @@ class Registry {
 export const assets = new Registry(
   STATION_BASE,
   () => (typeof __PP_STATION_MODELS__ !== 'undefined' ? __PP_STATION_MODELS__ : []),
-  true);
+  true,
+  ['VacuumSealer']);
 
 /** Food models — used whenever the file exists. */
 export const foodAssets = new Registry(

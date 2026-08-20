@@ -99,6 +99,7 @@ export class VacuumSealer extends Station {
     }
 
     this._lidOpen = 0.45; this._targetLid = 0.45; this._air = 1;   // ajar at rest
+    this._pumpPower = 0;
   }
 
   _drawGauge(v = 1) {
@@ -148,7 +149,9 @@ export class VacuumSealer extends Station {
     const squash = 1 - progress;
     this.bag.scale.set(1 - progress * 0.16, 0.36 + squash * 0.64, 1 - progress * 0.14);
     this.bag.material.opacity = 0.42 + progress * 0.2;
-    this.pumpBody.rotation.y += progress * 0.02;
+    // Drive a bounded vibration in tick(). The old cumulative rotation depended
+    // on input-event frequency and could leave the pump at an arbitrary angle.
+    this._pumpPower = Math.sin(Math.min(progress, 1) * Math.PI);
 
     for (let i = 0; i < Math.floor(progress * this.airBits.length); i++) {
       const a = this.airBits[i];
@@ -161,6 +164,7 @@ export class VacuumSealer extends Station {
 
   onStepDone(index) {
     if (index === 0) { this._targetLid = 1; this.bag.visible = true; this._loading = true; }
+    if (index === 1) this._pumpPower = 0;
     if (index === 2) {
       this._sealFlash = 1;
       this._targetLid = 0;
@@ -174,9 +178,11 @@ export class VacuumSealer extends Station {
 
   resetVisuals() {
     this._targetLid = 0.45; this._air = 1; this._loading = false;
+    this._pumpPower = 0;
     this.bag.visible = false;
     this.bag.scale.set(1, 1, 1);
     this.needle.rotation.z = -Math.PI * 0.75;
+    this.pumpBody.rotation.y = 0;
     this._drawGauge(1);
     this.sealBar.material.emissive.setHex(0x000000);
   }
@@ -211,6 +217,7 @@ export class VacuumSealer extends Station {
       const target = this.root.localToWorld(new THREE.Vector3(0, 1.32, 0.12));
       this.food.group.position.lerp(target, 1 - Math.pow(0.004, dt));
     }
-    this.pumpBody.position.y = 1.15 + Math.sin(elapsed * 12) * 0.008 * (1 - this._air);
+    this.pumpBody.position.y = 1.15 + Math.sin(elapsed * 20) * 0.014 * this._pumpPower;
+    this.pumpBody.rotation.y = Math.sin(elapsed * 17) * 0.035 * this._pumpPower;
   }
 }

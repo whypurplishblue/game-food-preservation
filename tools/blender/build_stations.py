@@ -370,39 +370,81 @@ def build_freezer():
 
 
 def build_vacuum():
-    """Low wide sealer: hinged lid, big round air gauge, ribbed pump."""
+    """
+    Toy-like countertop chamber sealer.
+
+    Keep the GLB focused on the parts Blender improves: the recognisable shell
+    and the three rigid movers. The live gauge face, deforming bag, sealing bar
+    and air particles remain procedural because they react continuously to the
+    player's hold progress. In particular, do not model a second gauge here --
+    the old asset overlapped the procedural gauge and looked unfinished.
+
+    Five shared materials and broad, bevelled forms keep this readable on a
+    phone without spending the frame budget on tiny surface detail.
+    """
     parts = []
-    parts.append(box("base", (2.25, 1.5, 0.72), (0, 0, 0.58),
-                     material="plastic_white", bevel=0.09, rough=0.32))
-    parts.append(box("trim", (2.3, 1.55, 0.16), (0, 0, 0.96),
-                     material="vacuum", bevel=0.05))
-    # Lid left ajar so the chamber reads at rest.
-    lid_tilt = math.radians(-25)
-    parts.append(box("lid", (2.2, 1.44, 0.24), (0, 0.16, 1.26),
-                     rot=(lid_tilt, 0, 0), material="plastic_white", bevel=0.07, rough=0.32))
-    parts.append(box("lid_window", (1.5, 0.9, 0.06), (0, 0.13, 1.40),
-                     rot=(lid_tilt, 0, 0), material="glass", bevel=0.03, rough=0.05))
-    parts.append(cyl("lid_grip", 0.05, 1.0, (0, 0.68, 1.42),
-                     rot=(0, math.radians(90), 0), material="steel", metal=0.85))
-    parts.append(box("seal_bar", (1.6, 0.09, 0.05), (0, 0.42, 0.98),
-                     material="vacuum", bevel=0.01))
 
-    # Air gauge — the "air is a quantity you remove" readout.
-    parts.append(cyl("gauge_body", 0.32, 0.09, (-0.84, 0.72, 1.12),
-                     rot=(math.radians(60), 0, 0), material="steel_dark", metal=0.7))
-    parts.append(cyl("gauge_face", 0.28, 0.03, (-0.84, 0.76, 1.15),
-                     rot=(math.radians(60), 0, 0), material="plastic_white", rough=0.3))
+    # Layered wedge body: one strong silhouette, with a dark recessed chamber
+    # and purple side cheeks that frame the place where the bag belongs.
+    parts.append(box("base", (2.24, 1.42, 0.56), (0, 0, 0.52),
+                     material="plastic_white", bevel=0.12, rough=0.38))
+    parts.append(box("lower_band", (2.28, 1.45, 0.16), (0, 0, 0.29),
+                     material="vacuum", bevel=0.055, rough=0.42))
+    parts.append(box("rear_console", (2.08, 0.48, 0.36), (0, -0.43, 0.88),
+                     material="plastic_white", bevel=0.09, rough=0.38))
+    parts.append(box("chamber", (1.68, 0.82, 0.11), (0, 0.08, 0.84),
+                     material="rubber", bevel=0.045, rough=0.72))
+    parts.append(box("front_band", (2.10, 0.16, 0.30), (0, 0.64, 0.91),
+                     material="vacuum", bevel=0.055, rough=0.42))
+    for x in (-1.01, 1.01):
+        parts.append(box(f"side_cheek{x}", (0.20, 1.18, 0.32), (x, -0.02, 0.84),
+                         material="vacuum", bevel=0.065, rough=0.42))
+
+    # Three simple status lamps make the front panel feel intentional without
+    # a texture lookup. They share existing materials, so they add no draw-call
+    # category after joining.
+    for i, material in enumerate(("vacuum", "plastic_white", "rubber")):
+        parts.append(cyl(f"status{i}", 0.045, 0.035, (0.34 + i * 0.15, 0.735, 0.96),
+                         rot=(math.radians(90), 0, 0), material=material,
+                         verts=8, bevel=0.006,
+                         rough=0.42 if material == "vacuum" else (0.38 if material == "plastic_white" else 0.72)))
+
+    # Closed lid authored around the same rear hinge used by the procedural
+    # station. Four frame rails leave a real transparent cut-out instead of
+    # stacking glass over an opaque panel.
+    parts.append(box("lid_rear", (2.14, 0.22, 0.17), (0, -0.57, 1.12),
+                     material="vacuum", bevel=0.065, rough=0.42))
+    parts.append(box("lid_front", (2.14, 0.25, 0.17), (0, 0.55, 1.12),
+                     material="vacuum", bevel=0.065, rough=0.42))
+    for x in (-0.98, 0.98):
+        parts.append(box(f"lid_side{x}", (0.18, 1.02, 0.17), (x, 0, 1.12),
+                         material="vacuum", bevel=0.06, rough=0.42))
+    parts.append(box("lid_window", (1.78, 0.86, 0.055), (0, -0.01, 1.105),
+                     material="glass", bevel=0.025, rough=0.08))
+    parts.append(box("lid_grip", (1.04, 0.13, 0.13), (0, 0.69, 1.19),
+                     material="vacuum", bevel=0.05, rough=0.42))
+
+    # The live canvas gauge remains procedural. Only its needle is replaced,
+    # preserving the crisp AIR/SEALED readout while matching the GLB styling.
     parts.append(box("needle", (0.025, 0.02, 0.24), (-0.84, 0.79, 1.22),
-                     rot=(math.radians(60), 0, 0), material="salting", bevel=0.005))
+                     rot=(math.radians(60), 0, 0), material="salting",
+                     bevel=0.005, rough=0.35))
 
-    # Pump + ribbed hose
-    parts.append(cyl("pump", 0.32, 0.66, (0.85, 0.5, 1.33), material="vacuum", verts=16))
-    parts.append(cyl("pump_cap", 0.33, 0.09, (0.85, 0.5, 1.69), material="steel_dark", metal=0.7))
-    for i in range(7):
-        parts.append(torus(f"hose{i}", 0.075, 0.028,
-                           (0.5 - i * 0.1, 0.5, 1.42 - i * 0.035),
-                           rot=(0, math.radians(75), 0), material="rubber", rough=0.7))
-    return split(parts, lid=("lid",), needle=("needle",))
+    # Compact pump pod. Broad ribs replace the old seven torus hose pieces,
+    # saving triangles and avoiding the visual knot where GLB and procedural
+    # pumps previously occupied the same space.
+    parts.append(cyl("pump_body", 0.29, 0.47, (0.85, 0.50, 1.36),
+                     material="vacuum", verts=12, bevel=0.025, rough=0.42))
+    parts.append(cyl("pump_cap", 0.30, 0.09, (0.85, 0.50, 1.62),
+                     material="vacuum", verts=12, bevel=0.018, rough=0.42))
+    for i in range(3):
+        parts.append(box(f"pump_rib{i}", (0.44, 0.08, 0.055),
+                         (0.85, 0.79, 1.25 + i * 0.13), material="vacuum",
+                         bevel=0.018, rough=0.42))
+    parts.append(cyl("pump_button", 0.095, 0.055, (0.85, 0.50, 1.70),
+                     material="salting", verts=10, bevel=0.012, rough=0.35))
+
+    return split(parts, lid=("lid",), needle=("needle",), pump=("pump",))
 
 
 def build_pickling():
@@ -573,7 +615,11 @@ BUILDERS = {
 PIVOTS = {
     "DryingRack":   {"sun": (-1.15, 0.62, 2.1)},
     "Freezer":      {"door": (-0.98, 0.8, 1.32), "dial": (0.78, 0.86, 1.05)},
-    "VacuumSealer": {"lid": (0.0, -0.72, 1.1), "needle": (-0.84, 0.79, 1.15)},
+    "VacuumSealer": {
+        "lid": (0.0, -0.72, 1.1),
+        "needle": (-0.84, 0.79, 1.15),
+        "pump": (0.85, 0.50, 1.15),
+    },
     "PicklingJar":  {"lid": (0.0, 0.16, 2.43)},
     "SaltTable":    {"scoop": (-0.62, 0.35, 1.55)},
 }
@@ -636,7 +682,13 @@ def main():
     print("Preservation Panic - building station assets")
     print("=" * 68)
     total_tris = total_kb = 0
-    for name, builder in BUILDERS.items():
+    only = os.environ.get("PP_ONLY")
+    builders = BUILDERS.items()
+    if only:
+        if only not in BUILDERS:
+            raise ValueError("Unknown PP_ONLY station: " + only)
+        builders = ((only, BUILDERS[only]),)
+    for name, builder in builders:
         clear_scene()
         groups = builder()
         path, tris, size_kb, names = export_machine(name, groups)
