@@ -81,8 +81,25 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding: clamp(8px, 1.4vw, 22px) 6px 12px 2px;
-  transition: opacity 0.12s linear;
+  transition: opacity 0.12s linear, -webkit-mask-image 0.15s ease, mask-image 0.15s ease;
   scrollbar-width: thin;
+}
+/* Fades the last ~20px of content instead of letting it end on a hard crop —
+   the only signal a reader gets that a section (food chips, source line) ran
+   past the fold, since content this dense will not always fit above it. Same
+   language as .pp-fb__tabs's edge fades, so "faded edge" reads consistently
+   as "more here" everywhere in the book. */
+.pp-fb__panelinner.has-more-below {
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 20px), transparent 100%);
+  mask-image: linear-gradient(to bottom, black calc(100% - 20px), transparent 100%);
+}
+.pp-fb__panelinner.has-more-above {
+  -webkit-mask-image: linear-gradient(to top, black calc(100% - 20px), transparent 100%);
+  mask-image: linear-gradient(to top, black calc(100% - 20px), transparent 100%);
+}
+.pp-fb__panelinner.has-more-above.has-more-below {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 20px, black calc(100% - 20px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, black 20px, black calc(100% - 20px), transparent 100%);
 }
 .pp-fb__panelinner::-webkit-scrollbar { width: 8px; }
 .pp-fb__panelinner::-webkit-scrollbar-thumb { background: rgba(22, 41, 77, 0.18); border-radius: 99px; }
@@ -335,6 +352,29 @@
   scrollbar-width: none;
 }
 .pp-fb__tabs::-webkit-scrollbar { display: none; }
+/* Same reasoning as .pp-fb__scrollcue, for the horizontal method strip: a
+   fade at whichever edge still has tabs off-screen, so the strip does not
+   look like a hard-cropped list. */
+.pp-fb__tabs::before, .pp-fb__tabs::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 28px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  z-index: 1;
+}
+.pp-fb__tabs::before {
+  left: 0; border-radius: 18px 0 0 18px;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0));
+}
+.pp-fb__tabs::after {
+  right: 0; border-radius: 0 18px 18px 0;
+  background: linear-gradient(to left, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0));
+}
+.pp-fb__tabs.has-fade-left::before { opacity: 1; }
+.pp-fb__tabs.has-fade-right::after { opacity: 1; }
 .pp-fb__tab {
   display: flex; align-items: center; gap: 6px;
   flex: 0 0 auto;
