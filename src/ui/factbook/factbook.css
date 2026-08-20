@@ -413,7 +413,10 @@
    draws the eye on open — but shrinks and the panel's spacing tightens so the
    rest of the page still lands in view, rather than each answer needing
    the reader to scroll (the whole point of the "under the book" nav move). */
-@media (max-height: 820px) and (min-width: 700px) {
+@media (max-height: 820px) and (min-width: 481px) {
+  /* The close button is fixed to the screen corner, not the panel, and at
+     this width a full-length title runs right up under it without room. */
+  .pp-fb__panelinner { padding-right: 44px; }
   .pp-fb__title { font-size: clamp(22px, 2.6vw, 32px); }
   .pp-fb__lead { margin-bottom: 10px; }
   .pp-fb__seclabel { margin: 10px 0 6px; }
@@ -422,8 +425,13 @@
 }
 
 /* Narrow / portrait: the book takes the top half and the panel reads below it,
-   rather than shrinking desktop type until it is unreadable (§52). */
-@media (max-width: 860px), (orientation: portrait) and (max-width: 1000px) {
+   rather than shrinking desktop type until it is unreadable (§52).
+   Gated on portrait (plus a hard floor for anything too narrow for two
+   columns at all) rather than width alone: a landscape phone is often just
+   as narrow as a portrait one, but it is short, not tall, and stacking would
+   leave the panel row a sliver of its own already-short viewport instead of
+   the fuller height two columns can share (§ tablet/mobile landscape). */
+@media (max-width: 480px), (orientation: portrait) and (max-width: 1000px) {
   .pp-fb__body {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(160px, 36vh) auto minmax(0, 1fr);
