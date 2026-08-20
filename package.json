@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview --port 4173 --host",
     "test:content": "node tools/check-content.mjs",
+    "test:credits": "node tools/check-credits.mjs",
     "test:play": "node tools/probe.mjs",
     "shots": "node tools/shoot.mjs",
     "test:notes": "node tools/check-notes.mjs",

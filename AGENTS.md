@@ -93,20 +93,24 @@ additional token and coordination cost.
 # Reference documents
 Learning syllabus docs/y6-sci-u8.md
 
-## 3D model attribution
+## Asset attribution
 
 Every `.glb` under `public/assets/models/` must be listed in `src/content/credits.js`, either in:
 
-- `CREDITS` — a downloaded asset that carries an external license (author, source URL, license name + URL). These are the ones shown to players on the in-game Credits screen (title screen and pause menu → © Credits).
-- `SELF_MADE` — a model authored in-house. No external license, just a short note. Not shown on the Credits screen.
+- `MODEL_CREDITS` — a downloaded 3D asset that carries an external license (author, source URL, license name + URL). These are shown under the 3D assets section of the in-game Credits screen.
+- `SELF_MADE` — a 3D model authored in-house. No external license, just a short note. Not shown on the Credits screen.
 
-`tools/check-credits.mjs` (`npm run test:credits`) walks the models folder and fails if any file is missing from both lists, listed in both, or if an entry points at a file that no longer exists.
+Other external creative work belongs in its own category list, such as `AUDIO_CREDITS` or `INSPIRATION_CREDITS`. `CREDIT_CATEGORIES` registers the lists shown by the Credits screen, so different asset types remain separate.
 
-**When adding a new downloaded model:** drop the `.glb` into `public/assets/models/`, then add a `CREDITS` entry with the matching `file` path (relative to `public/assets/models/`, e.g. `foods/prawns.glb`) in the same commit. `npm run test:credits` will fail until you do.
+`tools/check-credits.mjs` (`npm run test:credits`) walks the models folder and fails if any file is missing from both model lists, listed in both, or if a model entry points at a file that no longer exists.
+
+**When adding a new downloaded model:** drop the `.glb` into `public/assets/models/`, then add a `MODEL_CREDITS` entry with the matching `file` path (relative to `public/assets/models/`, e.g. `foods/prawns.glb`) in the same commit. `npm run test:credits` will fail until you do.
 
 **When adding a new self-made model:** add a `SELF_MADE` entry instead.
 
-The Credits screen (`Screens.js` → `credits()`) renders `CREDITS` directly — there is no separate copy to keep in sync, so updating `credits.js` is the only step needed.
+**When adding audio, inspiration, or another external asset:** add it to the appropriate category list and register that list in `CREDIT_CATEGORIES` if needed.
+
+The Credits screen (`Screens.js` → `credits()`) renders `CREDIT_CATEGORIES` directly — there is no separate copy to keep in sync, so updating `credits.js` is the only step needed.
 
 ## The 3D Fact Book (`src/ui/factbook/`)
 

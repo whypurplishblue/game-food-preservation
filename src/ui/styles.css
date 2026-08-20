@@ -614,6 +614,13 @@ html, body {
 .pp-fact__senses tr:last-child td { border-bottom: 0; }
 .pp-fact__warn { color: #c62828; font-weight: 800; }
 .pp-fact__intro ol { margin: 0; padding-left: 22px; font-size: 14.5px; line-height: 1.7; }
+.pp-credits__intro { margin: 0 0 18px; font-size: 14.5px; line-height: 1.5; }
+.pp-credits__section + .pp-credits__section { margin-top: 24px; }
+.pp-credits__section h3 { margin: 0 0 10px; font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: var(--ui-ink-soft); }
+.pp-credits__list { list-style: none; display: grid; gap: 10px; margin: 0; padding: 0; }
+.pp-credits__item { display: grid; gap: 3px; padding: 12px 14px; background: rgba(255,255,255,.72); border: 2px solid rgba(43,29,51,.1); border-radius: var(--r-sm); }
+.pp-credits__item b { font-size: 15px; }
+.pp-credits__item span, .pp-credits__license { font-size: 13px; }
 
 /* =========================================================== responsive == */
 @media (max-width: 900px) {

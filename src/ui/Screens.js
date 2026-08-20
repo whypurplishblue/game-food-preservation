@@ -9,7 +9,7 @@
  */
 import { t, tList, methodName, mechShort, methodMechShort, foodName, AVAILABLE_LANGS, getLang, setLang } from '../content/i18n.js';
 import { METHODS, FOODS, SCORING } from '../content/curriculum.js';
-import { CREDITS } from '../content/credits.js';
+import { CREDIT_CATEGORIES } from '../content/credits.js';
 import { sfx, audio } from '../core/Audio.js';
 
 const el = (tag, cls, html) => {
@@ -196,14 +196,20 @@ export class Screens {
   // -------------------------------------------------------------- credits
   credits(onClose) {
     // Sourced from src/content/credits.js — the single place attribution
-    // lives. tools/check-credits.mjs keeps this list honest against what is
-    // actually on disk, so this screen never drifts out of date.
-    const items = CREDITS.map((c) => `
-      <li class="pp-credits__item">
-        <b><a href="${c.sourceUrl}" target="_blank" rel="noopener noreferrer">${c.title}</a></b>
-        <span>${t('ui.creditsBy', { author: c.author })}</span>
-        <a class="pp-credits__license" href="${c.licenseUrl}" target="_blank" rel="noopener noreferrer">${c.license}</a>
-      </li>`).join('');
+    // lives. tools/check-credits.mjs keeps the model list honest against what
+    // is actually on disk, so this screen never drifts out of date.
+    const sections = CREDIT_CATEGORIES
+      .filter(({ entries }) => entries.length)
+      .map(({ titleKey, entries }) => `
+        <section class="pp-credits__section">
+          <h3>${t(titleKey)}</h3>
+          <ul class="pp-credits__list">${entries.map((c) => `
+            <li class="pp-credits__item">
+              <b><a href="${c.sourceUrl}" target="_blank" rel="noopener noreferrer">${c.title}</a></b>
+              <span>${t('ui.creditsBy', { author: c.author })}</span>
+              <a class="pp-credits__license" href="${c.licenseUrl}" target="_blank" rel="noopener noreferrer">${c.license}</a>
+            </li>`).join('')}</ul>
+        </section>`).join('');
     const node = this._open(`
       <div class="pp-fact pp-credits">
         <header class="pp-fact__top">
@@ -212,7 +218,7 @@ export class Screens {
         </header>
         <div class="pp-fact__scroll">
           <p class="pp-credits__intro">${t('ui.creditsIntro')}</p>
-          <ul class="pp-credits__list">${items}</ul>
+          ${sections}
         </div>
       </div>`, { escapable: true, onEscape: onClose, cls: 'is-fact' });
     node.querySelector('[data-act="close"]').addEventListener('click', () => { sfx('ui.back'); onClose(); });
