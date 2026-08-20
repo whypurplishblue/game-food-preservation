@@ -28,6 +28,7 @@ import {
 import { BookMesh, PAGE_W, PAGE_H } from './BookMesh.js';
 import { ObjectViewer } from './Viewer.js';
 import { buildMethodModel, buildFoodObject } from './models.js';
+import { StationAutoplay } from '../../world/stations/autoplay.js';
 import { sfx } from '../../core/Audio.js';
 import './factbook.css';
 
@@ -99,6 +100,7 @@ export class FactBook3D {
     this._cardEls = [];
     this._modelCache = new Map();   // methodId -> built model, current spread +/- 1
     this._foodCache = new Map();    // foodId   -> built thumbnail, kept for the session
+    this._autoplay = null;          // StationAutoplay | null — "watch it work" in progress
   }
 
   get reduced() {
@@ -322,6 +324,9 @@ export class FactBook3D {
             <span class="pp-fb__hint"></span>
             <button class="pp-fb__reset" type="button">&#8635;</button>
             <button class="pp-fb__backfood" type="button" hidden></button>
+            <button class="pp-fb__animate" type="button" hidden>
+              <span class="pp-fb__animatelabel"></span>
+            </button>
           </div>
         </section>
         <section class="pp-fb__foodsec" hidden>
@@ -366,6 +371,8 @@ export class FactBook3D {
       hint: q('.pp-fb__hint'),
       reset: q('.pp-fb__reset'),
       backFood: q('.pp-fb__backfood'),
+      animate: q('.pp-fb__animate'),
+      animateLabel: q('.pp-fb__animatelabel'),
       foodSec: q('.pp-fb__foodsec'),
       foodLabel: q('.pp-fb__foodsec .pp-fb__seclabel span'),
       cards: q('.pp-fb__cards'),
@@ -445,6 +452,12 @@ export class FactBook3D {
     } else {
       u.viewerSec.hidden = true;
     }
+    this._mv = mv;
+    // Only a playable method has a station with a real sequence to replay; a
+    // Fact-Book-only method's model is a diorama that already animates on its
+    // own (§ models.js DIORAMAS), so there is nothing here to press play on.
+    this.ui.animate.hidden = !(isMethod && mv.playable);
+    this._setAnimatePlaying(false);
 
     this._clearCards();
     if (isMethod && mv.foods.length) {
@@ -593,6 +606,7 @@ export class FactBook3D {
     const id = mv ? mv.id : null;
     if (this._modelId === id) return;
     this._modelId = id;
+    this._cancelAutoplay();
     this._disposeInspected();
     this._method = null;
     this._methodDesc = null;
@@ -651,12 +665,14 @@ export class FactBook3D {
     const built = buildFoodObject(fv);
     if (!built) return;
     sfx('ui.tap');
+    this._cancelAutoplay();
     this._disposeInspected();
     this._inspected = built;
     this._inspecting = fv;
     this.methodViewer.setObject(built.object, { spin: this.reduced ? 0 : 0.34 });
     this.methodViewer.entry = 1;
     this.ui.viewerLabel.textContent = fv.name;
+    this.ui.animate.hidden = true;
     this.ui.backFood.hidden = false;
     this.ui.backFood.textContent = `‹ ${t('ui.backToMethod')}`;
     this.ui.viewport.focus({ preventScroll: true });
@@ -669,9 +685,55 @@ export class FactBook3D {
     sfx('ui.back');
     this._disposeInspected();
     this.ui.backFood.hidden = true;
+    this.ui.animate.hidden = !this._mv?.playable;
     this.ui.viewerLabel.textContent = t('ui.interactive3d');
     if (this._methodDesc) this.methodViewer.use(this._methodDesc, { spin: this.reduced ? 0 : 0.16 });
     this.state = 'reading';
+  }
+
+  // ================================================================= animate
+  /**
+   * "Watch it work" — replays the station's own step sequence (StationAutoplay,
+   * driven from the station's real onStepProgress/onStepDone/playSuccess, same
+   * as a player's hand would) so the machine on the page does what the machine
+   * in the kitchen does, with nobody dragging or holding anything.
+   */
+  animateMethod() {
+    if (this.state !== 'reading' || this._autoplay) return;
+    const station = this._method?.station;
+    if (!station) return;
+    sfx('ui.tap');
+    this._autoplay = new StationAutoplay(station);
+    this._setAnimatePlaying(true);
+    if (this._autoplay.done) this._finishAutoplay();
+  }
+
+  /** Ends the sequence early with the machine reset, never mid-pose (§ cache). */
+  _cancelAutoplay() {
+    if (!this._autoplay) return;
+    this._autoplay.station.resetVisuals();
+    this._autoplay = null;
+    this._setAnimatePlaying(false);
+  }
+
+  async _finishAutoplay() {
+    const { station } = this._autoplay;
+    this._autoplay = null;
+    // Never let a station's success flourish wedge the demo (§ Game._finishInteraction).
+    await Promise.race([
+      Promise.resolve(station.playSuccess()),
+      new Promise((r) => setTimeout(r, 2500)),
+    ]);
+    station.resetVisuals();
+    this._setAnimatePlaying(false);
+  }
+
+  _setAnimatePlaying(playing) {
+    const btn = this.ui.animate;
+    if (!btn) return;
+    btn.disabled = playing;
+    btn.classList.toggle('is-playing', playing);
+    this.ui.animateLabel.textContent = t(playing ? 'ui.watching' : 'ui.watchItWork');
   }
 
   // ===================================================================== input
@@ -771,6 +833,7 @@ export class FactBook3D {
 
     this.ui.reset.addEventListener('click', () => { sfx('ui.tap'); this.methodViewer.reset(); });
     this.ui.backFood.addEventListener('click', () => this.backToMethod());
+    this.ui.animate.addEventListener('click', () => this.animateMethod());
     this.ui.prev.addEventListener('click', () => this.go(-1));
     this.ui.next.addEventListener('click', () => this.go(1));
     this.closeBtn.addEventListener('click', () => this.close());
@@ -984,6 +1047,7 @@ export class FactBook3D {
     this.book.setTurn(false);
     this.tTurn.cancel();
     this._turnFrom = this._turnTo = null;
+    this._cancelAutoplay();
     this._disposeInspected();
     // The geometry stays alive until the cover has actually shut (§46).
     this.tOpen.to(this.tOpen.value, 0, this._dur(0.72), easeInOutCubic, () => {
@@ -1032,6 +1096,7 @@ export class FactBook3D {
 
     this.methodViewer.update(dt, this._elapsed);
     if (!this._inspecting) this._method?.update?.(dt, this._elapsed);
+    if (this._autoplay && !this._inspecting && this._autoplay.advance(dt)) this._finishAutoplay();
     this.thumbViewer.update(dt, this._elapsed);
   }
 

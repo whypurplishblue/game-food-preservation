@@ -147,6 +147,10 @@ function mechanismDiorama(mv) {
 export function buildMethodModel(mv) {
   if (mv.playable && mv.station && STATION_CLASSES[mv.station]) {
     const station = new STATION_CLASSES[mv.station](mv.id);
+    // A station shared by two methods (Freezer = freezing + cooling) reads
+    // getSteps() off this, not off the constructor's methodId (§ Station.js);
+    // the book must set it itself since nothing ever drops food here to do it.
+    station.activeMethodId = mv.id;
     // The book is not the kitchen: the name plate and the drop ring belong to
     // gameplay, and the panel already says which method this is.
     station.setLabelsVisible(false);
@@ -155,6 +159,7 @@ export function buildMethodModel(mv) {
     return {
       object,
       playable: true,
+      station,
       update: (dt, elapsed) => station.update(dt, elapsed),
       dispose: () => disposeTree(object),
     };
