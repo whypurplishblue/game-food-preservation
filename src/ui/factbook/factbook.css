@@ -44,7 +44,7 @@
   grid-template-rows: minmax(0, 1fr) auto;
   grid-template-areas:
     "book   panel"
-    "nav    panel";
+    "note   panel";
   gap: 10px clamp(12px, 2vw, 34px);
   padding:
     calc(18px + var(--safe-t)) calc(clamp(16px, 2.4vw, 40px) + var(--safe-r))
@@ -65,14 +65,14 @@
 
 /* The panel and the tab strip belong to the OPEN book: while the cover is still
    shut or swinging they are not there to read. */
-.pp-fb__panel, .pp-fb__tabs, .pp-fb__nav {
+.pp-fb__panel, .pp-fb__tabs, .pp-fb__booknote {
   opacity: 0;
   transition: opacity 0.32s ease;
   pointer-events: none;
 }
 .pp-fb.is-open .pp-fb__panel,
 .pp-fb.is-open .pp-fb__tabs,
-.pp-fb.is-open .pp-fb__nav { opacity: 1; pointer-events: auto; }
+.pp-fb.is-open .pp-fb__booknote { opacity: 1; pointer-events: auto; }
 
 /* ---------------------------------------------------------------- panel --- */
 .pp-fb__panel {
@@ -155,6 +155,21 @@
 .pp-fb__seclabel::after { flex: 1 1 auto; }
 .pp-fb__seclabel--quiet { color: rgba(22, 41, 77, 0.42); font-weight: 700; }
 
+/* The model and its food examples are one feature: a compact square viewer
+   beside a vertically scrollable list, instead of a wide model above a grid. */
+.pp-fb__featuregrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(126px, 0.82fr);
+  gap: 12px;
+  align-items: start;
+}
+.pp-fb__featuregrid > .pp-fb__viewersec,
+.pp-fb__featuregrid > .pp-fb__foodsec {
+  min-width: 0;
+  min-height: 0;
+}
+.pp-fb__featuregrid .pp-fb__seclabel { margin-top: 0; }
+
 /* ------------------------------------------------------- 3D method viewer -- */
 /*
  * THE CUT-OUT. The WebGL canvas sits BEHIND the panel, so a solid background
@@ -167,7 +182,9 @@
  */
 .pp-fb__viewer {
   position: relative;
-  aspect-ratio: 16 / 10;
+  width: min(100%, 420px);
+  margin-inline: auto;
+  aspect-ratio: 1 / 1;
   background: transparent;
   border: 1px solid #cfe0ea;
   border-radius: 18px;
@@ -239,6 +256,14 @@
   grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
   gap: 10px;
 }
+.pp-fb__featuregrid .pp-fb__cards {
+  grid-template-columns: 1fr;
+  max-height: clamp(220px, 40vh, 420px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2px 6px 2px 1px;
+  scrollbar-width: thin;
+}
 /* Same cut-out as the viewer: the top of the card is a transparent hole the
    size of .pp-fb__cardslot, the rest is painted normally. */
 .pp-fb__card {
@@ -290,6 +315,12 @@
 }
 
 /* ----------------------------------------------------------- exam / list -- */
+.pp-fb__booknote {
+  grid-area: note;
+  min-width: 0;
+  min-height: 0;
+  padding: 4px 6px 0;
+}
 .pp-fb__exam {
   margin: 0;
   padding: 13px 15px;
@@ -321,37 +352,6 @@
   font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
   color: rgba(22, 41, 77, 0.42);
 }
-
-/* ------------------------------------------------------------- page nav --- */
-/* Lives under the book, not the panel: freeing the whole panel column for
-   content is the point of putting it here. */
-.pp-fb__nav {
-  grid-area: nav;
-  display: flex; align-items: center; gap: 12px;
-  padding: 4px 6px 0;
-}
-.pp-fb__navbtn {
-  width: 44px; height: 44px; flex: 0 0 44px;
-  border-radius: 50%;
-  border: 1px solid #cfe0ea;
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--fb-ink);
-  font-size: 21px; line-height: 1;
-  cursor: pointer;
-  box-shadow: 0 4px 10px rgba(23, 52, 82, 0.12);
-  transition: transform 0.12s ease, background 0.12s ease;
-}
-.pp-fb__navbtn:hover:not(:disabled) { background: #fff; transform: translateY(-1px); }
-.pp-fb__navbtn:disabled { opacity: 0.35; cursor: default; }
-.pp-fb__navmid { flex: 1 1 auto; text-align: center; }
-.pp-fb__count {
-  display: block;
-  font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--fb-ink-soft);
-}
-.pp-fb__dots { display: flex; justify-content: center; gap: 5px; margin-top: 6px; flex-wrap: wrap; }
-.pp-fb__dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(22, 41, 77, 0.2); }
-.pp-fb__dot.is-on { background: var(--m); transform: scale(1.5); }
 
 /* --------------------------------------------------------------- close ---- */
 .pp-fb__close {
@@ -436,7 +436,7 @@
    note in the same view as the 3D model. The model stays first — it's what
    draws the eye on open — but shrinks and the panel's spacing tightens so the
    rest of the page still lands in view, rather than each answer needing
-   the reader to scroll (the whole point of the "under the book" nav move). */
+   the reader to scroll (the note below the book remains a compact callout). */
 @media (max-height: 820px) and (min-width: 481px) {
   /* The close button is fixed to the screen corner, not the panel, and at
      this width a full-length title runs right up under it without room. */
@@ -444,7 +444,7 @@
   .pp-fb__title { font-size: clamp(22px, 2.6vw, 32px); }
   .pp-fb__lead { margin-bottom: 10px; }
   .pp-fb__seclabel { margin: 10px 0 6px; }
-  .pp-fb__viewer { aspect-ratio: 16 / 6.5; }
+  .pp-fb__viewer { aspect-ratio: 1 / 1; }
   .pp-fb__hint { display: none; }
 }
 
@@ -459,16 +459,20 @@
   .pp-fb__body {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(160px, 36vh) auto minmax(0, 1fr);
-    grid-template-areas: "book" "nav" "panel";
+    grid-template-areas: "book" "note" "panel";
     padding-bottom: calc(84px + var(--safe-b));
   }
-  .pp-fb__viewer { aspect-ratio: 16 / 8; }
+  .pp-fb__featuregrid { grid-template-columns: 1fr; }
+  .pp-fb__viewer { aspect-ratio: 1 / 1; }
+  .pp-fb__featuregrid .pp-fb__cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: 190px;
+  }
   .pp-fb__title { font-size: clamp(24px, 6vw, 34px); }
-  .pp-fb__cards { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .pp-fb { animation-duration: 0.01s; }
-  .pp-fb__card, .pp-fb__navbtn { transition: none; }
+  .pp-fb__card { transition: none; }
   .pp-fb__animate.is-playing::before { animation: none; }
 }

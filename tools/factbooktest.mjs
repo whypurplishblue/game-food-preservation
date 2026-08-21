@@ -78,12 +78,14 @@ await session({ width: 1600, height: 900 }, async (page) => {
   check('the book carries no title or spoilage spread',
     await page.evaluate(() => window.__pp.game.factBook.model.spreads
       .every((s) => !['contents', 'spoilage-a', 'spoilage-b'].includes(s.kind))));
-  check('pagination starts with the first navigation page',
+  check('pagination controls and arrows are removed',
     await page.evaluate(() => {
-      const count = document.querySelector('.pp-fb__count')?.textContent;
-      const total = window.__pp.game.factBook.model.spreads.length;
-      return count === `Page 1 of ${total}`;
+      return !document.querySelector('.pp-fb__nav') &&
+        !document.querySelector('.pp-fb__count') &&
+        !document.querySelector('.pp-fb__navbtn');
     }));
+  check('exam note stays hidden on pages without one',
+    await page.evaluate(() => document.querySelector('.pp-fb__booknote')?.hidden === true));
   check('book is fully open', Math.abs((await state(page)).open - 1) < 0.001);
 
   // --- a committed drag turns the page and never springs back
@@ -126,6 +128,27 @@ await session({ width: 1600, height: 900 }, async (page) => {
   await page.evaluate(() => window.__pp.game.factBook.goToMethod('drying'));
   await settle(page);
   const dryIdx = await state(page);
+  const featureLayout = await page.evaluate(() => {
+    const viewer = document.querySelector('.pp-fb__viewer')?.getBoundingClientRect();
+    const foods = document.querySelector('.pp-fb__foodsec')?.getBoundingClientRect();
+    const cards = document.querySelector('.pp-fb__cards');
+    const note = document.querySelector('.pp-fb__booknote');
+    const book = document.querySelector('.pp-fb__bookzone')?.getBoundingClientRect();
+    return {
+      square: !!viewer && Math.abs(viewer.width - viewer.height) < 2,
+      foodsRight: !!viewer && !!foods && foods.left >= viewer.right - 2,
+      foodsScrollable: !!cards && getComputedStyle(cards).overflowY === 'auto' &&
+        getComputedStyle(cards).maxHeight !== 'none',
+      noteBelowBook: !!note && !!book && note.getBoundingClientRect().top >= book.bottom - 2,
+      noteVisible: !!note && !note.hidden && !!note.querySelector('.pp-fb__exam')?.textContent,
+      noteHasNoHeader: !!note && !note.querySelector('.pp-fb__seclabel'),
+    };
+  });
+  check('the interactive model uses a square viewer', featureLayout.square);
+  check('food examples sit to the right of the model', featureLayout.foodsRight);
+  check('food examples use their own vertical scroller', featureLayout.foodsScrollable);
+  check('exam notes appear below the book without a header',
+    featureLayout.noteBelowBook && featureLayout.noteVisible && featureLayout.noteHasNoHeader);
 
   // --- rotating the model must not reach the book
   const vp = await (await page.$('.pp-fb__viewport')).boundingBox();
@@ -161,11 +184,11 @@ await session({ width: 1600, height: 900 }, async (page) => {
     fb.jumpTo(fb.model.spreads.length - 1);
   });
   await settle(page);
-  check('pagination ends with the final navigation page',
+  check('jumping still reaches the final spread without pagination UI',
     await page.evaluate(() => {
       const fb = window.__pp.game.factBook;
       const total = fb.model.spreads.length;
-      return document.querySelector('.pp-fb__count')?.textContent === `Page ${total} of ${total}`;
+      return fb.index === total - 1 && !document.querySelector('.pp-fb__count');
     }));
 
   // --- Escape closes, physically, and hands the game back
@@ -298,7 +321,9 @@ await session({ width: 1600, height: 900 }, async (page) => {
   await settle(page);
   await sleep(400);
   const title = await page.$eval('.pp-fb__title', (n) => n.textContent);
-  const pageCount = await page.$eval('.pp-fb__count', (n) => n.textContent);
+  const examNote = await page.$eval('.pp-fb__booknote .pp-fb__exam', (n) => n.textContent);
+  const examHasNoHeader = await page.evaluate(() =>
+    !document.querySelector('.pp-fb__booknote .pp-fb__seclabel'));
   const localizedFacts = await page.evaluate(() => {
     const fb = window.__pp.game.factBook;
     const salting = fb.model.methods.find((method) => method.id === 'salting');
@@ -314,8 +339,8 @@ await session({ width: 1600, height: 900 }, async (page) => {
     title !== 'Salting' && localizedFacts.name !== 'Salting' &&
       localizedFacts.detail.length > 0 && localizedFacts.exam.length > 0 &&
       !localizedFacts.foodNames.includes('Fish'), JSON.stringify(localizedFacts));
-  check('navigation-page numbering follows the chosen language',
-    pageCount.includes('页') && !pageCount.includes('Page'), pageCount);
+  check('exam notes follow the chosen language without a header',
+    examNote === localizedFacts.exam && examHasNoHeader, examNote);
   await page.screenshot({ path: `${OUT}/21-zh.png` });
 });
 

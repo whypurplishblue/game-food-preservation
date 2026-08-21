@@ -133,8 +133,12 @@ export class FactBook3D {
     this.bookZone.setAttribute('aria-label', t('a11y.bookArea'));
     this.bookZone.tabIndex = 0;
     this.panel = el('aside', 'pp-fb__panel');
-    this.nav = el('footer', 'pp-fb__nav');
-    body.append(this.bookZone, this.nav, this.panel);
+    this.bookNote = el('aside', 'pp-fb__booknote');
+    this.bookNote.setAttribute('role', 'note');
+    this.bookNoteText = el('p', 'pp-fb__exam');
+    this.bookNote.appendChild(this.bookNoteText);
+    this.bookNote.hidden = true;
+    body.append(this.bookZone, this.bookNote, this.panel);
     wrap.appendChild(body);
 
     this.closeBtn = el('button', 'pp-fb__close', '✕');
@@ -315,29 +319,27 @@ export class FactBook3D {
           <div class="pp-fb__badges"></div>
         </header>
         <p class="pp-fb__lead"></p>
-        <section class="pp-fb__viewersec" hidden>
-          <div class="pp-fb__seclabel"><span></span></div>
-          <div class="pp-fb__viewer">
-            <div class="pp-fb__viewport" tabindex="0" role="application"></div>
-            <span class="pp-fb__hint"></span>
-            <button class="pp-fb__reset" type="button">&#8635;</button>
-            <button class="pp-fb__backfood" type="button" hidden></button>
-            <button class="pp-fb__animate" type="button" hidden>
-              <span class="pp-fb__animatelabel"></span>
-            </button>
-          </div>
-        </section>
-        <section class="pp-fb__foodsec" hidden>
-          <div class="pp-fb__seclabel"><span></span></div>
-          <div class="pp-fb__cards"></div>
-        </section>
+        <div class="pp-fb__featuregrid">
+          <section class="pp-fb__viewersec" hidden>
+            <div class="pp-fb__seclabel"><span></span></div>
+            <div class="pp-fb__viewer">
+              <div class="pp-fb__viewport" tabindex="0" role="application"></div>
+              <span class="pp-fb__hint"></span>
+              <button class="pp-fb__reset" type="button">&#8635;</button>
+              <button class="pp-fb__backfood" type="button" hidden></button>
+              <button class="pp-fb__animate" type="button" hidden>
+                <span class="pp-fb__animatelabel"></span>
+              </button>
+            </div>
+          </section>
+          <section class="pp-fb__foodsec" hidden>
+            <div class="pp-fb__seclabel"><span></span></div>
+            <div class="pp-fb__cards"></div>
+          </section>
+        </div>
         <section class="pp-fb__alsosec" hidden>
           <div class="pp-fb__seclabel pp-fb__seclabel--quiet"><span></span></div>
           <div class="pp-fb__chips"></div>
-        </section>
-        <section class="pp-fb__examsec" hidden>
-          <div class="pp-fb__seclabel"><span></span></div>
-          <p class="pp-fb__exam"></p>
         </section>
         <section class="pp-fb__listsec" hidden>
           <div class="pp-fb__seclabel"><span></span></div>
@@ -346,18 +348,7 @@ export class FactBook3D {
         <p class="pp-fb__source"></p>
       </div>`;
 
-    // The page nav lives under the book zone, not the panel, so the panel gets
-    // the full column height for content (§ the "X of Y" move).
-    this.nav.innerHTML = `
-      <button class="pp-fb__navbtn" data-nav="prev" type="button">&#8249;</button>
-      <div class="pp-fb__navmid">
-        <span class="pp-fb__count"></span>
-        <div class="pp-fb__dots"></div>
-      </div>
-      <button class="pp-fb__navbtn" data-nav="next" type="button">&#8250;</button>`;
-
     const q = (s) => this.panel.querySelector(s);
-    const qn = (s) => this.nav.querySelector(s);
     this.ui = {
       inner: q('.pp-fb__panelinner'),
       title: q('.pp-fb__title'),
@@ -377,20 +368,11 @@ export class FactBook3D {
       alsoSec: q('.pp-fb__alsosec'),
       alsoLabel: q('.pp-fb__alsosec .pp-fb__seclabel span'),
       chips: q('.pp-fb__chips'),
-      examSec: q('.pp-fb__examsec'),
-      examLabel: q('.pp-fb__examsec .pp-fb__seclabel span'),
-      exam: q('.pp-fb__exam'),
       listSec: q('.pp-fb__listsec'),
       listLabel: q('.pp-fb__listsec .pp-fb__seclabel span'),
       list: q('.pp-fb__list'),
       source: q('.pp-fb__source'),
-      count: qn('.pp-fb__count'),
-      dots: qn('.pp-fb__dots'),
-      prev: qn('[data-nav="prev"]'),
-      next: qn('[data-nav="next"]'),
     };
-    this.ui.prev.setAttribute('aria-label', t('ui.prevPage'));
-    this.ui.next.setAttribute('aria-label', t('ui.nextPage'));
     this.ui.reset.setAttribute('aria-label', t('ui.resetView'));
   }
 
@@ -501,13 +483,12 @@ export class FactBook3D {
       u.alsoSec.hidden = true;
     }
 
-    if (isMethod && mv.exam) {
-      u.examSec.hidden = false;
-      u.examLabel.textContent = t('ui.examNote');
-      u.exam.textContent = mv.exam;
-    } else {
-      u.examSec.hidden = true;
-    }
+    // Exam notes sit in the former page-navigation row below the book. There
+    // is deliberately no label: the orange rule and the note's placement make
+    // it a quiet callout without stealing another heading from the page.
+    const exam = isMethod ? (mv.exam || '') : '';
+    this.bookNoteText.textContent = exam;
+    this.bookNote.hidden = !exam;
 
     const list = this._sectionList(s);
     if (list) {
@@ -523,17 +504,6 @@ export class FactBook3D {
     // §32: the teaching-notes reference stays attached, quietly.
     u.source.textContent = isMethod && mv.sourceRef ? t('ui.source', { ref: mv.sourceRef }) : '';
     u.source.hidden = !u.source.textContent;
-
-    u.count.textContent = t('ui.pageOf', {
-      n: this.index + 1,
-      total: this.model.spreads.length,
-    });
-    u.dots.textContent = '';
-    for (let i = 0; i < this.model.spreads.length; i++) {
-      u.dots.appendChild(el('i', `pp-fb__dot${i === this.index ? ' is-on' : ''}`));
-    }
-    u.prev.disabled = this.index === 0;
-    u.next.disabled = this.index === this.model.spreads.length - 1;
 
     for (const tab of this._tabEls) {
       const isOn = isMethod && tab.id === mv.id;
@@ -833,8 +803,6 @@ export class FactBook3D {
     this.ui.reset.addEventListener('click', () => { sfx('ui.tap'); this.methodViewer.reset(); });
     this.ui.backFood.addEventListener('click', () => this.backToMethod());
     this.ui.animate.addEventListener('click', () => this.animateMethod());
-    this.ui.prev.addEventListener('click', () => this.go(-1));
-    this.ui.next.addEventListener('click', () => this.go(1));
     this.closeBtn.addEventListener('click', () => this.close());
 
     this.ui.inner.addEventListener('scroll', () => this._updatePanelFade(), { passive: true });
@@ -991,8 +959,6 @@ export class FactBook3D {
     this.wrap.setAttribute('aria-label', t('ui.factBook'));
     this.closeBtn.setAttribute('aria-label', t('ui.close'));
     this.tabs.setAttribute('aria-label', t('ui.factBookMethods'));
-    this.ui.prev.setAttribute('aria-label', t('ui.prevPage'));
-    this.ui.next.setAttribute('aria-label', t('ui.nextPage'));
     this.ui.reset.setAttribute('aria-label', t('ui.resetView'));
     this.onClose = onClose;
     this.isOpen = true;
@@ -1212,9 +1178,19 @@ export class FactBook3D {
     const r = node.getBoundingClientRect();
     if (r.width < 4 || r.height < 4) return null;
     const c = this.canvas.getBoundingClientRect();
-    const p = this.ui.inner.getBoundingClientRect();
-    const x1 = Math.max(r.left, p.left), y1 = Math.max(r.top, p.top);
-    const x2 = Math.min(r.right, p.right), y2 = Math.min(r.bottom, p.bottom);
+    // The food cards have their own vertical scroller. Clip thumbnails to
+    // both it and the panel so a card leaving that list cannot paint over the
+    // rest of the detail column.
+    const clips = [this.ui.inner];
+    if (this.ui.cards?.contains(node)) clips.push(this.ui.cards);
+    let x1 = r.left, y1 = r.top, x2 = r.right, y2 = r.bottom;
+    for (const scroller of clips) {
+      const sr = scroller.getBoundingClientRect();
+      x1 = Math.max(x1, sr.left);
+      y1 = Math.max(y1, sr.top);
+      x2 = Math.min(x2, sr.right);
+      y2 = Math.min(y2, sr.bottom);
+    }
     if (x2 - x1 < 4 || y2 - y1 < 4) return null;
     return {
       x: r.left - c.left, y: r.top - c.top, w: r.width, h: r.height,
