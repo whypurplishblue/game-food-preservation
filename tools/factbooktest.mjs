@@ -66,6 +66,16 @@ await session({ width: 1600, height: 900 }, async (page) => {
       const z = document.querySelector('.pp-fb__bookzone');
       return z.getAttribute('role') === 'button' && !!z.getAttribute('aria-label') && z.tabIndex >= 0;
     }));
+  check('audio control is icon-only but accessible',
+    await page.evaluate(() => {
+      const buttons = [...document.querySelectorAll('.pp-quick [data-quick="mute"]')];
+      return buttons.length > 0 && buttons.every((button) => {
+        const label = button.querySelector('.pp-quick__label');
+        const icon = button.querySelector('.pp-quick__icon');
+        return !!icon?.textContent.trim() && !label?.textContent.trim() &&
+          !!button.getAttribute('aria-label') && !!button.title;
+      });
+    }));
   // Opened from the keyboard, to prove the reader can still open it early.
   await page.focus('.pp-fb__bookzone');
   await page.keyboard.press('Enter');
@@ -217,6 +227,13 @@ await session({ width: 1600, height: 900 }, async (page) => {
     await page.evaluate(() => !window.__pp.game.factBook.book.turning));
   check('play resumes', await page.evaluate(() => window.__pp.game.mode === 'playing'));
   check('the HUD comes back', await page.evaluate(() => !window.__pp.hud.root.classList.contains('is-hidden')));
+  check('audio control stays icon-only in the HUD',
+    await page.evaluate(() => {
+      const button = document.querySelector('.pp-quick.is-hud [data-quick="mute"]');
+      return !!button && !!button.querySelector('.pp-quick__icon')?.textContent.trim() &&
+        !button.querySelector('.pp-quick__label')?.textContent.trim() &&
+        !!button.getAttribute('aria-label') && !!button.title;
+    }));
 
   // Completing the final learning method schedules a quiz after the teaching
   // banner. The result screen must not win that delay and cover the quiz.
