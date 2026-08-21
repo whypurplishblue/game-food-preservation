@@ -335,10 +335,6 @@ export class FactBook3D {
           <div class="pp-fb__seclabel pp-fb__seclabel--quiet"><span></span></div>
           <div class="pp-fb__chips"></div>
         </section>
-        <section class="pp-fb__examsec" hidden>
-          <div class="pp-fb__seclabel"><span></span></div>
-          <p class="pp-fb__exam"></p>
-        </section>
         <section class="pp-fb__listsec" hidden>
           <div class="pp-fb__seclabel"><span></span></div>
           <ul class="pp-fb__list"></ul>
@@ -377,9 +373,6 @@ export class FactBook3D {
       alsoSec: q('.pp-fb__alsosec'),
       alsoLabel: q('.pp-fb__alsosec .pp-fb__seclabel span'),
       chips: q('.pp-fb__chips'),
-      examSec: q('.pp-fb__examsec'),
-      examLabel: q('.pp-fb__examsec .pp-fb__seclabel span'),
-      exam: q('.pp-fb__exam'),
       listSec: q('.pp-fb__listsec'),
       listLabel: q('.pp-fb__listsec .pp-fb__seclabel span'),
       list: q('.pp-fb__list'),
@@ -438,9 +431,12 @@ export class FactBook3D {
       );
     }
 
-    // The panel is the DEEPER read: a method leads with `detail`, while the
-    // book page carries `explain` — the same sentence is not printed twice.
-    u.lead.textContent = isMethod ? (mv.detail || mv.explain || '') : this._sectionLead(s);
+    // Put the exam note in the first reading position. It replaces the short
+    // detail paragraph there, so the desktop panel can show the useful method
+    // content without making the reader scroll before seeing the model.
+    const hasExam = Boolean(isMethod && mv.exam);
+    u.lead.textContent = hasExam ? mv.exam : isMethod ? (mv.detail || mv.explain || '') : this._sectionLead(s);
+    u.lead.classList.toggle('is-exam', hasExam);
     u.lead.hidden = !u.lead.textContent;
 
     if (isMethod) {
@@ -499,14 +495,6 @@ export class FactBook3D {
       for (const fv of mv.alsoWorks) u.chips.appendChild(el('span', 'pp-fb__chip', fv.name));
     } else {
       u.alsoSec.hidden = true;
-    }
-
-    if (isMethod && mv.exam) {
-      u.examSec.hidden = false;
-      u.examLabel.textContent = t('ui.examNote');
-      u.exam.textContent = mv.exam;
-    } else {
-      u.examSec.hidden = true;
     }
 
     const list = this._sectionList(s);

@@ -140,6 +140,16 @@
   color: #2c405f;
   max-width: 44ch;
 }
+.pp-fb__lead.is-exam {
+  max-width: none;
+  padding: 10px 13px;
+  border-left: 4px solid #e0762a;
+  border-radius: 0 10px 10px 0;
+  background: rgba(255, 255, 255, 0.62);
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 600;
+}
 
 .pp-fb__seclabel {
   display: flex; align-items: center; gap: 10px;
@@ -290,14 +300,6 @@
 }
 
 /* ----------------------------------------------------------- exam / list -- */
-.pp-fb__exam {
-  margin: 0;
-  padding: 13px 15px;
-  border-left: 4px solid #e0762a;
-  border-radius: 0 10px 10px 0;
-  background: rgba(255, 255, 255, 0.62);
-  font-size: 14px; line-height: 1.55; font-weight: 600;
-}
 .pp-fb__list { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.62; color: #2c405f; }
 .pp-fb__list li { margin-bottom: 5px; }
 .pp-fb__list.is-ordered { counter-reset: fb; list-style: none; padding-left: 0; }
