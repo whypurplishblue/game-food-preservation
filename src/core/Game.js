@@ -421,7 +421,7 @@ export class Game {
     const wasPlaying = this.mode === 'playing';
     if (wasPlaying) this.mode = 'paused';
     this.input.setEnabled(false);
-    this._setQuickContext('overlay', false);
+    this._setQuickContext('factbook', false);
     const done = () => {
       if (back) back();
       else if (wasPlaying) {

@@ -181,6 +181,7 @@ export class QuickControls {
     this.languageVisible = Boolean(languageVisible);
     this.root.classList.toggle('is-overlay', this.placement === 'overlay');
     this.root.classList.toggle('is-hud', this.placement === 'hud');
+    this.root.classList.toggle('is-factbook', placement === 'factbook');
     this.languageBtn.hidden = !this.languageVisible;
     this.languageBtn.setAttribute('aria-hidden', String(!this.languageVisible));
     if (!this.languageVisible) this.closeLanguageMenu();
