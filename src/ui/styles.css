@@ -524,6 +524,17 @@ html, body {
   inset-inline-start: auto; inset-inline-end: calc(12px + var(--safe-r));
   max-inline-size: calc(100% - 24px - var(--safe-l) - var(--safe-r));
 }
+/* The Fact Book owns the same top-right corner for its close button. Keep the
+   audio control available, but place it in a small utility rail underneath. */
+.pp-quick.is-overlay.is-factbook {
+  inset-block-start: calc(68px + var(--safe-t));
+}
+.pp-quick.is-overlay.is-factbook .pp-quick__mute {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: #cfe0ea;
+  color: #16294d;
+  box-shadow: 0 4px 12px rgba(23, 52, 82, 0.14);
+}
 .pp-quick.is-hud { flex: 0 1 auto; align-self: flex-start; }
 .pp-quick button { font-family: var(--font); touch-action: manipulation; }
 .pp-quick__mute, .pp-quick__language {
