@@ -399,6 +399,7 @@ export const LEARNING_SCORING = {
   firstAttemptBonus: 100,   // correct station, no wrong try first, for this food
   lateCorrectBonus: 50,     // correct eventually, after a wrong-station try
   quizCorrect: 50,          // one-shot, no retry credit
+  quizWrong: -25,           // wrong quiz answer; visible penalty, but no dead end
   timeBonusMax: 5,          // per method, capped, tiebreak-only
   maxPossible: 9 * (100 + 50), // = 1350
 };
