@@ -226,10 +226,16 @@ export class Screens {
 
   // ---------------------------------------------------------------- results
   results(opts) {
-    const remembered = this._current?.kind === 'results' ? this._captureResultFormState() : opts?._formState;
-    const renderOpts = remembered ? { ...opts, _formState: remembered } : opts;
-    const { stage, score, stars, preserved, target, spoilt, accuracy, bestCombo, learned, passed, runScore, isFinalLevel, onNext, onRetry, onMenu, onSubmitScore, onViewLeaderboard, _formState } = renderOpts;
-    this._setCurrent('results', () => this.results(renderOpts));
+    const { stage, score, stars, preserved, target, spoilt, accuracy, bestCombo, learned, passed, runScore, isFinalLevel, leaderboardRank, leaderboardRankStatus, onNext, onRetry, onMenu, onOpenSubmit, onViewLeaderboard } = opts;
+    this._setCurrent('results', () => this.results(opts));
+    const endOfMode = Boolean(passed && isFinalLevel);
+    const retryAction = endOfMode ? ''
+      : `<button class="pp-btn pp-btn--big" data-act="retry">${t('ui.retry')}</button>`;
+    const leaderboardAction = endOfMode ? ''
+      : `<button class="pp-btn" data-act="board">🏆 ${t('ui.viewLeaderboard')}</button>`;
+    const submitAction = endOfMode
+      ? `<button class="pp-btn pp-btn--big pp-btn--primary" data-act="submit-score">${t('ui.submitScore')}</button>`
+      : '';
     const starHtml = [0, 1, 2].map((i) =>
       `<span class="pp-result__star${i < stars ? ' is-on' : ''}" style="--d:${i * 0.18}s">★</span>`).join('');
     const learnedHtml = learned.length
@@ -249,98 +255,63 @@ export class Screens {
           <div><span>${t('ui.bestCombo')}</span><b>x${bestCombo.toFixed(bestCombo % 1 ? 2 : 0)}</b></div>
         </div>
         ${learnedHtml}
-        ${this._scoreSubmitHtml(isFinalLevel)}
+        ${this._scoreSubmitHtml({ isFinalLevel, passed, leaderboardRank, leaderboardRankStatus })}
         <div class="pp-result__actions">
           ${passed && !isFinalLevel ? `<button class="pp-btn pp-btn--big pp-btn--primary" data-act="next">${t('ui.nextStage')}</button>` : ''}
-          <button class="pp-btn pp-btn--big" data-act="retry">${t('ui.retry')}</button>
-          <button class="pp-btn" data-act="board">🏆 ${t('ui.viewLeaderboard')}</button>
+          ${submitAction}
+          ${retryAction}
+          ${leaderboardAction}
           <button class="pp-btn" data-act="menu">${t('ui.quit')}</button>
         </div>
       </div>`, { cls: 'is-result' });
     node.querySelector('[data-act="next"]')?.addEventListener('click', () => { sfx('ui.tap'); onNext(); });
-    node.querySelector('[data-act="retry"]').addEventListener('click', () => { sfx('ui.tap'); onRetry(); });
-    node.querySelector('[data-act="board"]').addEventListener('click', () => { sfx('ui.open'); onViewLeaderboard(); });
+    node.querySelector('[data-act="submit-score"]')?.addEventListener('click', () => { sfx('ui.open'); onOpenSubmit?.(); });
+    node.querySelector('[data-act="retry"]')?.addEventListener('click', () => { sfx('ui.tap'); onRetry(); });
+    node.querySelector('[data-act="board"]')?.addEventListener('click', () => { sfx('ui.open'); onViewLeaderboard?.(); });
     node.querySelector('[data-act="menu"]').addEventListener('click', () => { sfx('ui.back'); onMenu(); });
-    this._restoreResultFormState(node, _formState);
-    this._wireScoreSubmit(node, onSubmitScore);
     if (passed) sfx('stage.win'); else sfx('stage.lose');
   }
 
-  /**
-   * Shared name-entry + submit control used by both results screens.
-   * Submission is only offered on the run's final level/stage — a
-   * leaderboard entry represents a completed playthrough, not a single
-   * level. Earlier levels show a hint instead.
-   */
-  _scoreSubmitHtml(isFinalLevel) {
+  /** Show the rank preview for a completed run; name entry lives on the board. */
+  _scoreSubmitHtml({ isFinalLevel, passed, leaderboardRank, leaderboardRankStatus }) {
+    if (passed && isFinalLevel) {
+      const rankText = leaderboardRankStatus === 'loading'
+        ? t('ui.leaderboardRankLoading')
+        : Number.isFinite(Number(leaderboardRank))
+          ? t('ui.leaderboardRank', { rank: Number(leaderboardRank) })
+          : t('ui.leaderboardRankUnavailable');
+      return `<p class="pp-result__rank" data-el="rank" aria-live="polite">${rankText}</p>`;
+    }
     if (!isFinalLevel) {
       return `<p class="pp-result__submitHint">${t('ui.finishToSubmit')}</p>`;
     }
-    return `
-      <div class="pp-result__submit">
-        <input type="text" maxlength="20" placeholder="${t('ui.yourName')}" data-el="name" />
-        <button class="pp-btn" data-act="submit">🏆 ${t('ui.submitScore')}</button>
-        <span class="pp-result__submitMsg" data-el="msg"></span>
-      </div>`;
-  }
-
-  _wireScoreSubmit(node, onSubmitScore) {
-    const btn = node.querySelector('[data-act="submit"]');
-    const input = node.querySelector('[data-el="name"]');
-    const msg = node.querySelector('[data-el="msg"]');
-    if (!btn || !onSubmitScore) return;
-    btn.addEventListener('click', async () => {
-      const name = (input.value || '').trim();
-      if (!name) { input.focus(); return; }
-      sfx('ui.tap');
-      btn.disabled = true;
-      const res = await onSubmitScore(name);
-      if (res?.ok) {
-        msg.textContent = t('ui.scoreSubmitted');
-        input.disabled = true;
-      } else {
-        msg.textContent = t('ui.leaderboardError');
-        btn.disabled = false;
-      }
-    });
-  }
-
-  _captureResultFormState() {
-    const input = this.el.querySelector('[data-el="name"]');
-    if (!input) return null;
-    const button = this.el.querySelector('[data-act="submit"]');
-    const msg = this.el.querySelector('[data-el="msg"]');
-    return {
-      value: input.value,
-      inputDisabled: input.disabled,
-      buttonDisabled: !!button?.disabled,
-      message: msg?.textContent || '',
-    };
-  }
-
-  _restoreResultFormState(node, state) {
-    if (!state) return;
-    const input = node.querySelector('[data-el="name"]');
-    const button = node.querySelector('[data-act="submit"]');
-    const msg = node.querySelector('[data-el="msg"]');
-    if (input) { input.value = state.value || ''; input.disabled = !!state.inputDisabled; }
-    if (button) button.disabled = !!state.buttonDisabled;
-    if (msg) msg.textContent = state.message || '';
+    return '';
   }
 
   // -------------------------------------------------------- learning results
   learningResults(opts) {
-    const remembered = this._current?.kind === 'learning-results' ? this._captureResultFormState() : opts?._formState;
-    const renderOpts = remembered ? { ...opts, _formState: remembered } : opts;
-    const { stage, score, maxScore, timeBonus, passed, spoilt, breakdown, runScore, isFinalLevel, onNext, onRetry, onMenu, onSubmitScore, onViewLeaderboard, _formState } = renderOpts;
-    this._setCurrent('learning-results', () => this.learningResults(renderOpts));
+    const { stage, score, maxScore, timeBonus, passed, spoilt, breakdown, runScore, isFinalLevel, leaderboardRank, leaderboardRankStatus, onNext, onRetry, onMenu, onOpenSubmit, onViewLeaderboard } = opts;
+    this._setCurrent('learning-results', () => this.learningResults(opts));
     const correctnessScore = score - timeBonus;
+    const endOfMode = Boolean(passed && isFinalLevel);
+    const submitAction = endOfMode
+      ? `<button class="pp-btn pp-btn--big pp-btn--primary" data-act="submit-score">${t('ui.submitScore')}</button>`
+      : '';
+    const retryAction = !passed
+      ? `<button class="pp-btn pp-btn--big" data-act="retry">${t('ui.retry')}</button>`
+      : '';
+    const leaderboardAction = !passed
+      ? `<button class="pp-btn" data-act="board">🏆 ${t('ui.viewLeaderboard')}</button>`
+      : '';
     const percent = maxScore ? Math.round((correctnessScore / maxScore) * 100) : 0;
     const rows = breakdown.map((b) => {
       const m = METHODS[b.methodId];
-      const detail = b.quiz ? t('ui.quizBonus') : (b.firstAttempt ? t('ui.firstAttempt') : t('ui.lateAttempt'));
+      const detail = b.quiz
+        ? (b.correct === false ? t('ui.quizPenalty') : t('ui.quizBonus'))
+        : (b.firstAttempt ? t('ui.firstAttempt') : t('ui.lateAttempt'));
       const pts = b.base + (b.timeBonus || 0);
-      return `<li style="--c:${hex(m.colour)}"><b>${methodName(b.methodId)}</b><span>${detail}</span><b>+${pts}</b></li>`;
+      const points = pts < 0 ? `-${Math.abs(pts)}` : `+${pts}`;
+      return `<li style="--c:${hex(m.colour)}"><b>${methodName(b.methodId)}</b><span>${detail}</span><b>${points}</b></li>`;
     }).join('');
     const node = this._open(`
       <div class="pp-result ${passed ? 'is-pass' : 'is-fail'}">
@@ -356,20 +327,20 @@ export class Screens {
           <h4>${t('ui.pointsBreakdown')}</h4>
           <ul class="pp-result__breakdown">${rows}</ul>
         </div>
-        ${this._scoreSubmitHtml(isFinalLevel)}
+        ${this._scoreSubmitHtml({ isFinalLevel, passed, leaderboardRank, leaderboardRankStatus })}
         <div class="pp-result__actions">
           ${passed && !isFinalLevel ? `<button class="pp-btn pp-btn--big pp-btn--primary" data-act="next">${t('ui.nextStage')}</button>` : ''}
-          <button class="pp-btn pp-btn--big" data-act="retry">${t('ui.retry')}</button>
-          <button class="pp-btn" data-act="board">🏆 ${t('ui.viewLeaderboard')}</button>
+          ${submitAction}
+          ${retryAction}
+          ${leaderboardAction}
           <button class="pp-btn" data-act="menu">${t('ui.quit')}</button>
         </div>
       </div>`, { cls: 'is-result' });
     node.querySelector('[data-act="next"]')?.addEventListener('click', () => { sfx('ui.tap'); onNext(); });
-    node.querySelector('[data-act="retry"]').addEventListener('click', () => { sfx('ui.tap'); onRetry(); });
-    node.querySelector('[data-act="board"]').addEventListener('click', () => { sfx('ui.open'); onViewLeaderboard(); });
+    node.querySelector('[data-act="submit-score"]')?.addEventListener('click', () => { sfx('ui.open'); onOpenSubmit?.(); });
+    node.querySelector('[data-act="retry"]')?.addEventListener('click', () => { sfx('ui.tap'); onRetry(); });
+    node.querySelector('[data-act="board"]')?.addEventListener('click', () => { sfx('ui.open'); onViewLeaderboard?.(); });
     node.querySelector('[data-act="menu"]').addEventListener('click', () => { sfx('ui.back'); onMenu(); });
-    this._restoreResultFormState(node, _formState);
-    this._wireScoreSubmit(node, onSubmitScore);
     if (passed) sfx('stage.win'); else sfx('stage.lose');
   }
 
@@ -379,14 +350,23 @@ export class Screens {
    * requests begin together; switching tabs only reveals cached state and a
    * retry only refetches the tab that failed.
    */
-  leaderboard({ initialMode = 'learning', loadMode, onClose } = {}) {
+  leaderboard({ initialMode = 'learning', loadMode, onClose, submission = null } = {}) {
     const modes = ['learning', 'arcade'];
     const activeMode = modes.includes(initialMode) ? initialMode : 'learning';
     const focus = this._focusContext();
+    const scoreSubmission = submission?.onSubmit ? {
+      mode: modes.includes(submission.mode) ? submission.mode : activeMode,
+      score: Number.isFinite(Number(submission.score)) ? Number(submission.score) : 0,
+      onSubmit: submission.onSubmit,
+      submitting: false,
+      submitted: false,
+      rank: null,
+    } : null;
     const state = {
       activeMode,
       loadMode,
       onClose,
+      submission: scoreSubmission,
       focus,
       closed: false,
       entries: { learning: null, arcade: null },
@@ -407,6 +387,20 @@ export class Screens {
             ${modes.map((mode) => `<button type="button" class="pp-leaderboard__tab" role="tab" id="leaderboard-tab-${mode}" data-mode="${mode}" aria-controls="leaderboard-panel" aria-selected="${mode === activeMode}" tabindex="${mode === activeMode ? '0' : '-1'}">${this._leaderboardModeLabel(mode)}</button>`).join('')}
           </div>
           <p class="pp-leaderboard__hint">${t('a11y.leaderboardKeyboardHelp')}</p>
+          ${scoreSubmission ? `
+            <section class="pp-leaderboard__submit" data-el="score-submit">
+              <div class="pp-leaderboard__submit-copy">
+                <h3 data-el="submit-title">${t('ui.submitScore')}</h3>
+                <p data-el="submit-intro">${t('ui.submitScoreIntro')}</p>
+                <p class="pp-leaderboard__submit-score"><span data-el="submit-score-label">${t('ui.score')}</span> <b>${scoreSubmission.score.toLocaleString()}</b></p>
+              </div>
+              <form data-el="score-submit-form">
+                <label class="pp-sr" for="pp-score-name" data-el="submit-name-label">${t('ui.yourName')}</label>
+                <input id="pp-score-name" type="text" maxlength="20" autocomplete="nickname" required placeholder="${t('ui.yourName')}" aria-label="${t('ui.yourName')}" data-el="submit-name" />
+                <button class="pp-btn pp-btn--primary" type="submit" data-el="submit-button">${t('ui.submit')}</button>
+                <span class="pp-leaderboard__submit-msg" data-el="submit-msg" aria-live="polite"></span>
+              </form>
+            </section>` : ''}
           <section class="pp-leaderboard__panel" role="tabpanel" id="leaderboard-panel" aria-labelledby="leaderboard-tab-${activeMode}" tabindex="0" data-el="panel"></section>
         </div>
       </div>`, { escapable: true, onEscape: () => this._finishLeaderboard(state), cls: 'is-fact' });
@@ -438,6 +432,37 @@ export class Screens {
       sfx('ui.tap');
       this._loadLeaderboardMode(state, retry.dataset.mode, true);
     });
+    node.querySelector('[data-el="score-submit-form"]')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const submissionState = state.submission;
+      const input = node.querySelector('[data-el="submit-name"]');
+      const button = node.querySelector('[data-el="submit-button"]');
+      const msg = node.querySelector('[data-el="submit-msg"]');
+      if (!submissionState || submissionState.submitting || submissionState.submitted || !input || !button) return;
+      const name = input.value.trim();
+      if (!name) { input.focus(); return; }
+      submissionState.submitting = true;
+      input.disabled = true;
+      button.disabled = true;
+      sfx('ui.tap');
+      let result = null;
+      try { result = await submissionState.onSubmit(name); } catch { /* callback normalizes network errors */ }
+      submissionState.submitting = false;
+      if (result?.ok) {
+        submissionState.submitted = true;
+        submissionState.rank = Number(result.rank);
+        if (msg) {
+          msg.textContent = Number.isFinite(submissionState.rank)
+            ? t('ui.scoreSubmittedRank', { rank: submissionState.rank })
+            : t('ui.scoreSubmitted');
+        }
+        this._loadLeaderboardMode(state, submissionState.mode, true);
+      } else {
+        input.disabled = false;
+        button.disabled = false;
+        if (msg) msg.textContent = t('ui.leaderboardError');
+      }
+    });
     this._renderLeaderboard(state);
     // Start both requests without awaiting either one. Promise.resolve also
     // turns a synchronous loader failure into the tab's own error state.
@@ -460,6 +485,18 @@ export class Screens {
     this.el.querySelector('[data-act="close"]')?.setAttribute('aria-label', t('ui.close'));
     if (tablist) tablist.setAttribute('aria-label', t('ui.leaderboardTabs'));
     if (hint) hint.textContent = t('a11y.leaderboardKeyboardHelp');
+    const submitPanel = this.el.querySelector('[data-el="score-submit"]');
+    if (submitPanel && state.submission) {
+      submitPanel.querySelector('[data-el="submit-title"]').textContent = t('ui.submitScore');
+      submitPanel.querySelector('[data-el="submit-intro"]').textContent = t('ui.submitScoreIntro');
+      submitPanel.querySelector('[data-el="submit-score-label"]').textContent = t('ui.score');
+      submitPanel.querySelector('[data-el="submit-name-label"]').textContent = t('ui.yourName');
+      const input = submitPanel.querySelector('[data-el="submit-name"]');
+      input?.setAttribute('placeholder', t('ui.yourName'));
+      input?.setAttribute('aria-label', t('ui.yourName'));
+      const button = submitPanel.querySelector('[data-el="submit-button"]');
+      if (!state.submission.submitted) button.textContent = t('ui.submit');
+    }
     for (const tab of tablist?.querySelectorAll('[role="tab"]') || []) tab.textContent = this._leaderboardModeLabel(tab.dataset.mode);
     this._renderLeaderboard(state);
   }

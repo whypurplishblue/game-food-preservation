@@ -375,9 +375,12 @@ export class Game {
     this.screens.modeSelect({
       onSelect: (mode) => {
         const state = this._modeState(mode);
-        // One card, one click: unfinished runs resume automatically; new and
-        // completed runs enter at stage 1. The chooser itself stays simple.
-        this._startMode(mode, state.state === 'progress' ? state.checkpoint : 1);
+        // Learning is a guided lesson, so every tap starts a fresh run. Arcade
+        // keeps its saved checkpoint so an unfinished arcade run can resume.
+        const stageId = mode === 'learning'
+          ? 1
+          : state.state === 'progress' ? state.checkpoint : 1;
+        this._startMode(mode, stageId);
       },
       onBack: () => this.showMenu(),
     });
@@ -976,7 +979,36 @@ export class Game {
       this.mode = 'playing';
       this.input.setEnabled(true);
       this._checkStageEnd();
+    }, {
+      onAnswer: (correct) => {
+        if (correct || this.gameMode !== 'learning') return '';
+        return this._applyLearningQuizPenalty(q.methodId);
+      },
     });
+  }
+
+  _applyLearningQuizPenalty(methodId) {
+    const penalty = Math.abs(LEARNING_SCORING.quizWrong || 0);
+    if (!penalty) return '';
+
+    const before = Math.max(0, this.learningScore || 0);
+    const lost = Math.min(before, penalty);
+    this.learningScore = Math.max(0, before - penalty);
+    this._learningBreakdown.push({ methodId, quiz: true, correct: false, base: -lost, timeBonus: 0 });
+    this.hud.setScore(this.learningScore);
+
+    const p = new THREE.Vector3(0, 4.2, 2);
+    this.popups.show(new THREE.Vector3(p.x, p.y + 0.4, p.z), `-${lost}`, {
+      colour: `#${PALETTE.danger.toString(16).padStart(6, '0')}`,
+      size: 92,
+      life: 2,
+    });
+    this.stage3d.shake(0.38, 320);
+    this.quiz.shock?.();
+    const message = t('ui.pointsLost', { points: lost });
+    this.hud.flash(message, { kind: 'bad', ms: 1500 });
+    this.hud.say(message);
+    return message;
   }
 
   // ----------------------------------------------------------------- scoring
@@ -1125,25 +1157,48 @@ export class Game {
       // double-count if the retry then passes.
       if (passed) this.runScore = (this.runScore || 0) + (this.learningScore || 0);
       const isFinalLevel = this.stageId === LEARNING_STAGES.length;
+      const endOfMode = passed && isFinalLevel;
       this._save();
       const result = {
         stage: this.stage, score: this.learningScore || 0, maxScore: LEARNING_SCORING.maxPossible,
         timeBonus: this.learningTimeBonus || 0, passed, spoilt: this.spoiltCount,
         breakdown: this._learningBreakdown,
         runScore: this.runScore || 0, isFinalLevel,
+        leaderboardRank: null, leaderboardRankStatus: endOfMode ? 'loading' : null,
         onNext: () => { this.screens.close(); this.startStage(this.stageId + 1); },
         onRetry: () => { this.screens.close(); this.startStage(this.stageId); },
         onMenu: () => { this.screens.close(); this.showMenu(); },
-        onSubmitScore: isFinalLevel ? (name) => this._submitLeaderboardScore('learning', name, this.runScore || 0) : null,
         onViewLeaderboard: null,
+        onOpenSubmit: null,
       };
       const renderResults = () => {
         this._setQuickContext('overlay', true);
         this.screens.learningResults(result);
       };
+      if (endOfMode) {
+        result.onOpenSubmit = () => this.openLeaderboard('learning', renderResults, {
+          mode: 'learning',
+          score: result.runScore || 0,
+          onSubmit: async (name) => {
+            const submitted = await this._submitLeaderboardScore('learning', name, result.runScore || 0);
+            if (submitted?.ok) {
+              result.leaderboardRank = Number(submitted.rank);
+              result.leaderboardRankStatus = Number.isFinite(result.leaderboardRank) ? 'ready' : 'error';
+            }
+            return submitted;
+          },
+        });
+      }
       result.onViewLeaderboard = () => this.openLeaderboard('learning', renderResults);
       this._resultScreen = renderResults;
       renderResults();
+      if (endOfMode) {
+        this._loadLeaderboardRank('learning', result.runScore || 0).then((rank) => {
+          result.leaderboardRank = rank;
+          result.leaderboardRankStatus = Number.isFinite(rank) ? 'ready' : 'error';
+          if (this.screens._current?.kind === 'learning-results') renderResults();
+        });
+      }
       return;
     }
 
@@ -1153,6 +1208,7 @@ export class Game {
     if (passed) this.savedStage.arcade = this.stageId + 1;
     if (passed) this.runScore = (this.runScore || 0) + (this.score || 0);
     const isFinalStage = this.stageId === STAGES.length;
+    const endOfMode = passed && isFinalStage;
     this._save();
     this._setQuickContext('overlay', true);
 
@@ -1164,23 +1220,58 @@ export class Game {
       bestCombo: this.bestCombo,
       learned: [...this.methodsUsed],
       runScore: this.runScore || 0, isFinalLevel: isFinalStage,
+      leaderboardRank: null, leaderboardRankStatus: endOfMode ? 'loading' : null,
       onNext: () => { this.screens.close(); this.startStage(this.stageId + 1); },
       onRetry: () => { this.screens.close(); this.startStage(this.stageId); },
       onMenu: () => { this.screens.close(); this.showMenu(); },
-      onSubmitScore: isFinalStage ? (name) => this._submitLeaderboardScore('arcade', name, this.runScore || 0) : null,
       onViewLeaderboard: null,
+      onOpenSubmit: null,
     };
     const renderResults = () => {
       this._setQuickContext('overlay', true);
       this.screens.results(result);
     };
+    if (endOfMode) {
+      result.onOpenSubmit = () => this.openLeaderboard('arcade', renderResults, {
+        mode: 'arcade',
+        score: result.runScore || 0,
+        onSubmit: async (name) => {
+          const submitted = await this._submitLeaderboardScore('arcade', name, result.runScore || 0);
+          if (submitted?.ok) {
+            result.leaderboardRank = Number(submitted.rank);
+            result.leaderboardRankStatus = Number.isFinite(result.leaderboardRank) ? 'ready' : 'error';
+          }
+          return submitted;
+        },
+      });
+    }
     result.onViewLeaderboard = () => this.openLeaderboard('arcade', renderResults);
     this._resultScreen = renderResults;
     renderResults();
+    if (endOfMode) {
+      this._loadLeaderboardRank('arcade', result.runScore || 0).then((rank) => {
+        result.leaderboardRank = rank;
+        result.leaderboardRankStatus = Number.isFinite(rank) ? 'ready' : 'error';
+        if (this.screens._current?.kind === 'results') renderResults();
+      });
+    }
   }
 
   // ------------------------------------------------------------- leaderboard
-  openLeaderboard(initialMode = 'learning', back) {
+  async _loadLeaderboardRank(mode, score) {
+    try {
+      const params = new URLSearchParams({ mode, score: String(score) });
+      const res = await fetch(`/api/leaderboard/top?${params.toString()}`);
+      if (!res.ok) throw new Error(`Leaderboard rank request failed: ${res.status}`);
+      const data = await res.json();
+      const rank = Number(data.rank);
+      return Number.isFinite(rank) && rank > 0 ? rank : null;
+    } catch {
+      return null;
+    }
+  }
+
+  openLeaderboard(initialMode = 'learning', back, submission = null) {
     const wasPlaying = this.mode === 'playing';
     if (wasPlaying) this.mode = 'paused';
     this.input.setEnabled(false);
@@ -1202,7 +1293,7 @@ export class Game {
       const data = await res.json();
       return data.entries || [];
     };
-    this.screens.leaderboard({ initialMode, loadMode, onClose: done });
+    this.screens.leaderboard({ initialMode, loadMode, onClose: done, submission });
   }
 
   async _submitLeaderboardScore(mode, name, score) {

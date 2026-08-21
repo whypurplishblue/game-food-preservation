@@ -3,9 +3,9 @@
  *
  * Deliberate design choices, all in service of recall rather than scoring:
  *  - The question is asked AFTER the animation, while the image is fresh.
- *  - A wrong answer is never punished with a dead end: the correct option is
- *    highlighted and the verbatim exam sentence from the notes is shown, then
- *    the same question type comes back later in the session.
+ *  - A wrong answer never creates a dead end: the correct option is highlighted
+ *    and the verbatim exam sentence from the notes is shown. Learning mode may
+ *    still apply its explicit score penalty through the answer callback.
  *  - The exam sentence is shown on BOTH outcomes. Right answers need the
  *    wording reinforced just as much as wrong ones do.
  */
@@ -26,8 +26,11 @@ export class QuizCard {
   /**
    * @param {object} q from quiz.makeQuestion
    * @param {function} onDone (correct:boolean, msTaken:number) => void
+   * @param {object} [hooks]
+   * @param {function} [hooks.onAnswer] called immediately after an option is chosen;
+   *   returning text displays it in the reveal panel
    */
-  ask(q, onDone) {
+  ask(q, onDone, { onAnswer } = {}) {
     const m = METHODS[q.methodId];
     const accent = `#${(m?.colour ?? 0x66bb6a).toString(16).padStart(6, '0')}`;
     // The ribbon names what is being asked: "Why it works" for mechanism
@@ -47,6 +50,7 @@ export class QuizCard {
         <div class="pp-quiz__options" role="group"></div>
         <div class="pp-quiz__reveal" hidden>
           <p class="pp-quiz__verdict"></p>
+          <p class="pp-quiz__delta" hidden></p>
           <p class="pp-quiz__exam"></p>
           <button class="pp-btn pp-btn--confirm pp-quiz__next" type="button">${t('ui.next')}</button>
         </div>
@@ -80,6 +84,14 @@ export class QuizCard {
       }
       sfx(correct ? 'quiz.right' : 'quiz.wrong');
 
+      const feedback = onAnswer?.(correct, ms);
+      const delta = reveal.querySelector('.pp-quiz__delta');
+      if (feedback) {
+        delta.hidden = false;
+        delta.textContent = feedback;
+        delta.className = `pp-quiz__delta is-${correct ? 'right' : 'wrong'}`;
+      }
+
       reveal.hidden = false;
       reveal.querySelector('.pp-quiz__verdict').textContent = correct ? t('ui.correct') : t('ui.wrong');
       reveal.querySelector('.pp-quiz__verdict').className = `pp-quiz__verdict is-${correct ? 'right' : 'wrong'}`;
@@ -110,9 +122,34 @@ export class QuizCard {
   close() {
     window.removeEventListener('keydown', this._onKey);
     this.el.classList.remove('is-in');
+    this._clearShock();
     this.el.hidden = true;
     this.el.innerHTML = '';
   }
 
   get isOpen() { return !this.el.hidden; }
+
+  /** Give the quiz card a brief, unmistakable error jolt. */
+  shock() {
+    if (this.el.hidden) return;
+    this._clearShock();
+    const onAnimationEnd = (event) => {
+      if (event.target === this.el && event.animationName === 'quizshake') this._clearShock();
+    };
+    this._shockAnimationEnd = onAnimationEnd;
+    this.el.addEventListener('animationend', onAnimationEnd);
+    this._shockTimer = setTimeout(() => this._clearShock(), 500);
+    this.el.classList.remove('is-shock');
+    // Force a reflow so consecutive wrong answers can replay the animation.
+    void this.el.offsetWidth;
+    this.el.classList.add('is-shock');
+  }
+
+  _clearShock() {
+    this.el.classList.remove('is-shock');
+    if (this._shockTimer) clearTimeout(this._shockTimer);
+    if (this._shockAnimationEnd) this.el.removeEventListener('animationend', this._shockAnimationEnd);
+    this._shockTimer = null;
+    this._shockAnimationEnd = null;
+  }
 }
