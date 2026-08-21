@@ -7,7 +7,7 @@
  * sections, so the game covers Unit 8 as a whole even though only six methods
  * are hands-on.
  */
-import { t, tList, methodName, mechShort, methodMechShort, foodName, AVAILABLE_LANGS, getLang, setLang } from '../content/i18n.js';
+import { t, tList, methodName, mechShort, methodMechShort, foodName } from '../content/i18n.js';
 import { METHODS, FOODS, SCORING } from '../content/curriculum.js';
 import { CREDIT_CATEGORIES } from '../content/credits.js';
 import { sfx, audio } from '../core/Audio.js';
@@ -30,7 +30,17 @@ export class Screens {
     this.el = el('div', 'pp-screens');
     this.el.hidden = true;
     root.appendChild(this.el);
-    this._onKey = (e) => { if (e.key === 'Escape' && this._escapable) this._escape?.(); };
+    this._current = null;
+    this._leaderboardState = null;
+    this._onKey = (e) => {
+      if (e.key === 'Escape' && this._escapable) {
+        // Clear the handler before invoking it. A close callback can render a
+        // new screen synchronously, and that screen must own the next Escape.
+        const escape = this._escape;
+        this._escape = null;
+        escape?.();
+      }
+    };
     window.addEventListener('keydown', this._onKey);
   }
 
@@ -46,75 +56,157 @@ export class Screens {
   }
 
   close() {
+    this._leaderboardState && (this._leaderboardState.closed = true);
+    this._leaderboardState = null;
+    this._current = null;
     this.el.hidden = true;
     this.el.className = 'pp-screens';
     this.el.innerHTML = '';
     this._escapable = false;
+    this._escape = null;
   }
 
   get isOpen() { return !this.el.hidden; }
 
+  /**
+   * Rerender the currently supported menu screen after a locale change.
+   * Gameplay-adjacent screens deliberately do not register a refresh closure:
+   * their labels are owned by the HUD/gameplay layer and they should not be
+   * torn down while a player is interacting with them.
+   */
+  refreshCurrent() {
+    if (!this.isOpen) return false;
+    this._current?.refresh?.();
+    return !!this._current;
+  }
+
+  _setCurrent(kind, refresh, focus = null) {
+    this._current = { kind, refresh, focus };
+  }
+
+  _focusContext() {
+    const active = document.activeElement;
+    if (!active || active === document.body) return null;
+    const context = {
+      element: active,
+      act: active.dataset?.act || null,
+      mode: active.dataset?.mode || null,
+    };
+    return context;
+  }
+
+  _restoreFocus(context, fallback = null) {
+    const restore = () => {
+      if (context?.element?.isConnected && !context.element.disabled) {
+        context.element.focus({ preventScroll: true });
+        return;
+      }
+      let target = null;
+      if (context?.act) target = this.el.querySelector(`[data-act="${context.act}"]`);
+      if (!target && context?.mode) target = this.el.querySelector(`[data-mode="${context.mode}"]`);
+      if (!target && fallback) target = this.el.querySelector(fallback);
+      target?.focus({ preventScroll: true });
+    };
+    // The close callbacks render their destination synchronously. Restore
+    // immediately for keyboard callers that inspect focus right after
+    // Escape/click, then repeat on the next frame for animated transitions.
+    restore();
+    requestAnimationFrame(restore);
+  }
+
+  _closeTo(onClose, focusContext, fallback = '[data-act="play"]') {
+    this.close();
+    onClose?.();
+    this._restoreFocus(focusContext, fallback);
+  }
+
   // ------------------------------------------------------------------ title
   title(opts) {
-    const {
-      onPlayArcade, onContinueArcade, hasSaveArcade,
-      onPlayLearning, onContinueLearning, hasSaveLearning,
-      onFactBook, onCredits, onLeaderboard,
-    } = opts;
-    const langs = AVAILABLE_LANGS.map((l) =>
-      `<button class="pp-lang${l === getLang() ? ' is-on' : ''}" data-lang="${l}">${l.toUpperCase()}</button>`).join('');
-    const modeCard = (kind, { name, desc, hasSave, playAct, continueAct, boardAct }) => `
-      <div class="pp-title__mode">
-        <h3>${name}</h3>
-        <p>${desc}</p>
-        ${hasSave ? `<button class="pp-btn" data-act="${continueAct}">${t('ui.continue')}</button>` : ''}
-        <button class="pp-btn pp-btn--big pp-btn--primary" data-act="${playAct}">${t('ui.play')}</button>
-        <button class="pp-btn" data-act="${boardAct}">🏆 ${t('ui.leaderboard')}</button>
-      </div>`;
+    const { onPlay, onFactBook, onCredits, onLeaderboard } = opts || {};
+    this._setCurrent('title', () => this.title(opts));
     const node = this._open(`
-      <div class="pp-title">
-        <div class="pp-title__logo">
-          <span class="pp-title__word1">Preservation</span>
-          <span class="pp-title__word2">Panic!</span>
+      <div class="pp-home pp-title">
+        <h1 class="pp-home__logo pp-title__logo" aria-label="${t('ui.title')}">
+          <span class="pp-title__word1" aria-hidden="true">Preservation</span>
+          <span class="pp-title__word2" aria-hidden="true">Panic!</span>
+        </h1>
+        <p class="pp-home__subtitle pp-title__sub">${t('ui.subtitle')}</p>
+        <div class="pp-home__actions pp-title__actions">
+          <button class="pp-btn pp-btn--big pp-btn--primary" data-act="play">${t('ui.play')}</button>
         </div>
-        <p class="pp-title__sub">${t('ui.subtitle')}</p>
-        <div class="pp-title__actions pp-title__modes">
-          ${modeCard('learning', {
-            name: t('ui.learningMode'), desc: t('ui.learningModeDesc'), hasSave: hasSaveLearning,
-            playAct: 'playLearning', continueAct: 'continueLearning', boardAct: 'boardLearning',
-          })}
-          ${modeCard('arcade', {
-            name: t('ui.arcadeMode'), desc: t('ui.arcadeModeDesc'), hasSave: hasSaveArcade,
-            playAct: 'playArcade', continueAct: 'continueArcade', boardAct: 'boardArcade',
-          })}
-        </div>
-        <div class="pp-title__actions">
-          <button class="pp-btn" data-act="fact">📖 ${t('ui.factBook')}</button>
-        </div>
-        <div class="pp-title__langs">${langs}</div>
-        <p class="pp-title__hint">${t('a11y.keyboardHelp')}</p>
-        <button class="pp-title__credits" data-act="credits">© ${t('ui.credits')}</button>
+        <nav class="pp-home__utilities pp-title__utilities" aria-label="${t('ui.menuUtilities', {})}">
+          <button class="pp-btn pp-home__utility pp-title__utility" data-act="fact">📖 ${t('ui.factBook')}</button>
+          <button class="pp-btn pp-home__utility pp-title__utility" data-act="boards">🏆 ${t('ui.leaderboard')}</button>
+          <button class="pp-btn pp-home__utility pp-title__utility" data-act="credits">© ${t('ui.credits')}</button>
+        </nav>
+        <p class="pp-home__hint pp-title__hint">${t('a11y.menuKeyboardHelp')}</p>
       </div>`, { cls: 'is-title' });
 
-    node.querySelector('[data-act="playArcade"]').addEventListener('click', () => { sfx('ui.tap'); onPlayArcade(); });
-    node.querySelector('[data-act="playLearning"]').addEventListener('click', () => { sfx('ui.tap'); onPlayLearning(); });
-    node.querySelector('[data-act="continueArcade"]')?.addEventListener('click', () => { sfx('ui.tap'); onContinueArcade(); });
-    node.querySelector('[data-act="continueLearning"]')?.addEventListener('click', () => { sfx('ui.tap'); onContinueLearning(); });
-    node.querySelector('[data-act="boardArcade"]').addEventListener('click', () => { sfx('ui.open'); onLeaderboard('arcade'); });
-    node.querySelector('[data-act="boardLearning"]').addEventListener('click', () => { sfx('ui.open'); onLeaderboard('learning'); });
-    node.querySelector('[data-act="fact"]').addEventListener('click', () => { sfx('ui.open'); onFactBook(); });
-    node.querySelector('[data-act="credits"]').addEventListener('click', () => { sfx('ui.open'); onCredits(); });
-    for (const b of node.querySelectorAll('.pp-lang')) {
-      b.addEventListener('click', () => {
-        setLang(b.dataset.lang);
-        sfx('ui.tap');
-        this.title(opts);
-      });
-    }
+    node.querySelector('[data-act="play"]').addEventListener('click', () => { sfx('ui.tap'); onPlay?.(); });
+    node.querySelector('[data-act="boards"]').addEventListener('click', () => {
+      sfx('ui.open');
+      // Home's contextual leaderboard starts on Learning. Game can ignore the
+      // argument when it already bound the mode in its callback.
+      onLeaderboard?.('learning');
+    });
+    node.querySelector('[data-act="fact"]').addEventListener('click', () => { sfx('ui.open'); onFactBook?.(); });
+    node.querySelector('[data-act="credits"]').addEventListener('click', () => { sfx('ui.open'); onCredits?.(); });
+    return node;
+  }
+
+  // ---------------------------------------------------------- mode selection
+  /** Two image-led choices. Each complete card is the control. */
+  modeSelect({ onSelect, onBack } = {}) {
+    const modeIds = ['learning', 'arcade'];
+    const focus = this._focusContext();
+    const modeLabel = (mode) => mode === 'learning' ? t('ui.learningMode') : t('ui.arcadeMode');
+    const modeDesc = (mode) => mode === 'learning' ? t('ui.learningModeDesc') : t('ui.arcadeModeDesc');
+    const modeImage = (mode) => mode === 'learning'
+      ? 'assets/ui/mode-learn.webp'
+      : 'assets/ui/mode-arcade.webp';
+    const modeCard = (mode) => `<button type="button" class="pp-mode-card pp-mode-card--${mode}" data-mode="${mode}">
+      <span class="pp-mode-card__art"><img src="${modeImage(mode)}" alt="" draggable="false"></span>
+      <span class="pp-mode-card__label">
+        <strong>${modeLabel(mode)}</strong>
+        <small>${modeDesc(mode)}</small>
+      </span>
+    </button>`;
+
+    const goBack = () => {
+      sfx('ui.back');
+      this.close();
+      onBack?.();
+      this._restoreFocus(focus);
+    };
+
+    const render = () => {
+      const node = this._open(`
+        <button class="pp-btn pp-mode-select__back" data-act="back">← ${t('ui.back')}</button>
+        <div class="pp-mode-select">
+          <header class="pp-mode-select__header"><h1>${t('ui.modeSelection')}</h1><p>${t('ui.chooseMode')}</p></header>
+          <div class="pp-mode-select__cards">${modeIds.map(modeCard).join('')}</div>
+          <p class="pp-mode-select__hint">${t('a11y.modeKeyboardHelp')}</p>
+        </div>`, { escapable: true, onEscape: goBack, cls: 'is-mode-select' });
+
+      node.querySelector('[data-act="back"]').addEventListener('click', goBack);
+      for (const button of node.querySelectorAll('.pp-mode-card[data-mode]')) {
+        button.addEventListener('click', () => {
+          sfx('ui.tap');
+          onSelect?.(button.dataset.mode);
+        });
+      }
+      return node;
+    };
+
+    this._setCurrent('mode-select', render, focus);
+    return render();
   }
 
   // ------------------------------------------------------------ stage brief
   stageBrief(stage, unlocked, onStart) {
+    // Stage briefs are intentionally not language-refreshable: gameplay owns
+    // the transition into the brief and should not lose its pending start.
+    this._current = null;
     const chips = unlocked.map((id) => {
       const m = METHODS[id];
       return `<li style="--c:${hex(m.colour)}">
@@ -133,7 +225,11 @@ export class Screens {
   }
 
   // ---------------------------------------------------------------- results
-  results({ stage, score, stars, preserved, target, spoilt, accuracy, bestCombo, learned, passed, runScore, isFinalLevel, onNext, onRetry, onMenu, onSubmitScore, onViewLeaderboard }) {
+  results(opts) {
+    const remembered = this._current?.kind === 'results' ? this._captureResultFormState() : opts?._formState;
+    const renderOpts = remembered ? { ...opts, _formState: remembered } : opts;
+    const { stage, score, stars, preserved, target, spoilt, accuracy, bestCombo, learned, passed, runScore, isFinalLevel, onNext, onRetry, onMenu, onSubmitScore, onViewLeaderboard, _formState } = renderOpts;
+    this._setCurrent('results', () => this.results(renderOpts));
     const starHtml = [0, 1, 2].map((i) =>
       `<span class="pp-result__star${i < stars ? ' is-on' : ''}" style="--d:${i * 0.18}s">★</span>`).join('');
     const learnedHtml = learned.length
@@ -165,6 +261,7 @@ export class Screens {
     node.querySelector('[data-act="retry"]').addEventListener('click', () => { sfx('ui.tap'); onRetry(); });
     node.querySelector('[data-act="board"]').addEventListener('click', () => { sfx('ui.open'); onViewLeaderboard(); });
     node.querySelector('[data-act="menu"]').addEventListener('click', () => { sfx('ui.back'); onMenu(); });
+    this._restoreResultFormState(node, _formState);
     this._wireScoreSubmit(node, onSubmitScore);
     if (passed) sfx('stage.win'); else sfx('stage.lose');
   }
@@ -208,8 +305,35 @@ export class Screens {
     });
   }
 
+  _captureResultFormState() {
+    const input = this.el.querySelector('[data-el="name"]');
+    if (!input) return null;
+    const button = this.el.querySelector('[data-act="submit"]');
+    const msg = this.el.querySelector('[data-el="msg"]');
+    return {
+      value: input.value,
+      inputDisabled: input.disabled,
+      buttonDisabled: !!button?.disabled,
+      message: msg?.textContent || '',
+    };
+  }
+
+  _restoreResultFormState(node, state) {
+    if (!state) return;
+    const input = node.querySelector('[data-el="name"]');
+    const button = node.querySelector('[data-act="submit"]');
+    const msg = node.querySelector('[data-el="msg"]');
+    if (input) { input.value = state.value || ''; input.disabled = !!state.inputDisabled; }
+    if (button) button.disabled = !!state.buttonDisabled;
+    if (msg) msg.textContent = state.message || '';
+  }
+
   // -------------------------------------------------------- learning results
-  learningResults({ stage, score, maxScore, timeBonus, passed, spoilt, breakdown, runScore, isFinalLevel, onNext, onRetry, onMenu, onSubmitScore, onViewLeaderboard }) {
+  learningResults(opts) {
+    const remembered = this._current?.kind === 'learning-results' ? this._captureResultFormState() : opts?._formState;
+    const renderOpts = remembered ? { ...opts, _formState: remembered } : opts;
+    const { stage, score, maxScore, timeBonus, passed, spoilt, breakdown, runScore, isFinalLevel, onNext, onRetry, onMenu, onSubmitScore, onViewLeaderboard, _formState } = renderOpts;
+    this._setCurrent('learning-results', () => this.learningResults(renderOpts));
     const correctnessScore = score - timeBonus;
     const percent = maxScore ? Math.round((correctnessScore / maxScore) * 100) : 0;
     const rows = breakdown.map((b) => {
@@ -244,31 +368,170 @@ export class Screens {
     node.querySelector('[data-act="retry"]').addEventListener('click', () => { sfx('ui.tap'); onRetry(); });
     node.querySelector('[data-act="board"]').addEventListener('click', () => { sfx('ui.open'); onViewLeaderboard(); });
     node.querySelector('[data-act="menu"]').addEventListener('click', () => { sfx('ui.back'); onMenu(); });
+    this._restoreResultFormState(node, _formState);
     this._wireScoreSubmit(node, onSubmitScore);
     if (passed) sfx('stage.win'); else sfx('stage.lose');
   }
 
   // ----------------------------------------------------------- leaderboard
-  leaderboard({ mode, entries, loading, error, onClose }) {
-    const title = mode === 'learning' ? t('ui.learningMode') : t('ui.arcadeMode');
-    const body = loading
-      ? `<p class="pp-leaderboard__status">${t('ui.loading')}</p>`
-      : error
-        ? `<p class="pp-leaderboard__status">${t('ui.leaderboardError')}</p>`
-        : !entries?.length
-          ? `<p class="pp-leaderboard__status">${t('ui.noScoresYet')}</p>`
-          : `<ol class="pp-leaderboard__list">${
-              entries.map((e) => `<li><span class="pp-leaderboard__rank">${e.rank}</span><span class="pp-leaderboard__name">${esc(e.name)}</span><b>${e.score.toLocaleString()}</b></li>`).join('')
-            }</ol>`;
+  /**
+   * The two mode boards share one screen, but never share request state. Both
+   * requests begin together; switching tabs only reveals cached state and a
+   * retry only refetches the tab that failed.
+   */
+  leaderboard({ initialMode = 'learning', loadMode, onClose } = {}) {
+    const modes = ['learning', 'arcade'];
+    const activeMode = modes.includes(initialMode) ? initialMode : 'learning';
+    const focus = this._focusContext();
+    const state = {
+      activeMode,
+      loadMode,
+      onClose,
+      focus,
+      closed: false,
+      entries: { learning: null, arcade: null },
+      status: { learning: 'loading', arcade: 'loading' },
+      request: { learning: 0, arcade: 0 },
+    };
+    this._leaderboardState = state;
+    this._setCurrent('leaderboard', () => this._refreshLeaderboard(state), focus);
+
     const node = this._open(`
       <div class="pp-fact pp-leaderboard">
-        <header class="pp-fact__top">
-          <h2>🏆 ${t('ui.leaderboard')} — ${title}</h2>
+        <header class="pp-fact__top pp-leaderboard__header">
+          <h2 data-el="title">🏆 ${t('ui.leaderboard')}</h2>
           <button class="pp-icon-btn" data-act="close" aria-label="${t('ui.close')}">✕</button>
         </header>
-        <div class="pp-fact__scroll">${body}</div>
-      </div>`, { escapable: true, onEscape: onClose, cls: 'is-fact' });
-    node.querySelector('[data-act="close"]').addEventListener('click', () => { sfx('ui.back'); onClose(); });
+        <div class="pp-leaderboard__body">
+          <div class="pp-leaderboard__tabs" role="tablist" aria-label="${t('ui.leaderboardTabs')}" data-el="tabs">
+            ${modes.map((mode) => `<button type="button" class="pp-leaderboard__tab" role="tab" id="leaderboard-tab-${mode}" data-mode="${mode}" aria-controls="leaderboard-panel" aria-selected="${mode === activeMode}" tabindex="${mode === activeMode ? '0' : '-1'}">${this._leaderboardModeLabel(mode)}</button>`).join('')}
+          </div>
+          <p class="pp-leaderboard__hint">${t('a11y.leaderboardKeyboardHelp')}</p>
+          <section class="pp-leaderboard__panel" role="tabpanel" id="leaderboard-panel" aria-labelledby="leaderboard-tab-${activeMode}" tabindex="0" data-el="panel"></section>
+        </div>
+      </div>`, { escapable: true, onEscape: () => this._finishLeaderboard(state), cls: 'is-fact' });
+
+    node.querySelector('[data-act="close"]').addEventListener('click', () => { sfx('ui.back'); this._finishLeaderboard(state); });
+    const tabs = node.querySelector('[data-el="tabs"]');
+    tabs.addEventListener('click', (event) => {
+      const tab = event.target.closest('[role="tab"]');
+      if (!tab || !tabs.contains(tab)) return;
+      this._selectLeaderboardTab(state, tab.dataset.mode, true);
+    });
+    tabs.addEventListener('keydown', (event) => {
+      const tab = event.target.closest('[role="tab"]');
+      if (!tab) return;
+      const index = modes.indexOf(tab.dataset.mode);
+      let next = null;
+      if (event.key === 'ArrowRight') next = (index + 1) % modes.length;
+      else if (event.key === 'ArrowLeft') next = (index - 1 + modes.length) % modes.length;
+      else if (event.key === 'Home') next = 0;
+      else if (event.key === 'End') next = modes.length - 1;
+      if (next == null) return;
+      event.preventDefault();
+      this._selectLeaderboardTab(state, modes[next], true);
+      node.querySelector(`[role="tab"][data-mode="${modes[next]}"]`)?.focus({ preventScroll: true });
+    });
+    node.querySelector('[data-el="panel"]').addEventListener('click', (event) => {
+      const retry = event.target.closest('[data-act="retry"]');
+      if (!retry) return;
+      sfx('ui.tap');
+      this._loadLeaderboardMode(state, retry.dataset.mode, true);
+    });
+    this._renderLeaderboard(state);
+    // Start both requests without awaiting either one. Promise.resolve also
+    // turns a synchronous loader failure into the tab's own error state.
+    for (const mode of modes) this._loadLeaderboardMode(state, mode);
+    return node;
+  }
+
+  _leaderboardModeLabel(mode) {
+    return mode === 'learning' ? t('ui.leaderboardLearning') : t('ui.leaderboardArcade');
+  }
+
+  _refreshLeaderboard(state) {
+    if (!state || state.closed || this._leaderboardState !== state) return;
+    const panel = this.el.querySelector('[data-el="panel"]');
+    if (!panel) return;
+    const title = this.el.querySelector('[data-el="title"]');
+    const tablist = this.el.querySelector('[data-el="tabs"]');
+    const hint = this.el.querySelector('.pp-leaderboard__hint');
+    if (title) title.textContent = `🏆 ${t('ui.leaderboard')}`;
+    this.el.querySelector('[data-act="close"]')?.setAttribute('aria-label', t('ui.close'));
+    if (tablist) tablist.setAttribute('aria-label', t('ui.leaderboardTabs'));
+    if (hint) hint.textContent = t('a11y.leaderboardKeyboardHelp');
+    for (const tab of tablist?.querySelectorAll('[role="tab"]') || []) tab.textContent = this._leaderboardModeLabel(tab.dataset.mode);
+    this._renderLeaderboard(state);
+  }
+
+  _renderLeaderboard(state) {
+    if (!state || state.closed || this._leaderboardState !== state) return;
+    const panel = this.el.querySelector('[data-el="panel"]');
+    const tablist = this.el.querySelector('[data-el="tabs"]');
+    if (!panel || !tablist) return;
+    const active = state.activeMode;
+    for (const tab of tablist.querySelectorAll('[role="tab"]')) {
+      const selected = tab.dataset.mode === active;
+      tab.setAttribute('aria-selected', String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+    }
+    panel.setAttribute('aria-labelledby', `leaderboard-tab-${active}`);
+    const status = state.status[active];
+    panel.setAttribute('aria-busy', String(status === 'loading'));
+    if (status === 'loading') {
+      panel.innerHTML = `<p class="pp-leaderboard__status" role="status">${t('ui.leaderboardLoading')}</p>`;
+      return;
+    }
+    if (status === 'error') {
+      panel.innerHTML = `<div class="pp-leaderboard__status pp-leaderboard__error" role="alert"><p>${t('ui.leaderboardError')}</p><button class="pp-btn" data-act="retry" data-mode="${active}">${t('ui.leaderboardRetry')}</button></div>`;
+      return;
+    }
+    const entries = state.entries[active] || [];
+    if (!entries.length) {
+      panel.innerHTML = `<p class="pp-leaderboard__status" role="status">${t('ui.leaderboardEmpty')}</p>`;
+      return;
+    }
+    panel.innerHTML = `<ol class="pp-leaderboard__list">${entries.map((entry, index) => {
+      const rank = Number.isFinite(Number(entry?.rank)) ? Number(entry.rank) : index + 1;
+      const score = Number.isFinite(Number(entry?.score)) ? Number(entry.score).toLocaleString() : '0';
+      return `<li><span class="pp-leaderboard__rank">${rank}</span><span class="pp-leaderboard__name">${esc(entry?.name ?? '')}</span><b>${score}</b></li>`;
+    }).join('')}</ol>`;
+  }
+
+  _selectLeaderboardTab(state, mode, focus = false) {
+    if (!state || state.closed || !['learning', 'arcade'].includes(mode)) return;
+    state.activeMode = mode;
+    this._renderLeaderboard(state);
+    if (focus) this.el.querySelector(`[role="tab"][data-mode="${mode}"]`)?.focus({ preventScroll: true });
+  }
+
+  _loadLeaderboardMode(state, mode, retry = false) {
+    if (!state || state.closed || this._leaderboardState !== state) return;
+    if (!retry && state.status[mode] !== 'loading') return;
+    const request = ++state.request[mode];
+    state.status[mode] = 'loading';
+    state.entries[mode] = null;
+    this._renderLeaderboard(state);
+    Promise.resolve().then(() => state.loadMode?.(mode)).then((entries) => {
+      if (state.closed || this._leaderboardState !== state || state.request[mode] !== request) return;
+      state.entries[mode] = Array.isArray(entries) ? entries : [];
+      state.status[mode] = state.entries[mode].length ? 'ready' : 'empty';
+      this._renderLeaderboard(state);
+    }).catch(() => {
+      if (state.closed || this._leaderboardState !== state || state.request[mode] !== request) return;
+      state.entries[mode] = null;
+      state.status[mode] = 'error';
+      this._renderLeaderboard(state);
+    });
+  }
+
+  _finishLeaderboard(state) {
+    if (!state || state.closed || this._leaderboardState !== state) return;
+    state.closed = true;
+    const { onClose, focus } = state;
+    this.close();
+    onClose?.();
+    this._restoreFocus(focus);
   }
 
   // -------------------------------------------------------------- fact book
@@ -280,6 +543,8 @@ export class Screens {
    * reference layer is never simply missing.
    */
   factBook(onClose) {
+    const focus = this._focusContext();
+    this._current = null;
     const methodCard = (m) => {
       const foods = (m.foods || []).map((f) => FOODS[f] ? foodName(f) : t(`foods.${f}`)).join(' · ');
       return `<article class="pp-fact__card${m.playable ? '' : ' is-extra'}" style="--c:${hex(m.colour)}">
@@ -325,12 +590,17 @@ export class Screens {
             <ol>${tList('importance.items').map((s) => `<li>${s}</li>`).join('')}</ol>
           </section>
         </div>
-      </div>`, { escapable: true, onEscape: onClose, cls: 'is-fact' });
-    node.querySelector('[data-act="close"]').addEventListener('click', () => { sfx('ui.back'); onClose(); });
+      </div>`, { escapable: true, onEscape: () => this._closeTo(onClose, focus), cls: 'is-fact' });
+    node.querySelector('[data-act="close"]').addEventListener('click', () => {
+      sfx('ui.back');
+      this._closeTo(onClose, focus);
+    });
   }
 
   // -------------------------------------------------------------- credits
   credits(onClose) {
+    const focus = this._focusContext();
+    this._setCurrent('credits', () => this.credits(onClose), focus);
     // Sourced from src/content/credits.js — the single place attribution
     // lives. tools/check-credits.mjs keeps the model list honest against what
     // is actually on disk, so this screen never drifts out of date.
@@ -356,12 +626,16 @@ export class Screens {
           <p class="pp-credits__intro">${t('ui.creditsIntro')}</p>
           ${sections}
         </div>
-      </div>`, { escapable: true, onEscape: onClose, cls: 'is-fact' });
-    node.querySelector('[data-act="close"]').addEventListener('click', () => { sfx('ui.back'); onClose(); });
+      </div>`, { escapable: true, onEscape: () => this._closeTo(onClose, focus), cls: 'is-fact' });
+    node.querySelector('[data-act="close"]').addEventListener('click', () => {
+      sfx('ui.back');
+      this._closeTo(onClose, focus);
+    });
   }
 
   // ------------------------------------------------------------------ pause
   pause({ onResume, onRestart, onMenu, onFactBook, onCredits, settings, onSetting }) {
+    this._current = null;
     const node = this._open(`
       <div class="pp-pause">
         <h2>${t('ui.pause')}</h2>

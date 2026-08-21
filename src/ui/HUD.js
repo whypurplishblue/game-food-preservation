@@ -50,10 +50,14 @@ export class HUD {
     this.factBtn = el('button', 'pp-icon-btn', '📖');
     this.factBtn.title = t('ui.factBook');
     this.factBtn.setAttribute('aria-label', t('ui.factBook'));
+    // QuickControls moves its mute control into this slot while gameplay is
+    // active. Keeping the slot immediately before Pause makes the control
+    // discoverable without changing the HUD's score/status layout.
+    this.quickSlot = el('div', 'pp-hud__quick-slot');
     this.pauseBtn = el('button', 'pp-icon-btn', '⏸');
     this.pauseBtn.title = t('ui.pause');
     this.pauseBtn.setAttribute('aria-label', t('ui.pause'));
-    right.append(this.goalEl, this.starsEl, this.factBtn, this.pauseBtn);
+    right.append(this.goalEl, this.starsEl, this.factBtn, this.quickSlot, this.pauseBtn);
 
     top.append(left, mid, right);
 
@@ -112,6 +116,11 @@ export class HUD {
     this.microbe.querySelector('h3').textContent = t('ui.microbeMeter');
     this.microbe.querySelector('.pp-microbe__hint').textContent = t('ui.microbeMeterHint');
     this.peekBtn.innerHTML = `💡 ${t('ui.preservationMemory')}`;
+    this.comboEl.querySelector('.pp-combo__label').textContent = t('ui.combo');
+    this.factBtn.title = t('ui.factBook');
+    this.factBtn.setAttribute('aria-label', t('ui.factBook'));
+    this.pauseBtn.title = t('ui.pause');
+    this.pauseBtn.setAttribute('aria-label', t('ui.pause'));
   }
 
   /**
@@ -192,5 +201,11 @@ export class HUD {
     this.factBtn.title = v ? t('ui.factBook') : t('ui.factBookLocked');
   }
 
-  setVisible(v) { this.root.classList.toggle('is-hidden', !v); }
+  setVisible(v) {
+    this.root.classList.toggle('is-hidden', !v);
+    this.root.inert = !v;
+    for (const button of this.root.querySelectorAll('button')) button.tabIndex = v ? 0 : -1;
+    if (v) this.root.removeAttribute('aria-hidden');
+    else this.root.setAttribute('aria-hidden', 'true');
+  }
 }

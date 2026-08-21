@@ -3,13 +3,15 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'fs';
 mkdirSync('shots', { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b = await chromium.launch({ executablePath: process.env.PP_CHROME || undefined,
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const p = await b.newPage({ viewport: { width: 1000, height: 700 } });
 p.on('pageerror', (e) => console.log('PAGEERROR', String(e).slice(0, 250)));
 await p.goto('http://localhost:4173/', { waitUntil: 'networkidle' });
 await p.waitForFunction(() => !!window.__pp, null, { timeout: 45000 });
 await p.click('[data-act="play"]');
+await sleep(300);
+await p.click('[data-mode="arcade"]');
 await sleep(300);
 await p.evaluate(() => { window.__pp.game.screens.close(); window.__pp.game.startStage(3); });
 await sleep(300);

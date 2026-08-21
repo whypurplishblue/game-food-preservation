@@ -9,7 +9,7 @@ import { chromium } from 'playwright';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const browser = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  executablePath: process.env.PP_CHROME || undefined,
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'],
 });
 const p = await browser.newPage({ viewport: { width: 900, height: 600 } });
@@ -21,6 +21,8 @@ await p.goto('http://localhost:4173/', { waitUntil: 'networkidle' });
 await sleep(1500);
 
 await p.click('[data-act="play"]').catch(() => {});
+await sleep(300);
+await p.click('[data-mode="arcade"]').catch(() => {});
 await sleep(300);
 // Stage 8 puts every machine on the counter, including the two new ones.
 await p.evaluate(() => { window.__pp.game.screens.close(); window.__pp.game.startStage(8); });

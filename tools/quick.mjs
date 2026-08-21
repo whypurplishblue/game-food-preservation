@@ -9,7 +9,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const errors = [];
 
 const b = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  executablePath: process.env.PP_CHROME || undefined,
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox', '--disable-dev-shm-usage'],
 });
 const p = await b.newPage({ viewport: { width: W, height: H } });
@@ -24,6 +24,7 @@ await sleep(2000);
 await shot('01-title', 0.5);
 
 await p.click('[data-act="play"]');
+await p.click('[data-mode="arcade"]');
 await sleep(400);
 await shot('02-brief', 0.5);
 

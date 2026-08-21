@@ -10,7 +10,7 @@ import { chromium } from 'playwright';
 const STAGE = +(process.env.PP_STAGE || 1);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const b = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  executablePath: process.env.PP_CHROME || undefined,
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'],
 });
 const p = await b.newPage({ viewport: { width: 960, height: 600 } });
@@ -25,6 +25,8 @@ await sleep(3000);
 
 // ---- title -> stage brief -> play, all through the real buttons
 await p.click('[data-act="play"]');
+await sleep(400);
+await p.click('[data-mode="arcade"]');
 await sleep(400);
 if (STAGE !== 1) {
   await p.evaluate((s) => { window.__pp.game.screens.close(); window.__pp.game.startStage(s); }, STAGE);
