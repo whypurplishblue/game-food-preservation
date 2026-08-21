@@ -125,6 +125,22 @@ await session({ width: 1600, height: 900 }, async (page) => {
 
   await page.evaluate(() => window.__pp.game.factBook.goToMethod('drying'));
   await settle(page);
+  await page.waitForFunction(() =>
+    document.querySelector('.pp-fb__lead')?.classList.contains('is-exam'),
+    null, { timeout: 5000 });
+  const desktopMethodLayout = await page.evaluate(() => {
+    const inner = document.querySelector('.pp-fb__panelinner');
+    const lead = document.querySelector('.pp-fb__lead');
+    return {
+      examAtTop: lead?.classList.contains('is-exam') && !!lead.textContent.trim(),
+      noDuplicateExamSection: !document.querySelector('.pp-fb__examsec'),
+      noVerticalScroll: inner && inner.scrollHeight <= inner.clientHeight + 1,
+    };
+  });
+  check('exam note replaces the method information at the top', desktopMethodLayout.examAtTop);
+  check('desktop method panel fits without vertical scrolling', desktopMethodLayout.noVerticalScroll,
+    `${desktopMethodLayout.noVerticalScroll ? 'fits' : 'overflows'}`);
+  check('the lower duplicate exam section is removed', desktopMethodLayout.noDuplicateExamSection);
   const dryIdx = await state(page);
 
   // --- rotating the model must not reach the book
