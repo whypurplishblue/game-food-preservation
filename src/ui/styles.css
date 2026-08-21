@@ -536,9 +536,10 @@ html, body {
   max-inline-size: calc(100% - 24px - var(--safe-l) - var(--safe-r));
 }
 /* The Fact Book owns the same top-right corner for its close button. Keep the
-   audio control available, but place it in a small utility rail underneath. */
+   audio control on the same row, immediately to its left. */
 .pp-quick.is-overlay.is-factbook {
-  inset-block-start: calc(68px + var(--safe-t));
+  inset-block-start: calc(16px + var(--safe-t));
+  inset-inline-end: calc(68px + var(--safe-r));
 }
 .pp-quick.is-overlay.is-factbook .pp-quick__mute {
   background: rgba(255, 255, 255, 0.88);
