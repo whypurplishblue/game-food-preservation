@@ -23,7 +23,7 @@ const errors = [];
 const timeLeft = () => DEADLINE - Date.now();
 
 const browser = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  executablePath: process.env.PP_CHROME || undefined,
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox', '--disable-dev-shm-usage'],
 });
 const page = await browser.newPage({ viewport: { width: W, height: H } });
@@ -154,6 +154,8 @@ await sleep(1800);
 await shot('01-title', 0.4);
 
 await page.click('[data-act="play"]').catch(() => {});
+await sleep(400);
+await page.click('[data-mode="arcade"]').catch(() => {});
 await sleep(400);
 await page.evaluate((st) => { window.__pp.game.screens.close(); window.__pp.game.startStage(st); }, STAGE);
 await sleep(500);

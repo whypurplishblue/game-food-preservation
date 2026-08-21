@@ -11,7 +11,7 @@ import { mkdirSync } from 'fs';
 const OUT = 'shots/foods';
 mkdirSync(OUT, { recursive: true });
 const b = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  executablePath: process.env.PP_CHROME || undefined,
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'],
 });
 const p = await b.newPage({ viewport: { width: 620, height: 620 } });

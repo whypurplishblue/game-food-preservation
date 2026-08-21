@@ -22,8 +22,13 @@ class AudioEngine {
     this.ctx = null;
     this.enabled = true;
     this.musicOn = true;
+    // Master mute is deliberately separate from the SFX/music preferences.
+    // It gates the final output bus without changing either child bus, so
+    // unmuting restores the exact volume/toggle preferences the player had.
+    this.muted = false;
     this.sfxVolume = 1;
     this.musicVolume = 0.6;
+    this.masterVolume = 0.55;
     this.master = null;
     this.sfxGain = null;
     this.musicGain = null;
@@ -38,7 +43,7 @@ class AudioEngine {
     if (!AC) return;
     this.ctx = new AC();
     this.master = this.ctx.createGain();
-    this.master.gain.value = 0.55;
+    this.master.gain.value = this.muted ? 0 : this.masterVolume;
     // Gentle limiter so stacked combo sounds never clip.
     const comp = this.ctx.createDynamicsCompressor();
     comp.threshold.value = -12;
@@ -56,6 +61,7 @@ class AudioEngine {
   _applyVolumes() {
     if (this.sfxGain) this.sfxGain.gain.value = this.enabled ? this.sfxVolume : 0;
     if (this.musicGain) this.musicGain.gain.value = this.musicOn ? this.musicVolume : 0;
+    if (this.master) this.master.gain.value = this.muted ? 0 : this.masterVolume;
   }
 
   /** Fetch + decode a recorded sample once, then cache the AudioBuffer. */
@@ -87,6 +93,8 @@ class AudioEngine {
 
   resume() { if (this.ctx?.state === 'suspended') this.ctx.resume(); }
   setEnabled(v) { this.enabled = v; this._applyVolumes(); }
+  /** Gate the final output while preserving SFX/music toggles and volumes. */
+  setMuted(v) { this.muted = Boolean(v); this._applyVolumes(); }
   setSfxVolume(v) { this.sfxVolume = clamp01(v); this._applyVolumes(); }
   setMusicVolume(v) { this.musicVolume = clamp01(v); this._applyVolumes(); }
 

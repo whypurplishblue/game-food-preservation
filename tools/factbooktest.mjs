@@ -180,7 +180,8 @@ await session({ width: 1600, height: 900 }, async (page) => {
 // -------------------------------------------------------- opened in-game
 await session({ width: 1600, height: 900 }, async (page) => {
   console.log('\n[in game]');
-  await page.click('[data-act="playLearning"]');
+  await page.click('[data-act="play"]');
+  await page.click('[data-mode="learning"]');
   await page.click('[data-act="go"]');
   await page.waitForFunction(() => window.__pp.game.mode === 'playing', null, { timeout: 15000 });
   await page.click('.pp-hud .pp-icon-btn');           // the Fact Book button
@@ -233,8 +234,11 @@ await session({ width: 1600, height: 900 }, async (page) => {
     !document.querySelector('.pp-result [data-act="next"]')));
   await page.click('.pp-result [data-act="menu"]');
   await page.waitForFunction(() => !!document.querySelector('.pp-title'));
+  await page.click('[data-act="play"]');
+  await page.waitForFunction(() => !!document.querySelector('.pp-mode-select'));
   check('completed learning mode is not offered as resumable', await page.evaluate(() =>
-    !document.querySelector('[data-act="continueLearning"]')));
+    !document.querySelector('[data-act="continue"][data-mode="learning"]') &&
+    !!document.querySelector('.pp-mode-card[data-mode="learning"]')));
 });
 
 // ------------------------------------------------------------ narrow layout
@@ -276,13 +280,19 @@ await session({ width: 1600, height: 900 }, async (page) => {
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !window.__pp.game.factBook.isOpen, null, { timeout: 8000 });
   await page.waitForFunction(() => !!document.querySelector('.pp-title'));
-  await page.click('.pp-lang[data-lang="zh"]');
+  await page.click('[data-quick="language"]');
+  await page.click('.pp-language-menu [data-lang="zh"]');
   await sleep(200);
   const stationLabels = await page.evaluate(() =>
     [...window.__pp.game.stations.values()].map((station) => station.plaqueLabel)
   );
   check('station plaques refresh to the chosen language',
     stationLabels.every((label) => label && !/[A-Za-z]/.test(label)), stationLabels.join(', '));
+  check('quick-control mute label refreshes with language', await page.evaluate(() => {
+    const mute = document.querySelector('[data-quick="mute"]');
+    const expected = window.__pp.content.i18n.t('ui.mute');
+    return mute?.getAttribute('aria-label') === expected && mute.title === expected && mute.textContent.includes(expected);
+  }));
   await openBook(page);
   await page.evaluate(() => window.__pp.game.factBook.goToMethod('salting'));
   await settle(page);

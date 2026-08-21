@@ -1,6 +1,6 @@
 /** Measure each GLB shell against the procedural machine it replaces. */
 import { chromium } from 'playwright';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b = await chromium.launch({ executablePath: process.env.PP_CHROME || undefined,
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const p = await b.newPage({ viewport: { width: 900, height: 600 } });
 p.on('console', (m) => { if (m.type() === 'error') console.log('ERR', m.text().slice(0, 200)); });

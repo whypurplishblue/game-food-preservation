@@ -17,6 +17,7 @@ import { Input } from './core/Input.js';
 import { Game } from './core/Game.js';
 import { assets, foodAssets, MOVER_BINDINGS } from './world/AssetRegistry.js';
 import { HUD } from './ui/HUD.js';
+import { QuickControls } from './ui/QuickControls.js';
 import { StationPanel } from './ui/StationPanel.js';
 import { QuizCard } from './ui/QuizCard.js';
 import { Screens } from './ui/Screens.js';
@@ -84,6 +85,7 @@ async function boot() {
   const popups = new Popups(stage3d.scene);
 
   const hud = new HUD(app);
+  const quickControls = new QuickControls(app, { hudSlot: hud.quickSlot });
   const panel = new StationPanel(app);
   const quiz = new QuizCard(app);
   const screens = new Screens(app);
@@ -112,7 +114,7 @@ async function boot() {
   if (import.meta.env?.DEV && assets.report.length) console.info('[assets]', assets.report.join(', '));
 
   const input = new Input(canvas, stage3d, {});
-  const game = new Game({ stage3d, kitchen, hud, panel, quiz, screens, particles, popups, input });
+  const game = new Game({ stage3d, kitchen, hud, panel, quiz, screens, particles, popups, input, quickControls });
   const stationRoots = game.prepareStations();
   await stage3d.warmup(stationRoots);
   // Allocate post-processing targets and compile their shaders while the boot
@@ -124,6 +126,7 @@ async function boot() {
   const unlock = () => {
     audio.init();
     audio.setEnabled(game.settings.sound);
+    audio.setMuted(game.settings.muted);
     if (game.settings.music) audio.startMusic();
     window.removeEventListener('pointerdown', unlock);
     window.removeEventListener('keydown', unlock);
@@ -211,7 +214,7 @@ async function boot() {
 
   // Expose for the automated visual/perf harness.
   window.__pp = {
-    game, stage3d, kitchen, input, hud, validation: problems,
+    game, stage3d, kitchen, input, hud, quickControls, validation: problems,
     foodFactory: FOODFACTORY,
     assetReport: assets.report,
     foodAssetReport: foodAssets.report,

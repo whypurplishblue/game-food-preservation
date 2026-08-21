@@ -7,7 +7,7 @@
 import { chromium } from 'playwright';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const b = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  executablePath: process.env.PP_CHROME || undefined,
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'],
 });
 const p = await b.newPage({ viewport: { width: 960, height: 620 } });
@@ -18,6 +18,8 @@ p.on('console', (m) => { if (m.type() === 'error') { errors.push(m.text()); cons
 await p.goto('http://localhost:4173/', { waitUntil: 'networkidle' });
 await p.waitForFunction(() => !!window.__pp, null, { timeout: 45000 });
 await p.click('[data-act="play"]');
+await sleep(300);
+await p.click('[data-mode="arcade"]');
 await sleep(300);
 await p.evaluate(() => { window.__pp.game.screens.close(); window.__pp.game.startStage(3); });
 await sleep(300);

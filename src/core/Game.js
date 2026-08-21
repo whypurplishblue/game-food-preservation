@@ -13,7 +13,7 @@ import {
   STATION_METHODS, stationsFor, methodAtStation,
   LEARNING_STAGES, LEARNING_SCORING,
 } from '../content/curriculum.js';
-import { t, methodName, foodName, mechShort, methodMechShort, onLangChange } from '../content/i18n.js';
+import { t, methodName, foodName, mechShort, methodMechShort, onLangChange, setLang } from '../content/i18n.js';
 import { makeQuestion } from '../content/quiz.js';
 import { PALETTE } from '../world/Palette.js';
 import { slotsFor, PREP_CENTRE, PREP_RADIUS } from '../world/Kitchen.js';
@@ -40,12 +40,18 @@ const STATION_CLASSES = {
   Smokehouse, Cannery,
 };
 
-// Bumped to v2 for the namespaced {arcade, learning} save shape — no
-// migration shim, there is no real save data yet to preserve.
 const SAVE_KEY = 'pp.progress.v2';
+const LEGACY_SAVE_KEY = 'pp.progress.v1';
+const MODE_IDS = ['learning', 'arcade'];
+
+const isRecord = (value) => value && typeof value === 'object' && !Array.isArray(value);
+const safeNumber = (value, fallback = 0) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+};
 
 export class Game {
-  constructor({ stage3d, kitchen, hud, panel, quiz, screens, particles, popups, input }) {
+  constructor({ stage3d, kitchen, hud, panel, quiz, screens, particles, popups, input, quickControls = null }) {
     this.stage3d = stage3d;
     this.kitchen = kitchen;
     this.hud = hud;
@@ -55,12 +61,20 @@ export class Game {
     this.particles = particles;
     this.popups = popups;
     this.input = input;
+    this.quickControls = quickControls;
 
     this.foods = [];
     this.stations = new Map();
-    this.mode = 'menu';           // menu | brief | playing | teaching | paused | quiz | result
+    this.mode = 'menu';           // menu | mode-select | brief | playing | teaching | paused | quiz | result
     this.gameMode = 'arcade';     // arcade | learning — which content/scoring track
-    this.settings = { sound: true, music: true, sfxVolume: 1, musicVolume: 0.6, reducedMotion: false };
+    this.settings = { sound: true, music: true, sfxVolume: 1, musicVolume: 0.6, reducedMotion: false, muted: false };
+    this.savedStage = { arcade: 1, learning: 1 };
+    this.bestScores = { arcade: {}, learning: {} };
+    this.misses = {};
+    this.history = {};
+    this.modeRecency = { arcade: 0, learning: 0 };
+    this._recencyCounter = 0;
+    this._saveExtras = {};
 
     this._tmpVec = new THREE.Vector3();
     this._builtStations = new Set();
@@ -71,6 +85,12 @@ export class Game {
     });
     this._wireInput();
     this._loadSettings();
+
+    this.quickControls?.setCallbacks({
+      onMute: (value) => this.setSetting('muted', value),
+      onLanguage: (code) => this.setLanguage(code),
+    });
+    this.quickControls?.setMuted(this.settings.muted);
 
     this.hud.factBtn.addEventListener('click', () => this.openFactBook());
     this.hud.pauseBtn.addEventListener('click', () => this.pause());
@@ -135,31 +155,98 @@ export class Game {
 
   // -------------------------------------------------------------- persistence
   _loadSettings() {
+    let data = null;
+    let sourceKey = null;
     try {
-      const raw = localStorage.getItem(SAVE_KEY);
-      if (raw) {
-        const d = JSON.parse(raw);
-        Object.assign(this.settings, d.settings || {});
-        this.savedStage = { arcade: d.savedStage?.arcade || 1, learning: d.savedStage?.learning || 1 };
-        this.bestScores = { arcade: d.bestScores?.arcade || {}, learning: d.bestScores?.learning || {} };
-        this.misses = d.misses || {};
-      }
+      const current = localStorage.getItem(SAVE_KEY);
+      const legacy = current ? null : localStorage.getItem(LEGACY_SAVE_KEY);
+      const raw = current || legacy;
+      if (raw) { data = JSON.parse(raw); sourceKey = current ? SAVE_KEY : LEGACY_SAVE_KEY; }
     } catch { /* private mode — play without a save */ }
-    this.savedStage ||= { arcade: 1, learning: 1 };
-    this.bestScores ||= { arcade: {}, learning: {} };
+
+    if (isRecord(data)) {
+      // Keep fields owned by other save features (for example history) when
+      // the save is upgraded. Known fields below are rewritten in normalized
+      // form, while unknown fields survive a later settings/checkpoint save.
+      const known = new Set([
+        'settings', 'stage', 'savedStage', 'bestScores', 'misses',
+        'modeRecency', 'lastPlayed', 'lastPlayedMode', 'recencyCounter',
+      ]);
+      this._saveExtras = Object.fromEntries(Object.entries(data).filter(([key]) => !known.has(key)));
+      Object.assign(this.settings, isRecord(data.settings) ? data.settings : {});
+
+      // v1 stored one arcade checkpoint as `stage`; v2 stores separate mode
+      // checkpoints. A legacy arcade checkpoint must not be thrown away and
+      // learning starts cleanly because it did not exist in v1.
+      const saved = isRecord(data.savedStage)
+        ? data.savedStage
+        : { arcade: data.stage, learning: 1 };
+      this.savedStage = {
+        arcade: Math.max(1, Math.floor(safeNumber(saved.arcade, 1))),
+        learning: Math.max(1, Math.floor(safeNumber(saved.learning, 1))),
+      };
+
+      const scores = isRecord(data.bestScores) ? data.bestScores : {};
+      const namespacedScores = Object.prototype.hasOwnProperty.call(scores, 'arcade')
+        || Object.prototype.hasOwnProperty.call(scores, 'learning');
+      this.bestScores = {
+        // v1's flat score map belongs to Arcade. Empty maps are harmless in
+        // either shape and are kept as objects so score writes stay safe.
+        arcade: isRecord(namespacedScores ? scores.arcade : scores) ? (namespacedScores ? scores.arcade : scores) : {},
+        learning: isRecord(namespacedScores ? scores.learning : null) ? scores.learning : {},
+      };
+      this.misses = isRecord(data.misses) ? data.misses : {};
+      this.history = data.history ?? this._saveExtras.history ?? {};
+
+      const rawRecency = data.modeRecency ?? data.lastPlayed;
+      const recency = isRecord(rawRecency) ? rawRecency : {};
+      this.modeRecency = {
+        arcade: Math.max(0, safeNumber(recency.arcade, 0)),
+        learning: Math.max(0, safeNumber(recency.learning, 0)),
+      };
+      this._recencyCounter = Math.max(
+        this.modeRecency.arcade,
+        this.modeRecency.learning,
+        safeNumber(data.recencyCounter, 0),
+      );
+      // A simple mode marker is accepted from intermediate builds and is a
+      // useful deterministic hint when the numeric recency map is absent.
+      const lastMode = MODE_IDS.includes(data.lastPlayedMode) ? data.lastPlayedMode : null;
+      this.lastPlayedMode = lastMode;
+      if (lastMode && !this.modeRecency.arcade && !this.modeRecency.learning) {
+        this._recencyCounter = 1;
+        this.modeRecency[lastMode] = 1;
+      }
+    }
+
+    // Existing saves predate the master mute setting. Keep their sound,
+    // music, and volume preferences untouched while defaulting this new
+    // independent gate to unmuted.
+    if (typeof this.settings.muted !== 'boolean') this.settings.muted = false;
     audio.setEnabled(this.settings.sound);
+    audio.setMuted(this.settings.muted);
     audio.setSfxVolume(this.settings.sfxVolume);
     audio.setMusicVolume(this.settings.musicVolume);
     audio.setMusic(this.settings.music);
+
+    // Upgrade v1 and old v2 records in place so recency metadata is available
+    // on the next reload. The fallback is computed later from checkpoints;
+    // writing it here does not alter any player-owned progress or scores.
+    if (sourceKey && (!data?.modeRecency || sourceKey === LEGACY_SAVE_KEY)) this._save();
   }
 
   _save() {
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({
+        ...this._saveExtras,
         settings: this.settings,
         savedStage: this.savedStage,
         bestScores: this.bestScores,
         misses: this.misses || {},
+        history: this.history || {},
+        modeRecency: this.modeRecency || { arcade: 0, learning: 0 },
+        recencyCounter: this._recencyCounter || 0,
+        lastPlayedMode: this.lastPlayedMode || null,
       }));
     } catch { /* ignore */ }
   }
@@ -167,29 +254,132 @@ export class Game {
   setSetting(key, value) {
     this.settings[key] = value;
     if (key === 'sound') audio.setEnabled(value);
+    if (key === 'muted') {
+      this.settings.muted = Boolean(value);
+      audio.setMuted(this.settings.muted);
+      this.quickControls?.setMuted(this.settings.muted);
+    }
     if (key === 'music') audio.setMusic(value);
     if (key === 'sfxVolume') audio.setSfxVolume(value);
     if (key === 'musicVolume') audio.setMusicVolume(value);
     this._save();
   }
 
+  setLanguage(code) {
+    if (!setLang(code)) return false;
+    this.quickControls?.setLanguage(code);
+    this.screens.refreshCurrent?.();
+    // Screen refreshes schedule their own first-control focus. Restore the
+    // language trigger on the next frame so choosing a language never strands
+    // keyboard users at the top of the newly-rendered screen.
+    globalThis.requestAnimationFrame?.(() => this.quickControls?.focusLanguageTrigger?.());
+    return true;
+  }
+
+  _setQuickContext(placement, languageVisible) {
+    this.quickControls?.setContext({ placement, languageVisible });
+    this.quickControls?.setVisible(true);
+  }
+
+  _modeState(mode) {
+    const stages = mode === 'learning' ? LEARNING_STAGES : STAGES;
+    const finalStage = stages.length;
+    const checkpoint = Number(this.savedStage?.[mode]) || 1;
+    const safeCheckpoint = Math.max(1, Math.min(finalStage + 1, checkpoint));
+    const state = safeCheckpoint <= 1 ? 'new' : safeCheckpoint > finalStage ? 'completed' : 'progress';
+    return {
+      mode,
+      state,
+      // `status` is an alias kept intentionally clear for screen renderers.
+      status: state,
+      checkpoint: safeCheckpoint,
+      finalStage,
+      stage: safeCheckpoint,
+    };
+  }
+
+  /** Return the one unfinished mode that the chooser should offer to resume. */
+  _continueMode() {
+    const unfinished = MODE_IDS.filter((mode) => this._modeState(mode).state === 'progress');
+    if (!unfinished.length) return null;
+
+    const hasRecency = unfinished.some((mode) => safeNumber(this.modeRecency?.[mode], 0) > 0);
+    if (hasRecency) {
+      return unfinished.reduce((best, mode) => {
+        const bestRecency = safeNumber(this.modeRecency?.[best], 0);
+        const recency = safeNumber(this.modeRecency?.[mode], 0);
+        return recency > bestRecency ? mode : best;
+      }, unfinished[0]);
+    }
+
+    // Saves from before recency tracking cannot reveal the last mode. Prefer
+    // the furthest checkpoint, then the stable mode order above as a tie-break
+    // so migration never changes from one reload to the next.
+    return unfinished.reduce((best, mode) => {
+      const bestStage = this._modeState(best).checkpoint;
+      const stage = this._modeState(mode).checkpoint;
+      return stage > bestStage ? mode : best;
+    }, unfinished[0]);
+  }
+
+  _markModePlayed(mode) {
+    if (!MODE_IDS.includes(mode)) return;
+    const next = Math.max(
+      safeNumber(this._recencyCounter, 0),
+      safeNumber(this.modeRecency?.arcade, 0),
+      safeNumber(this.modeRecency?.learning, 0),
+    ) + 1;
+    this._recencyCounter = next;
+    this.modeRecency[mode] = next;
+    this.lastPlayedMode = mode;
+    this._save();
+  }
+
+  _startMode(mode, stageId = 1) {
+    if (mode === 'learning') this.startLearning(stageId);
+    else this.startArcade(stageId);
+  }
+
+  _resetMode(mode) {
+    // Reset only the selected checkpoint. Best scores, leaderboard history,
+    // and adaptive-learning misses are intentionally left untouched.
+    this.savedStage[mode] = 1;
+    this._save();
+    this._startMode(mode, 1);
+  }
+
   // ------------------------------------------------------------------ menus
   showMenu() {
     this.mode = 'menu';
+    this._resultScreen = null;
     this._teardownStage();
     this.stage3d.setCameraFraming('menu', { instant: false });
     this.hud.setVisible(false);
     this.input.setEnabled(false);
+    this._setQuickContext('overlay', true);
     this.screens.title({
-      hasSaveArcade: this.savedStage.arcade > 1 && this.savedStage.arcade <= STAGES.length,
-      hasSaveLearning: this.savedStage.learning > 1 && this.savedStage.learning <= LEARNING_STAGES.length,
-      onPlayArcade: () => this.startArcade(1),
-      onContinueArcade: () => this.startArcade(this.savedStage.arcade),
-      onPlayLearning: () => this.startLearning(1),
-      onContinueLearning: () => this.startLearning(this.savedStage.learning),
+      onPlay: () => this.showModeSelect(),
       onFactBook: () => this.openFactBook(() => this.showMenu()),
       onCredits: () => this.openCredits(() => this.showMenu()),
-      onLeaderboard: (mode) => this.openLeaderboard(mode, () => this.showMenu()),
+      onLeaderboard: () => this.openLeaderboard('learning', () => this.showMenu()),
+    });
+  }
+
+  showModeSelect() {
+    this.mode = 'mode-select';
+    this._teardownStage();
+    this.stage3d.setCameraFraming('menu', { instant: false });
+    this.hud.setVisible(false);
+    this.input.setEnabled(false);
+    this._setQuickContext('overlay', true);
+    this.screens.modeSelect({
+      onSelect: (mode) => {
+        const state = this._modeState(mode);
+        // One card, one click: unfinished runs resume automatically; new and
+        // completed runs enter at stage 1. The chooser itself stays simple.
+        this._startMode(mode, state.state === 'progress' ? state.checkpoint : 1);
+      },
+      onBack: () => this.showMenu(),
     });
   }
 
@@ -204,9 +394,15 @@ export class Game {
     const wasPlaying = this.mode === 'playing';
     if (wasPlaying) this.mode = 'paused';
     this.input.setEnabled(false);
+    this._setQuickContext('overlay', true);
     this.screens.credits(() => {
       if (back) back();
-      else if (wasPlaying) { this.screens.close(); this.mode = 'playing'; this.input.setEnabled(true); }
+      else if (wasPlaying) {
+        this.screens.close();
+        this.mode = 'playing';
+        this._setQuickContext('hud', false);
+        this.input.setEnabled(true);
+      }
       else this.showMenu();
     });
   }
@@ -219,13 +415,23 @@ export class Game {
       this.hud.flash(t('ui.factBookLocked'), { kind: 'info', ms: 1600 });
       return;
     }
+    // FactBook3D owns its own dialog and focus loop, so keep the invoking
+    // control here and hand focus back after its close animation completes.
+    const focus = this.screens._focusContext?.();
     const wasPlaying = this.mode === 'playing';
     if (wasPlaying) this.mode = 'paused';
     this.input.setEnabled(false);
+    this._setQuickContext('overlay', false);
     const done = () => {
       if (back) back();
-      else if (wasPlaying) { this.screens.close(); this.mode = 'playing'; this.input.setEnabled(true); }
+      else if (wasPlaying) {
+        this.screens.close();
+        this.mode = 'playing';
+        this._setQuickContext('hud', false);
+        this.input.setEnabled(true);
+      }
       else this.showMenu();
+      this.screens._restoreFocus?.(focus);
     };
     // The Fact Book is a physical 3D book (src/ui/factbook). It needs its own
     // WebGL context; if that cannot be had — a second context refused, an old
@@ -246,14 +452,15 @@ export class Game {
     }
   }
 
-  pause() {
-    if (this.mode !== 'playing') return;
+  pause({ reopen = false } = {}) {
+    if (this.mode !== 'playing' && !(reopen && this.mode === 'paused')) return;
     this.mode = 'paused';
     this.input.setEnabled(false);
+    this._setQuickContext('overlay', false);
     // Put the station interaction down rather than destroying it: pausing
     // mid-interaction used to leave the food inside a busy machine with no
     // controls at all, which ends the run.
-    this._pausedPanel = this.panel.snapshot();
+    if (!reopen) this._pausedPanel = this.panel.snapshot();
     this.panel.stop();
     this.screens.pause({
       settings: this.settings,
@@ -261,6 +468,7 @@ export class Game {
       onResume: () => {
         this.screens.close();
         this.mode = 'playing';
+        this._setQuickContext('hud', false);
         if (this._pausedPanel) {
           // Back to the step it was on, with the machine still mid-animation.
           this.panel.start(this._pausedPanel);
@@ -271,14 +479,15 @@ export class Game {
       },
       onRestart: () => { this._pausedPanel = null; this.screens.close(); this.startStage(this.stageId); },
       onMenu: () => { this._pausedPanel = null; this.screens.close(); this.showMenu(); },
-      onFactBook: () => this.openFactBook(() => this.pause()),
-      onCredits: () => this.openCredits(() => this.pause()),
+      onFactBook: () => this.openFactBook(() => this.pause({ reopen: true })),
+      onCredits: () => this.openCredits(() => this.pause({ reopen: true })),
     });
   }
 
   // ------------------------------------------------------------------ stages
   startStage(id) {
     const stages = this.gameMode === 'learning' ? LEARNING_STAGES : STAGES;
+    this._markModePlayed(this.gameMode);
     this.stageId = THREE.MathUtils.clamp(id, 1, stages.length);
     this.stage = stages[this.stageId - 1];
     this._teardownStage();
@@ -316,10 +525,12 @@ export class Game {
 
     this.mode = 'brief';
     this.input.setEnabled(false);
+    this._setQuickContext('overlay', false);
     this.stage3d.setCameraFraming('hero', { instant: false });
     this.screens.stageBrief(this.stage, this.stage.methods, () => {
       this.screens.close();
       this.mode = 'playing';
+      this._setQuickContext('hud', false);
       this.input.setEnabled(true);
       this.stage3d.setCameraFraming('play', { instant: false });
       this._save();
@@ -915,7 +1126,7 @@ export class Game {
       if (passed) this.runScore = (this.runScore || 0) + (this.learningScore || 0);
       const isFinalLevel = this.stageId === LEARNING_STAGES.length;
       this._save();
-      this.screens.learningResults({
+      const result = {
         stage: this.stage, score: this.learningScore || 0, maxScore: LEARNING_SCORING.maxPossible,
         timeBonus: this.learningTimeBonus || 0, passed, spoilt: this.spoiltCount,
         breakdown: this._learningBreakdown,
@@ -924,8 +1135,15 @@ export class Game {
         onRetry: () => { this.screens.close(); this.startStage(this.stageId); },
         onMenu: () => { this.screens.close(); this.showMenu(); },
         onSubmitScore: isFinalLevel ? (name) => this._submitLeaderboardScore('learning', name, this.runScore || 0) : null,
-        onViewLeaderboard: () => this.openLeaderboard('learning'),
-      });
+        onViewLeaderboard: null,
+      };
+      const renderResults = () => {
+        this._setQuickContext('overlay', true);
+        this.screens.learningResults(result);
+      };
+      result.onViewLeaderboard = () => this.openLeaderboard('learning', renderResults);
+      this._resultScreen = renderResults;
+      renderResults();
       return;
     }
 
@@ -936,8 +1154,9 @@ export class Game {
     if (passed) this.runScore = (this.runScore || 0) + (this.score || 0);
     const isFinalStage = this.stageId === STAGES.length;
     this._save();
+    this._setQuickContext('overlay', true);
 
-    this.screens.results({
+    const result = {
       stage: this.stage, score: this.score, stars, passed,
       preserved: this.preserved, target: this.stage.targetPreserved,
       spoilt: this.spoiltCount,
@@ -949,28 +1168,41 @@ export class Game {
       onRetry: () => { this.screens.close(); this.startStage(this.stageId); },
       onMenu: () => { this.screens.close(); this.showMenu(); },
       onSubmitScore: isFinalStage ? (name) => this._submitLeaderboardScore('arcade', name, this.runScore || 0) : null,
-      onViewLeaderboard: () => this.openLeaderboard('arcade'),
-    });
+      onViewLeaderboard: null,
+    };
+    const renderResults = () => {
+      this._setQuickContext('overlay', true);
+      this.screens.results(result);
+    };
+    result.onViewLeaderboard = () => this.openLeaderboard('arcade', renderResults);
+    this._resultScreen = renderResults;
+    renderResults();
   }
 
   // ------------------------------------------------------------- leaderboard
-  async openLeaderboard(mode, back) {
+  openLeaderboard(initialMode = 'learning', back) {
     const wasPlaying = this.mode === 'playing';
     if (wasPlaying) this.mode = 'paused';
     this.input.setEnabled(false);
+    this._setQuickContext('overlay', true);
     const done = () => {
       if (back) back();
-      else if (wasPlaying) { this.screens.close(); this.mode = 'playing'; this.input.setEnabled(true); }
+      else if (wasPlaying) {
+        this.screens.close();
+        this.mode = 'playing';
+        this._setQuickContext('hud', false);
+        this.input.setEnabled(true);
+      }
+      else if (this.mode === 'result' && this._resultScreen) this._resultScreen();
       else this.showMenu();
     };
-    this.screens.leaderboard({ mode, loading: true, onClose: done });
-    try {
+    const loadMode = async (mode) => {
       const res = await fetch(`/api/leaderboard/top?mode=${mode}&limit=10`);
+      if (!res.ok) throw new Error(`Leaderboard request failed: ${res.status}`);
       const data = await res.json();
-      this.screens.leaderboard({ mode, entries: data.entries || [], onClose: done });
-    } catch {
-      this.screens.leaderboard({ mode, entries: [], error: true, onClose: done });
-    }
+      return data.entries || [];
+    };
+    this.screens.leaderboard({ initialMode, loadMode, onClose: done });
   }
 
   async _submitLeaderboardScore(mode, name, score) {

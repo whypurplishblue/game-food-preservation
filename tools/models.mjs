@@ -15,7 +15,7 @@ const suffix = NO_GLB ? 'proc' : 'glb';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const b = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  executablePath: process.env.PP_CHROME || undefined,
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox', '--disable-dev-shm-usage'],
 });
 const p = await b.newPage({ viewport: { width: 1200, height: 800 } });
@@ -28,6 +28,8 @@ await sleep(6000);
 console.log('assets:', await p.evaluate(() => window.__pp?.assetReport?.join(', ') || 'n/a'));
 
 await p.click('[data-act="play"]').catch(() => {});
+await sleep(300);
+await p.click('[data-mode="arcade"]').catch(() => {});
 await sleep(300);
 await p.evaluate(() => { window.__pp.game.screens.close(); window.__pp.game.startStage(3); });
 await sleep(300);
