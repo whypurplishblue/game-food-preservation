@@ -543,6 +543,134 @@ export function drawFoodGlyph(ctx, id, size) {
         ctx.restore();
       }
       break;
+    case 'fruits': {
+      for (const [x, y, r, fill] of [[-17, 8, 22, '#d6483c'], [16, 7, 21, '#ef8a1f'], [0, -16, 20, '#e7b832']]) {
+        ctx.fillStyle = fill;
+        ctx.beginPath(); ctx.arc(x * u, y * u, r * u, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.beginPath(); ctx.ellipse((x - 6) * u, (y - 6) * u, 5 * u, 8 * u, -0.5, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.strokeStyle = '#76522c'; ctx.lineWidth = 3 * u; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(0, -33 * u); ctx.lineTo(5 * u, -43 * u); ctx.stroke();
+      ctx.fillStyle = '#5b8d42';
+      ctx.beginPath(); ctx.ellipse(10 * u, -39 * u, 10 * u, 4 * u, -0.35, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'fish': {
+      ctx.fillStyle = '#d89559';
+      ctx.beginPath(); ctx.ellipse(4 * u, 0, 31 * u, 19 * u, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-22 * u, 0); ctx.lineTo(-43 * u, -18 * u); ctx.lineTo(-43 * u, 18 * u); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#f3c77b';
+      ctx.beginPath(); ctx.ellipse(15 * u, -7 * u, 13 * u, 4 * u, -0.18, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#253b5a';
+      ctx.beginPath(); ctx.arc(20 * u, -6 * u, 3 * u, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'prawns': {
+      ctx.strokeStyle = '#e18768'; ctx.lineWidth = 13 * u; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-28 * u, 16 * u);
+      ctx.bezierCurveTo(-18 * u, -17 * u, 17 * u, -28 * u, 30 * u, -2 * u);
+      ctx.stroke();
+      ctx.strokeStyle = '#f6b092'; ctx.lineWidth = 2 * u;
+      for (const x of [-17, -6, 6, 17]) {
+        ctx.beginPath(); ctx.moveTo(x * u, -18 * u); ctx.lineTo((x - 5) * u, 1 * u); ctx.stroke();
+      }
+      ctx.fillStyle = '#e18768';
+      ctx.beginPath(); ctx.moveTo(30 * u, -2 * u); ctx.lineTo(42 * u, -13 * u); ctx.lineTo(38 * u, 5 * u); ctx.closePath(); ctx.fill();
+      break;
+    }
+    case 'squid': {
+      ctx.fillStyle = '#c3a9bd';
+      ctx.beginPath();
+      ctx.moveTo(0, -35 * u); ctx.bezierCurveTo(25 * u, -29 * u, 27 * u, 7 * u, 0, 22 * u);
+      ctx.bezierCurveTo(-27 * u, 7 * u, -25 * u, -29 * u, 0, -35 * u); ctx.fill();
+      ctx.fillStyle = '#9b7797';
+      for (const x of [-22, -11, 0, 11, 22]) {
+        ctx.beginPath(); ctx.moveTo(x * u, 12 * u); ctx.quadraticCurveTo((x - 5) * u, 35 * u, x * u, 40 * u);
+        ctx.quadraticCurveTo((x + 5) * u, 35 * u, x * u, 12 * u); ctx.fill();
+      }
+      ctx.fillStyle = '#fff4f0';
+      ctx.beginPath(); ctx.arc(-8 * u, -2 * u, 5 * u, 0, Math.PI * 2); ctx.arc(8 * u, -2 * u, 5 * u, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'chicken': {
+      ctx.fillStyle = '#e0a260';
+      ctx.beginPath(); ctx.ellipse(-5 * u, 3 * u, 25 * u, 20 * u, -0.55, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#f0d0a5';
+      roundRect(ctx, 14 * u, -8 * u, 17 * u, 14 * u, 6 * u); ctx.fill();
+      ctx.fillStyle = '#c47d42';
+      ctx.beginPath(); ctx.arc(31 * u, -1 * u, 5 * u, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'meat': {
+      ctx.fillStyle = '#9d4c3e';
+      ctx.beginPath();
+      ctx.moveTo(-31 * u, -12 * u); ctx.quadraticCurveTo(-10 * u, -31 * u, 16 * u, -20 * u);
+      ctx.quadraticCurveTo(35 * u, -10 * u, 29 * u, 13 * u);
+      ctx.quadraticCurveTo(14 * u, 32 * u, -15 * u, 24 * u);
+      ctx.quadraticCurveTo(-35 * u, 15 * u, -31 * u, -12 * u); ctx.fill();
+      ctx.fillStyle = 'rgba(255,220,184,0.55)';
+      for (const [x, y, r] of [[-13, -7, 4], [8, -12, 3], [15, 9, 4], [-7, 12, 3]]) {
+        ctx.beginPath(); ctx.arc(x * u, y * u, r * u, 0, Math.PI * 2); ctx.fill();
+      }
+      break;
+    }
+    case 'sausages': {
+      ctx.fillStyle = '#c87955';
+      for (const [x, y, rot] of [[-13, -12, -0.4], [10, -7, 0.35], [-5, 12, 0.25]]) {
+        ctx.save(); ctx.translate(x * u, y * u); ctx.rotate(rot);
+        ctx.beginPath(); ctx.ellipse(0, 0, 25 * u, 9 * u, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,225,185,0.38)';
+        ctx.beginPath(); ctx.ellipse(6 * u, -2 * u, 8 * u, 2 * u, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore(); ctx.fillStyle = '#c87955';
+      }
+      break;
+    }
+    case 'mushrooms': {
+      ctx.fillStyle = '#e8d4b6';
+      roundRect(ctx, -12 * u, -2 * u, 24 * u, 30 * u, 8 * u); ctx.fill();
+      ctx.fillStyle = '#a9825d';
+      ctx.beginPath(); ctx.ellipse(0, -7 * u, 31 * u, 17 * u, 0, Math.PI, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#d0aa7b';
+      ctx.beginPath(); ctx.ellipse(0, -8 * u, 22 * u, 8 * u, 0, Math.PI, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'vegetables': {
+      ctx.fillStyle = '#6d9e62';
+      for (const [x, y, rx, ry, rot] of [[-16, 7, 19, 25, -0.45], [11, 4, 21, 26, 0.38], [0, -14, 18, 24, 0]]) {
+        ctx.save(); ctx.translate(x * u, y * u); ctx.rotate(rot);
+        ctx.beginPath(); ctx.ellipse(0, 0, rx * u, ry * u, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      }
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 2 * u;
+      ctx.beginPath(); ctx.moveTo(-13 * u, -26 * u); ctx.quadraticCurveTo(-7 * u, 0, -11 * u, 24 * u); ctx.moveTo(6 * u, -29 * u); ctx.quadraticCurveTo(2 * u, -4 * u, 8 * u, 22 * u); ctx.stroke();
+      break;
+    }
+    case 'eggs': {
+      for (const [x, y, rot] of [[-14, 7, -0.25], [13, -5, 0.28]]) {
+        ctx.save(); ctx.translate(x * u, y * u); ctx.rotate(rot); ctx.fillStyle = '#f5ead6';
+        ctx.beginPath(); ctx.ellipse(0, 0, 19 * u, 26 * u, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#efbd4c'; ctx.beginPath(); ctx.arc(2 * u, 5 * u, 7 * u, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      }
+      break;
+    }
+    case 'milk': {
+      ctx.fillStyle = '#f5f2e9';
+      ctx.beginPath(); ctx.moveTo(-24 * u, -24 * u); ctx.lineTo(12 * u, -24 * u); ctx.lineTo(22 * u, -14 * u); ctx.lineTo(22 * u, 30 * u); ctx.lineTo(-24 * u, 30 * u); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#72b9d6';
+      ctx.beginPath(); ctx.moveTo(-24 * u, -24 * u); ctx.lineTo(12 * u, -24 * u); ctx.lineTo(22 * u, -14 * u); ctx.lineTo(-14 * u, -14 * u); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#3c87aa'; roundRect(ctx, -13 * u, -2 * u, 25 * u, 13 * u, 4 * u); ctx.fill();
+      break;
+    }
+    case 'fruit_juice': {
+      ctx.fillStyle = '#f0a437';
+      roundRect(ctx, -23 * u, -17 * u, 46 * u, 45 * u, 7 * u); ctx.fill();
+      ctx.fillStyle = '#ffe5a5'; roundRect(ctx, -18 * u, -8 * u, 36 * u, 17 * u, 4 * u); ctx.fill();
+      ctx.strokeStyle = '#6f9c55'; ctx.lineWidth = 3 * u; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(5 * u, -17 * u); ctx.lineTo(14 * u, -39 * u); ctx.stroke();
+      ctx.fillStyle = '#6f9c55'; ctx.beginPath(); ctx.arc(5 * u, -39 * u, 4 * u, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
     case 'jam': {
       ctx.fillStyle = '#b8342f';
       roundRect(ctx, -24 * u, -14 * u, 48 * u, 44 * u, 8 * u); ctx.fill();
@@ -901,6 +1029,54 @@ function drawDiagram(ctx, mv, box) {
       drawIcon(ctx, iconForMethod(mv), cx, cy, Math.min(w, h) * 0.3, rgba(c, 0.7));
   }
   ctx.restore();
+}
+
+/**
+ * Draw the readable mobile companion art without creating a second curriculum
+ * illustration. Method spreads reuse the same mechanism diagram as the
+ * printed page; overview spreads use the existing method icons as a compact
+ * chapter map. The caller supplies CSS-sized dimensions and may scale the
+ * canvas for device-pixel density.
+ */
+export function drawMobileArt(ctx, spread, width, height) {
+  const w = Math.max(1, width);
+  const h = Math.max(1, height);
+  ctx.clearRect(0, 0, w, h);
+  if (!spread) return;
+
+  if (spread.kind === 'method') {
+    drawDiagram(ctx, spread.method, { x: 0, y: 0, w, h });
+    return;
+  }
+
+  const entries = spread.kind === 'divider'
+    ? (spread.methods || [])
+    : ['sun', 'snowflake', 'jar', 'vacuum', 'salt', 'thermometer', 'can', 'smoke', 'flame'];
+  if (!entries.length) return;
+
+  const cols = Math.min(4, entries.length);
+  const rows = Math.ceil(entries.length / cols);
+  const cellW = w / cols;
+  const cellH = h / rows;
+  const radius = Math.min(28, cellW * 0.22, cellH * 0.24);
+
+  entries.forEach((entry, i) => {
+    const x = cellW * (i % cols + 0.5);
+    const y = cellH * (Math.floor(i / cols) + 0.5);
+    const colour = spread.kind === 'divider' ? hexOf(entry.colour) : '#16294d';
+    ctx.fillStyle = rgba(colour, spread.kind === 'divider' ? 0.13 : 0.06);
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 1.55, 0, Math.PI * 2);
+    ctx.fill();
+    drawIcon(
+      ctx,
+      spread.kind === 'divider' ? iconForMethod(entry) : entry,
+      x,
+      y,
+      radius,
+      spread.kind === 'divider' ? shade(colour, 0.18) : 'rgba(22,41,77,0.5)',
+    );
+  });
 }
 
 // ---------------------------------------------------------------- page bodies
