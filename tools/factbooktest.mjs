@@ -95,6 +95,8 @@ await session({ width: 1600, height: 900 }, async (page) => {
       return count === `Page 1 of ${total}`;
     }));
   check('book is fully open', Math.abs((await state(page)).open - 1) < 0.001);
+  check('desktop expand waits for an interactive method viewer',
+    await page.evaluate(() => document.querySelector('.pp-fb__expand')?.hidden === true));
 
   // --- a committed drag turns the page and never springs back
   const zone = await (await page.$('.pp-fb__bookzone')).boundingBox();
@@ -145,12 +147,21 @@ await session({ width: 1600, height: 900 }, async (page) => {
       examAtTop: lead?.classList.contains('is-exam') && !!lead.textContent.trim(),
       noDuplicateExamSection: !document.querySelector('.pp-fb__examsec'),
       noVerticalScroll: inner && inner.scrollHeight <= inner.clientHeight + 1,
+      expandVisible: !!document.querySelector('.pp-fb__expand') &&
+        !document.querySelector('.pp-fb__expand').hidden &&
+        getComputedStyle(document.querySelector('.pp-fb__expand')).display !== 'none',
+      expandIsIconOnly: document.querySelector('.pp-fb__expand')?.textContent.trim() === '⤢',
+      expandLabel: document.querySelector('.pp-fb__expand')?.getAttribute('aria-label') === 'Explore in 3D' &&
+        document.querySelector('.pp-fb__expand')?.title === 'Explore in 3D',
     };
   });
   check('exam note replaces the method information at the top', desktopMethodLayout.examAtTop);
   check('desktop method panel fits without vertical scrolling', desktopMethodLayout.noVerticalScroll,
     `${desktopMethodLayout.noVerticalScroll ? 'fits' : 'overflows'}`);
   check('the lower duplicate exam section is removed', desktopMethodLayout.noDuplicateExamSection);
+  check('desktop method viewer exposes an icon-only expand control',
+    desktopMethodLayout.expandVisible && desktopMethodLayout.expandIsIconOnly && desktopMethodLayout.expandLabel,
+    JSON.stringify(desktopMethodLayout));
   const dryIdx = await state(page);
 
   // --- rotating the model must not reach the book
@@ -166,10 +177,92 @@ await session({ width: 1600, height: 900 }, async (page) => {
   check('dragging the model rotates it', Math.abs(afterRot - before) > 0.2);
   check('dragging the model does not turn the page', s2.index === dryIdx.index && s2.state === 'reading');
 
+  // --- desktop expansion reuses the mobile full-screen model surface
+  const poseBeforeExpand = await page.evaluate(() => {
+    const v = window.__pp.game.factBook.methodViewer;
+    return { az: v._targetAz, el: v._targetEl, zoom: v._targetZoom };
+  });
+  await page.click('.pp-fb__expand');
+  await page.waitForFunction(() => window.__pp.game.factBook.state === 'mobile-model', null, { timeout: 5000 });
+  const desktopFullscreen = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    const overlay = document.querySelector('.pp-fb__mobilemodel');
+    const viewport = document.querySelector('.pp-fb__mobileviewport')?.getBoundingClientRect();
+    const back = document.querySelector('.pp-fb__mobileback');
+    const animate = document.querySelector('.pp-fb__mobileanimate');
+    const mute = document.querySelector('.pp-quick.is-overlay.is-factbook');
+    const expand = document.querySelector('.pp-fb__expand');
+    const v = fb.methodViewer;
+    return {
+      overlayVisible: !!overlay && !overlay.hidden && getComputedStyle(overlay).display !== 'none',
+      bodyHidden: getComputedStyle(document.querySelector('.pp-fb__body')).visibility === 'hidden',
+      fillsStage: !!viewport && viewport.width > window.innerWidth * 0.75 && viewport.height > window.innerHeight * 0.55,
+      backVisible: !!back && !back.hidden && getComputedStyle(back).display !== 'none',
+      animateVisible: !!animate && !animate.hidden && getComputedStyle(animate).display !== 'none',
+      muteVisible: !!mute && getComputedStyle(mute).display !== 'none',
+      expandHidden: !!expand && expand.hidden,
+      foodCards: document.querySelectorAll('.pp-fb__mobilefood').length === fb._mv.foods.length,
+      pose: { az: v._targetAz, el: v._targetEl, zoom: v._targetZoom },
+    };
+  });
+  check('desktop expand opens the shared full-screen model surface',
+    desktopFullscreen.overlayVisible && desktopFullscreen.bodyHidden && desktopFullscreen.fillsStage &&
+      desktopFullscreen.backVisible && desktopFullscreen.animateVisible && desktopFullscreen.muteVisible &&
+      desktopFullscreen.expandHidden && desktopFullscreen.foodCards,
+    JSON.stringify(desktopFullscreen));
+  check('desktop expansion preserves the current camera pose',
+    Math.abs(desktopFullscreen.pose.az - poseBeforeExpand.az) < 0.001 &&
+      Math.abs(desktopFullscreen.pose.el - poseBeforeExpand.el) < 0.001 &&
+      Math.abs(desktopFullscreen.pose.zoom - poseBeforeExpand.zoom) < 0.001,
+    JSON.stringify({ before: poseBeforeExpand, after: desktopFullscreen.pose }));
+  await page.click('.pp-fb__mobilefood:nth-child(1)');
+  await page.waitForFunction(() => !!window.__pp.game.factBook._mobileActivity?.flight, null, { timeout: 3000 });
+  check('desktop full-screen food cards start the existing handoff',
+    await page.evaluate(() => {
+      const fb = window.__pp.game.factBook;
+      return !!fb._mobileActivity?.flight && !fb._mobileActivity.station.food &&
+        fb._mobileActivity.entries.every((entry) => !entry.food.group.visible);
+    }));
+  await page.waitForFunction(() => {
+    const fb = window.__pp.game.factBook;
+    return !!fb._mobileActivity?.station.food && !!fb._autoplay;
+  }, null, { timeout: 10000 });
+  check('desktop full-screen food placement starts station autoplay', await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    return !!fb._mobileActivity?.station.food && !!fb._autoplay;
+  }));
+  await page.click('.pp-fb__mobileback');
+  await page.waitForFunction(() => window.__pp.game.factBook.state === 'reading', null, { timeout: 5000 });
+  const afterDesktopBack = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    return {
+      overlayHidden: document.querySelector('.pp-fb__mobilemodel')?.hidden === true,
+      inlineVisible: getComputedStyle(document.querySelector('.pp-fb__viewport')).display !== 'none',
+      expandVisible: document.querySelector('.pp-fb__expand')?.hidden === false,
+      activityDisposed: !fb._mobileActivity,
+      spinRestored: fb.methodViewer.spin > 0,
+    };
+  });
+  check('Back to book restores the desktop inline viewer',
+    afterDesktopBack.overlayHidden && afterDesktopBack.inlineVisible && afterDesktopBack.expandVisible &&
+      afterDesktopBack.activityDisposed && afterDesktopBack.spinRestored,
+    JSON.stringify(afterDesktopBack));
+  await page.click('.pp-fb__expand');
+  await page.waitForFunction(() => window.__pp.game.factBook.state === 'mobile-model', null, { timeout: 5000 });
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => window.__pp.game.factBook.state === 'reading', null, { timeout: 5000 });
+  check('Escape closes only the desktop full-screen viewer', await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    return fb.isOpen && !fb._mobileModelOpen && fb.state === 'reading' &&
+      document.querySelector('.pp-fb__mobilemodel')?.hidden === true;
+  }));
+
   // --- food inspection round trip
   await page.click('.pp-fb__cards .pp-fb__card:not(:disabled)');
   await sleep(500);
   check('inspecting a food enters the food state', (await state(page)).state === 'food');
+  check('expand is hidden while inspecting a food',
+    await page.evaluate(() => document.querySelector('.pp-fb__expand')?.hidden === true));
   await page.click('.pp-fb__backfood');
   await sleep(400);
   check('back to method leaves the book open',
@@ -391,6 +484,7 @@ await session({ width: 667, height: 375 }, async (page) => {
       exploreUnderBook: !!explore && explore.getBoundingClientRect().left < panel.getBoundingClientRect().left &&
         explore.getBoundingClientRect().top > document.querySelector('.pp-fb__bookzone').getBoundingClientRect().top,
       panelExploreHidden: document.querySelector('.pp-fb__mobilepanel-explore')?.hidden === true,
+      desktopExpandHidden: document.querySelector('.pp-fb__expand')?.hidden === true,
       inlineViewerHidden: getComputedStyle(document.querySelector('.pp-fb__viewersec')).display === 'none',
       foodChips: chips.length === fb._mv.foods.length && chips.every((chip) =>
         chip.tagName === 'SPAN' && !chip.querySelector('.pp-fb__cardslot')),
@@ -405,6 +499,7 @@ await session({ width: 667, height: 375 }, async (page) => {
   check('mobile method page offers a 3D model action below the book',
     mobileMethod.exploreVisible && mobileMethod.exploreUnderBook && mobileMethod.panelExploreHidden,
     JSON.stringify(mobileMethod));
+  check('mobile layout keeps the desktop expand control hidden', mobileMethod.desktopExpandHidden);
   check('mobile method hides the inline 3D viewer', mobileMethod.inlineViewerHidden);
   check('mobile method renders foods as text-only chips', mobileMethod.foodChips);
   check('mobile method keeps also-works foods separate', mobileMethod.alsoWorksChips);
@@ -876,6 +971,10 @@ await session({ width: 1600, height: 900 }, async (page) => {
       !localizedFacts.foodNames.includes('Fish'), JSON.stringify(localizedFacts));
   check('navigation-page numbering follows the chosen language',
     pageCount.includes('页') && !pageCount.includes('Page'), pageCount);
+  check('desktop expand control localizes with the Fact Book', await page.evaluate(() => {
+    const expand = document.querySelector('.pp-fb__expand');
+    return expand?.getAttribute('aria-label') === '探索 3D' && expand.title === '探索 3D';
+  }));
   await page.screenshot({ path: `${OUT}/21-zh.png` });
 
   await page.setViewportSize({ width: 667, height: 375 });
