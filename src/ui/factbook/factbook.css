@@ -660,9 +660,9 @@
 
 /* Mobile preview: let the physical book use the whole stage so its printed
    text can be judged on its own before the detail panel returns. The width
-   branch includes landscape phone emulation such as 667 × 375; the portrait
-   branch also covers taller phone and small-tablet viewports. */
-@media (max-width: 720px), (orientation: portrait) and (max-width: 1000px) {
+   branch includes modern landscape phones such as 844 × 390 and 932 × 430;
+   portrait phones and small tablets are covered by the same width threshold. */
+@media (max-width: 1000px) {
   .pp-fb__nav,
   .pp-fb__tabs { display: none; }
   .pp-fb.is-mobile-model .pp-fb__body { visibility: hidden; }
@@ -966,7 +966,7 @@
 /* Landscape phone: keep the physical book as context while restoring the
    readable detail column. Page navigation stays out of the way; the method
    spread and the panel are the two things the reader is here to inspect. */
-@media (max-width: 720px) and (orientation: landscape) {
+@media (max-width: 1000px) and (orientation: landscape) {
   .pp-fb__body {
     grid-template-columns: minmax(0, 0.92fr) minmax(280px, 1.08fr);
     grid-template-rows: minmax(0, 1fr);
