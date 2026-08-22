@@ -516,7 +516,82 @@ await session({ width: 667, height: 375 }, async (page) => {
     mobileCards.verticalColumn && mobileCards.cardGap, JSON.stringify(mobileCards));
   await page.screenshot({ path: `${OUT}/20c-landscape-foods.png` });
 
-  await page.click('.pp-fb__mobilefood');
+  const firstFoodSelector = '.pp-fb__mobilefood:nth-child(1)';
+  const secondFoodSelector = '.pp-fb__mobilefood:nth-child(2)';
+  await page.click(firstFoodSelector);
+  const flightStart = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    const activity = fb._mobileActivity;
+    const entry = activity.entries[0];
+    const token = document.querySelector('.pp-fb__mobileflighttoken');
+    const tokenRect = token?.getBoundingClientRect();
+    const sourceRect = entry.label.getBoundingClientRect();
+    return {
+      tokenVisible: !!token && tokenRect.width > 0 && tokenRect.height > 0 &&
+        getComputedStyle(token).opacity !== '0',
+      tokenStartsAtCard: !!token && Math.hypot(
+        tokenRect.left + tokenRect.width / 2 - (sourceRect.left + sourceRect.width / 2),
+        tokenRect.top + tokenRect.height / 2 - (sourceRect.top + sourceRect.height / 2),
+      ) < 28,
+      stationEmpty: !activity.station.food && !activity.station.busy,
+      realFoodHidden: !entry.food.group.visible,
+      flightActive: !!activity.flight && activity.flight.entry === entry,
+    };
+  });
+  check('tapping a food card starts a visible handoff from the card',
+    flightStart.tokenVisible && flightStart.tokenStartsAtCard && flightStart.stationEmpty &&
+      flightStart.realFoodHidden && flightStart.flightActive, JSON.stringify(flightStart));
+  await page.screenshot({ path: `${OUT}/20d-landscape-food-flight-start.png` });
+
+  const modelBox = await page.locator('.pp-fb__mobileviewport').boundingBox();
+  const azBeforeFlightDrag = await page.evaluate(() => window.__pp.game.factBook.methodViewer._targetAz);
+  if (modelBox) {
+    await page.mouse.move(modelBox.x + modelBox.width * 0.68, modelBox.y + modelBox.height * 0.52);
+    await page.mouse.down();
+    await page.mouse.move(modelBox.x + modelBox.width * 0.78, modelBox.y + modelBox.height * 0.52);
+    await page.mouse.up();
+  }
+  const azDuringFlightDrag = await page.evaluate(() => window.__pp.game.factBook.methodViewer._targetAz);
+  check('model rotation is held while the food is in flight',
+    Math.abs(azDuringFlightDrag - azBeforeFlightDrag) < 0.001,
+    `delta=${(azDuringFlightDrag - azBeforeFlightDrag).toFixed(4)}`);
+
+  await sleep(220);
+  const flightMid = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    const activity = fb._mobileActivity;
+    const flight = activity.flight;
+    return {
+      flightProgress: flight?.elapsed || 0,
+      tokenMoved: !!flight && Math.hypot(
+        flight.current.x - flight.start.x, flight.current.y - flight.start.y,
+      ) > 8,
+      stationEmpty: !activity.station.food && !activity.station.busy,
+      realFoodHidden: !activity.entries[0].food.group.visible,
+      tokenVisible: !!document.querySelector('.pp-fb__mobileflighttoken'),
+    };
+  });
+  check('the handoff travels toward the method before accepting the food',
+    flightMid.flightProgress > 100 && flightMid.tokenMoved && flightMid.stationEmpty &&
+      flightMid.realFoodHidden && flightMid.tokenVisible, JSON.stringify(flightMid));
+  await page.screenshot({ path: `${OUT}/20e-landscape-food-flight-mid.png` });
+
+  await sleep(150);
+  const flightNearTarget = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    const activity = fb._mobileActivity;
+    const flight = activity.flight;
+    if (!flight) return { flightStillVisible: false, nearTarget: false };
+    const target = fb._mobileFlightTarget(activity);
+    return {
+      flightStillVisible: true,
+      nearTarget: Math.hypot(flight.current.x - target.x, flight.current.y - target.y) < 110,
+    };
+  });
+  check('the handoff reaches the projected station target',
+    flightNearTarget.flightStillVisible && flightNearTarget.nearTarget,
+    JSON.stringify(flightNearTarget));
+
   await page.waitForFunction(() => {
     const fb = window.__pp.game.factBook;
     return !!fb._autoplay && !!fb._mobileActivity?.active && !!fb._mobileActivity.station.food;
@@ -528,44 +603,107 @@ await session({ width: 667, height: 375 }, async (page) => {
       acceptedFood: fb._mobileActivity.station.food?.foodId === entry.fv.id,
       stationBusy: fb._mobileActivity.station.busy,
       autoplayRunning: !!fb._autoplay,
+      flightCleared: !fb._mobileActivity.flight &&
+        document.querySelectorAll('.pp-fb__mobileflighttoken').length === 0,
       cardPlaced: entry.label.classList.contains('is-placed') && !entry.label.disabled &&
         entry.label.getAttribute('aria-pressed') === 'true',
       foodVisible: entry.food.group.visible,
     };
   });
-  check('clicking a food card places it and starts the station demonstration',
+  check('the handoff lands, accepts the food, and starts the station demonstration',
     accepted.acceptedFood && accepted.stationBusy && accepted.autoplayRunning &&
-      accepted.cardPlaced && accepted.foodVisible,
+      accepted.flightCleared && accepted.cardPlaced && accepted.foodVisible,
     JSON.stringify(accepted));
   await sleep(450);
-  await page.screenshot({ path: `${OUT}/20d-landscape-food-drop.png` });
+  await page.screenshot({ path: `${OUT}/20f-landscape-food-landed.png` });
 
-  const replacementId = await page.evaluate(() =>
-    window.__pp.game.factBook._mobileActivity.entries[1]?.fv.id);
-  await page.click('.pp-fb__mobilefood:nth-child(2)');
-  await page.waitForFunction((id) => {
+  const azBeforePlacedDrag = await page.evaluate(() => window.__pp.game.factBook.methodViewer._targetAz);
+  if (modelBox) {
+    await page.mouse.move(modelBox.x + modelBox.width * 0.68, modelBox.y + modelBox.height * 0.52);
+    await page.mouse.down();
+    await page.mouse.move(modelBox.x + modelBox.width * 0.78, modelBox.y + modelBox.height * 0.52);
+    await page.mouse.up();
+  }
+  const azAfterPlacedDrag = await page.evaluate(() => window.__pp.game.factBook.methodViewer._targetAz);
+  check('manual model rotation resumes after the food is placed',
+    Math.abs(azAfterPlacedDrag - azBeforePlacedDrag) > 0.01,
+    `delta=${(azAfterPlacedDrag - azBeforePlacedDrag).toFixed(4)}`);
+
+  await page.click('.pp-fb__mobilemodelreset');
+  await page.waitForFunction(() => {
     const fb = window.__pp.game.factBook;
-    return id && fb._mobileActivity?.active?.fv.id === id &&
-      fb._mobileActivity.station.food?.foodId === id && !!fb._autoplay;
-  }, replacementId, { timeout: 3000 });
-  const replaced = await page.evaluate((id) => {
+    return !fb._autoplay && !fb._mobileActivity?.station.food && !fb._mobileActivity?.active;
+  }, null, { timeout: 3000 });
+
+  await page.click(firstFoodSelector);
+  await sleep(220);
+  const midflightReplacementId = await page.evaluate(() =>
+    window.__pp.game.factBook._mobileActivity.entries[1]?.fv.id);
+  await page.click(secondFoodSelector);
+  const midflightReplacement = await page.evaluate((id) => {
     const fb = window.__pp.game.factBook;
     const activity = fb._mobileActivity;
-    const previous = activity.entries[0];
+    const oldEntry = activity.entries[0];
     const next = activity.entries.find((entry) => entry.fv.id === id);
     return {
-      replacedFood: activity.station.food?.foodId === id,
-      oldFoodRemoved: !previous.food.group.visible && !previous.placed &&
-        !previous.label.classList.contains('is-placed'),
-      newFoodVisible: next.food.group.visible && next.placed,
-      newCardSelected: next.label.getAttribute('aria-pressed') === 'true',
-      autoplayRestarted: !!fb._autoplay && fb._autoplay.station === activity.station,
+      activeNewEntry: activity.active?.fv.id === id,
+      newFlightActive: activity.flight?.entry?.fv.id === id,
+      stationStillEmpty: !activity.station.food && !activity.station.busy,
+      oldFoodRemoved: !oldEntry.food.group.visible && !oldEntry.placed &&
+        !oldEntry.label.classList.contains('is-placing'),
+      newFoodStillHidden: !next.food.group.visible,
     };
-  }, replacementId);
-  check('tapping another food replaces the existing food and replays the station',
-    replaced.replacedFood && replaced.oldFoodRemoved && replaced.newFoodVisible &&
-      replaced.newCardSelected && replaced.autoplayRestarted, JSON.stringify(replaced));
-  await page.screenshot({ path: `${OUT}/20e-landscape-food-replace.png` });
+  }, midflightReplacementId);
+  check('a new tap interrupts an in-flight food and starts the replacement flight',
+    midflightReplacement.activeNewEntry && midflightReplacement.newFlightActive &&
+      midflightReplacement.stationStillEmpty && midflightReplacement.oldFoodRemoved &&
+      midflightReplacement.newFoodStillHidden, JSON.stringify(midflightReplacement));
+  await page.screenshot({ path: `${OUT}/20g-landscape-food-replace-flight.png` });
+
+  await page.waitForFunction((id) => {
+    const fb = window.__pp.game.factBook;
+    return fb._mobileActivity?.station.food?.foodId === id && !!fb._autoplay;
+  }, midflightReplacementId, { timeout: 3000 });
+  const midflightReplacementLanded = await page.evaluate((id) => {
+    const fb = window.__pp.game.factBook;
+    const activity = fb._mobileActivity;
+    const oldEntry = activity.entries[0];
+    const next = activity.entries.find((entry) => entry.fv.id === id);
+    return {
+      stationFood: activity.station.food?.foodId === id,
+      oldFoodRemoved: !oldEntry.food.group.visible,
+      newFoodVisible: next.food.group.visible,
+      autoplayRunning: !!fb._autoplay,
+    };
+  }, midflightReplacementId);
+  check('the replacement food reaches the station and starts its demonstration',
+    midflightReplacementLanded.stationFood && midflightReplacementLanded.oldFoodRemoved &&
+      midflightReplacementLanded.newFoodVisible && midflightReplacementLanded.autoplayRunning,
+    JSON.stringify(midflightReplacementLanded));
+  await page.screenshot({ path: `${OUT}/20h-landscape-food-replaced.png` });
+
+  await page.click(firstFoodSelector);
+  await page.waitForFunction(() => {
+    const fb = window.__pp.game.factBook;
+    return fb._mobileActivity?.station.food?.foodId === fb._mobileActivity.entries[0]?.fv.id &&
+      !!fb._autoplay;
+  }, null, { timeout: 3000 });
+  const dockedReplacement = await page.evaluate((id) => {
+    const fb = window.__pp.game.factBook;
+    const activity = fb._mobileActivity;
+    const oldEntry = activity.entries.find((entry) => entry.fv.id === id);
+    const next = activity.entries[0];
+    return {
+      stationFood: activity.station.food?.foodId === next.fv.id,
+      oldFoodRemoved: !oldEntry.food.group.visible && !oldEntry.placed,
+      newFoodVisible: next.food.group.visible && next.placed,
+      autoplayRunning: !!fb._autoplay,
+    };
+  }, midflightReplacementId);
+  check('a placed food can be replaced and re-animated by tapping another card',
+    dockedReplacement.stationFood && dockedReplacement.oldFoodRemoved &&
+      dockedReplacement.newFoodVisible && dockedReplacement.autoplayRunning,
+    JSON.stringify(dockedReplacement));
 
   await page.click('.pp-fb__mobilemodelreset');
   await page.waitForFunction(() => {
@@ -579,6 +717,8 @@ await session({ width: 667, height: 375 }, async (page) => {
       foodsHome: activity.entries.every((entry) => entry.food.group.position.distanceTo(entry.home) < 0.02),
       foodsHidden: activity.entries.every((entry) => !entry.food.group.visible && entry.food.state === 'idle'),
       cardsEnabled: activity.entries.every((entry) => !entry.label.disabled && !entry.label.classList.contains('is-placed')),
+      flightLayerEmpty: document.querySelectorAll('.pp-fb__mobileflighttoken').length === 0 &&
+        activity.flight === null,
       cameraReset: Math.abs(fb.methodViewer._targetAz - fb.methodViewer.home.az) < 0.001 &&
         Math.abs(fb.methodViewer._targetEl - fb.methodViewer.home.el) < 0.001,
       ringHidden: activity.station.ring?.visible === false && activity.station._targetHighlight === 0,
@@ -586,8 +726,48 @@ await session({ width: 667, height: 375 }, async (page) => {
   });
   check('reset clears the selected food and restores the camera',
     resetActivity.foodsHome && resetActivity.foodsHidden && resetActivity.cardsEnabled &&
+      resetActivity.flightLayerEmpty &&
       resetActivity.cameraReset && resetActivity.ringHidden,
     JSON.stringify(resetActivity));
+
+  await page.click(firstFoodSelector);
+  await sleep(180);
+  await page.click('.pp-fb__mobileback');
+  await page.waitForFunction(() => window.__pp.game.factBook.state === 'reading', null, { timeout: 5000 });
+  const backCleanup = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    return {
+      modelClosed: !fb._mobileModelOpen,
+      activityDisposed: !fb._mobileActivity,
+      stationReleased: !fb._method?.station?.food,
+      flightLayerEmpty: document.querySelectorAll('.pp-fb__mobileflighttoken').length === 0,
+    };
+  });
+  check('Back to book cancels an active food handoff cleanly',
+    backCleanup.modelClosed && backCleanup.activityDisposed && backCleanup.stationReleased &&
+      backCleanup.flightLayerEmpty, JSON.stringify(backCleanup));
+
+  await page.click('.pp-fb__mobile-explore');
+  await page.waitForFunction(() => window.__pp.game.factBook.state === 'mobile-model', null, { timeout: 5000 });
+  await page.click(firstFoodSelector);
+  await sleep(180);
+  await page.click('.pp-fb__close');
+  await page.waitForFunction(() => !window.__pp.game.factBook.isOpen, null, { timeout: 8000 });
+  const closeCleanup = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    return {
+      activityDisposed: !fb._mobileActivity,
+      flightLayerEmpty: document.querySelectorAll('.pp-fb__mobileflighttoken').length === 0,
+    };
+  });
+  check('closing the Fact Book cancels an active food handoff cleanly',
+    closeCleanup.activityDisposed && closeCleanup.flightLayerEmpty, JSON.stringify(closeCleanup));
+
+  await openBook(page);
+  await page.evaluate(() => window.__pp.game.factBook.goToMethod('pickling'));
+  await settle(page);
+  await page.click('.pp-fb__mobile-explore');
+  await page.waitForFunction(() => window.__pp.game.factBook.state === 'mobile-model', null, { timeout: 5000 });
 
   await page.click('.pp-fb__mobileanimate');
   await page.waitForFunction(() => window.__pp.game.factBook._autoplay != null, null, { timeout: 3000 });

@@ -41,6 +41,9 @@ const lerp = (a, b, t) => a + (b - a) * t;
 
 /** How long the shut book is held on screen before it opens itself (§38). */
 const AUTO_OPEN_MS = 1000;
+const MOBILE_FOOD_FLIGHT_MS = 640;
+const MOBILE_FOOD_ACCEPT_AT = 0.82;
+const MOBILE_FOOD_LANDING_MS = 220;
 const el = (tag, cls, text) => {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -152,6 +155,7 @@ export class FactBook3D {
     this._foodCache = new Map();    // foodId   -> built thumbnail, kept for the session
     this._autoplay = null;          // StationAutoplay | null — "watch it work" in progress
     this._autoplayRun = 0;          // invalidates a finishing success flourish when a new food is chosen
+    this._mobilePlacementRun = 0;   // invalidates an interrupted mobile card-to-station flight
     this._mobileModelOpen = false;
     this._mobileActivity = null;
   }
@@ -229,6 +233,7 @@ export class FactBook3D {
     this.mobileViewport.tabIndex = 0;
     this.mobileViewport.setAttribute('role', 'application');
     this.mobileViewport.setAttribute('aria-label', t('ui.interactive3d'));
+    this.mobileFlightLayer = el('div', 'pp-fb__mobileflightlayer');
     this.mobileFoodLayer = el('div', 'pp-fb__mobilefoodlayer');
     this.mobileFoodLayer.setAttribute('aria-label', t('ui.suitableFoods'));
     this.mobileModelReset = el('button', 'pp-fb__mobilemodelreset', '↻');
@@ -242,7 +247,7 @@ export class FactBook3D {
     this.mobileAnimate.setAttribute('aria-label', t('ui.watchItWork'));
     this.mobileModelHint = el('span', 'pp-fb__mobilemodelhint', t('ui.dragToRotate'));
     this.mobileModel.append(
-      mobileModelHead, this.mobileViewport, this.mobileFoodLayer, this.mobileModelReset,
+      mobileModelHead, this.mobileViewport, this.mobileFlightLayer, this.mobileFoodLayer, this.mobileModelReset,
       this.mobileAnimate, this.mobileModelHint,
     );
     wrap.appendChild(this.mobileModel);
@@ -805,7 +810,7 @@ export class FactBook3D {
       return;
     }
 
-    const activity = { station, entries: [], active: null };
+    const activity = { station, entries: [], active: null, flight: null, landing: 0 };
     // The mobile activity is click-to-place, so the ring is not presented as
     // a drop target. The station still owns all of its normal visuals.
     station.ring && (station.ring.visible = false);
@@ -831,8 +836,9 @@ export class FactBook3D {
       this.mobileFoodLayer.appendChild(label);
 
       activity.entries.push({
-        fv, food, label,
+        fv, food, label, thumb,
         home: food.group.position.clone(),
+        groupBaseScale: food.group.scale.x,
         placed: false,
       });
     }
@@ -844,9 +850,11 @@ export class FactBook3D {
   _disposeMobileActivity() {
     const activity = this._mobileActivity;
     if (!activity) {
+      this.mobileFlightLayer?.replaceChildren();
       this.mobileFoodLayer?.replaceChildren();
       return;
     }
+    this._cancelMobileFlight(activity, { immediate: true });
     if (activity.station.food) activity.station.release();
     activity.station.setHighlight(false);
     if (activity.station.ring) activity.station.ring.visible = false;
@@ -855,6 +863,7 @@ export class FactBook3D {
       entry.food.dispose();
       entry.label.remove();
     }
+    this.mobileFlightLayer.replaceChildren();
     this.mobileFoodLayer.replaceChildren();
     this._mobileActivity = null;
   }
@@ -867,15 +876,18 @@ export class FactBook3D {
     this.methodViewer._idle = 2.5;
     const activity = this._mobileActivity;
     if (!activity) return;
+    this._cancelMobileFlight(activity, { immediate: true });
     this._cancelAutoplay();
     if (activity.station.food) activity.station.release();
     activity.station.setHighlight(false);
     if (activity.station.ring) activity.station.ring.visible = false;
+    activity.landing = 0;
     activity.active = null;
     for (const entry of activity.entries) {
       entry.food.group.position.copy(entry.home);
       entry.food.group.rotation.set(0, 0, 0);
       entry.food.model.rotation.set(0, 0, 0);
+      entry.food.group.scale.setScalar(entry.groupBaseScale);
       entry.food.group.visible = false;
       entry.food.state = 'idle';
       entry.placed = false;
@@ -895,7 +907,7 @@ export class FactBook3D {
     this._clearMobileSelection(activity);
     activity.active = entry;
     entry.placed = true;
-    entry.food.group.visible = true;
+    entry.food.group.visible = false;
     for (const item of activity.entries) {
       item.label.disabled = false;
       item.label.classList.toggle('is-placed', item === entry);
@@ -903,32 +915,164 @@ export class FactBook3D {
     }
     entry.label.classList.add('is-placed');
     activity.station.setHighlight(false);
-    activity.station.accept(entry.food);
-    this.live.textContent = t('ui.foodDropped', {
-      food: entry.fv.name, method: this._mv.name,
-    });
-    this._autoplayRun++;
-    this._autoplay = new StationAutoplay(activity.station);
-    this._setAnimatePlaying(true);
+    if (activity.station.ring) activity.station.ring.visible = false;
+    this._startMobileFoodFlight(activity, entry);
   }
 
   /** Release the selected food so another card can take its place immediately. */
   _clearMobileSelection(activity) {
+    this._cancelMobileFlight(activity, { immediate: false });
     this._cancelAutoplay();
     const previous = activity.active;
     if (activity.station.food) activity.station.release();
     activity.station.setHighlight(false);
     if (activity.station.ring) activity.station.ring.visible = false;
+    activity.landing = 0;
     if (!previous) return;
     previous.food.group.position.copy(previous.home);
     previous.food.group.rotation.set(0, 0, 0);
     previous.food.model.rotation.set(0, 0, 0);
+    previous.food.group.scale.setScalar(previous.groupBaseScale);
     previous.food.group.visible = false;
     previous.food.state = 'idle';
     previous.placed = false;
     previous.label.classList.remove('is-placed');
     previous.label.setAttribute('aria-pressed', 'false');
     activity.active = null;
+  }
+
+  _mobileFlightSource(entry) {
+    const root = this.mobileModel.getBoundingClientRect();
+    const rect = entry.label.getBoundingClientRect();
+    return {
+      x: rect.left + rect.width * 0.5 - root.left,
+      y: rect.top + rect.height * 0.5 - root.top,
+    };
+  }
+
+  _mobileFlightTarget(activity) {
+    const root = this.mobileModel.getBoundingClientRect();
+    const vp = this.mobileViewport.getBoundingClientRect();
+    const dock = activity.station.dockPoint;
+    const local = this._methodDesc?.holder?.worldToLocal(dock.clone());
+    const projected = local && this.methodViewer.project(local, {
+      x: vp.left, y: vp.top, w: vp.width, h: vp.height,
+    });
+    return {
+      x: (projected?.x ?? vp.left + vp.width * 0.58) - root.left,
+      y: (projected?.y ?? vp.top + vp.height * 0.55) - root.top,
+    };
+  }
+
+  _makeMobileFlightToken(entry) {
+    const token = el('div', 'pp-fb__mobileflighttoken');
+    const thumb = el('canvas', 'pp-fb__mobileflightthumb');
+    thumb.width = entry.thumb.width;
+    thumb.height = entry.thumb.height;
+    thumb.getContext('2d').drawImage(entry.thumb, 0, 0);
+    thumb.setAttribute('aria-hidden', 'true');
+    token.appendChild(thumb);
+    this.mobileFlightLayer.appendChild(token);
+    return token;
+  }
+
+  _startMobileFoodFlight(activity, entry) {
+    this._cancelMobileFlight(activity, { immediate: true });
+    const run = ++this._mobilePlacementRun;
+    const token = this._makeMobileFlightToken(entry);
+    const start = this._mobileFlightSource(entry);
+    const flight = {
+      run, activity, entry, token, start, current: { ...start }, elapsed: 0, accepted: false,
+    };
+    activity.flight = flight;
+    token.style.left = `${start.x}px`;
+    token.style.top = `${start.y}px`;
+    token.style.transform = 'translate(-50%, -50%) scale(0.92)';
+    token.style.opacity = '1';
+  }
+
+  _acceptMobileFlightFood(flight) {
+    const { activity, entry } = flight;
+    flight.accepted = true;
+    activity.station.accept(entry.food);
+    entry.food.group.visible = true;
+    entry.food.group.scale.setScalar(entry.groupBaseScale * 0.72);
+  }
+
+  _completeMobileFoodFlight(flight) {
+    const { activity, entry } = flight;
+    if (activity.flight !== flight || flight.run !== this._mobilePlacementRun) return;
+    entry.food.group.scale.setScalar(entry.groupBaseScale);
+    entry.label.classList.remove('is-placing');
+    flight.token.remove();
+    activity.flight = null;
+    activity.landing = MOBILE_FOOD_LANDING_MS;
+    if (activity.station.ring) activity.station.ring.visible = true;
+    activity.station.setHighlight(true);
+    sfx('food.drop');
+    this.live.textContent = t('ui.foodDropped', {
+      food: entry.fv.name, method: this._mv.name,
+    });
+    const run = ++this._autoplayRun;
+    this._autoplay = new StationAutoplay(activity.station);
+    this._setAnimatePlaying(true);
+    if (this._autoplay.done) this._finishAutoplay(this._autoplay, run);
+  }
+
+  _cancelMobileFlight(activity, { immediate = false } = {}) {
+    this._mobilePlacementRun++;
+    const flight = activity?.flight;
+    if (!flight) return;
+    activity.flight = null;
+    flight.entry.label.classList.remove('is-placing');
+    if (immediate) {
+      flight.token.remove();
+      return;
+    }
+    const token = flight.token;
+    token.style.transition = 'opacity 140ms ease, transform 140ms ease';
+    token.style.opacity = '0';
+    token.style.transform = `${token.style.transform} scale(0.68)`;
+    window.setTimeout(() => token.remove(), 160);
+  }
+
+  _updateMobileFoodFlight(dt) {
+    const activity = this._mobileActivity;
+    if (!activity) return;
+    if (activity.landing > 0) {
+      activity.landing = Math.max(0, activity.landing - dt * 1000);
+      if (!activity.landing) {
+        activity.station.setHighlight(false);
+        if (activity.station.ring) activity.station.ring.visible = false;
+      }
+    }
+    const flight = activity.flight;
+    if (!flight || flight.run !== this._mobilePlacementRun) return;
+    flight.elapsed += dt * 1000;
+    const p = clamp01(flight.elapsed / MOBILE_FOOD_FLIGHT_MS);
+    const travel = easeInOutCubic(p);
+    const target = this._mobileFlightTarget(activity);
+    const arc = THREE.MathUtils.clamp(Math.abs(target.y - flight.start.y) * 0.18 + 28, 28, 84);
+    const x = lerp(flight.start.x, target.x, travel);
+    const y = lerp(flight.start.y, target.y, travel) - Math.sin(Math.PI * travel) * arc;
+    flight.current = { x, y };
+
+    let scale = 0.92 + Math.sin(Math.PI * Math.min(1, p / MOBILE_FOOD_ACCEPT_AT)) * 0.1;
+    let opacity = 1;
+    if (p >= MOBILE_FOOD_ACCEPT_AT) {
+      const cross = clamp01((p - MOBILE_FOOD_ACCEPT_AT) / (1 - MOBILE_FOOD_ACCEPT_AT));
+      if (!flight.accepted) this._acceptMobileFlightFood(flight);
+      flight.entry.food.group.scale.setScalar(lerp(
+        flight.entry.groupBaseScale * 0.72, flight.entry.groupBaseScale, cross,
+      ));
+      scale = lerp(1.02, 0.34, cross);
+      opacity = 1 - cross;
+    }
+    flight.token.style.left = `${x}px`;
+    flight.token.style.top = `${y}px`;
+    flight.token.style.transform = `translate(-50%, -50%) scale(${scale})`;
+    flight.token.style.opacity = `${opacity}`;
+    if (p >= 1) this._completeMobileFoodFlight(flight);
   }
 
   _updateMobileFoodLabels() {
@@ -1159,6 +1303,11 @@ export class FactBook3D {
     const wireViewerZone = (vp) => {
       let rot = null;
       vp.addEventListener('pointerdown', (e) => {
+        if (this._mobileModelOpen && this._mobileActivity?.flight) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
         rot = { x: e.clientX, y: e.clientY };
         try { vp.setPointerCapture(e.pointerId); } catch { /* no capture available */ }
         vp.classList.add('is-grabbing');
@@ -1181,9 +1330,14 @@ export class FactBook3D {
       vp.addEventListener('pointercancel', endRot);
       vp.addEventListener('wheel', (e) => {
         e.preventDefault();
+        if (this._mobileModelOpen && this._mobileActivity?.flight) return;
         this.methodViewer.zoomBy(e.deltaY);
       }, { passive: false });
       vp.addEventListener('keydown', (e) => {
+        if (this._mobileModelOpen && this._mobileActivity?.flight) {
+          e.preventDefault();
+          return;
+        }
         const step = 0.07;
         if (e.key === 'ArrowLeft') this.methodViewer.rotateBy(-step, 0);
         else if (e.key === 'ArrowRight') this.methodViewer.rotateBy(step, 0);
@@ -1509,6 +1663,7 @@ export class FactBook3D {
 
     this.methodViewer.update(dt, this._elapsed);
     if (!this._inspecting) this._method?.update?.(dt, this._elapsed);
+    this._updateMobileFoodFlight(dt);
     const autoplay = this._autoplay;
     if (autoplay && !this._inspecting && autoplay.advance(dt)) {
       this._finishAutoplay(autoplay, this._autoplayRun);
