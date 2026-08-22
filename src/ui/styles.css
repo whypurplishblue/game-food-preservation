@@ -965,7 +965,7 @@ html, body {
   .pp-leaderboard__status, .pp-leaderboard__loading, .pp-leaderboard__empty, .pp-leaderboard__error { min-height: 92px; padding: 12px 8px; }
   .pp-quick__mute, .pp-quick__language { min-height: 44px; padding: 7px 10px; font-size: 12px; }
 }
-@media (max-width: 720px) and (orientation: portrait) {
+@media (max-width: 1000px) and (orientation: portrait) {
   .pp-mode-select__cards { grid-template-columns: 1fr; }
   .pp-mode-select { padding: 14px 12px; }
   .pp-mode-select__header { padding-inline: 0; }
@@ -1009,7 +1009,7 @@ html, body {
   .pp-lang { padding: 6px 12px; }
   .pp-title__credits { white-space: nowrap; }
 }
-@media (max-width: 720px), (max-height: 460px), (max-aspect-ratio: 11/10) {
+@media (max-width: 1000px), (max-height: 460px), (max-aspect-ratio: 11/10) {
   .pp-memory, .pp-microbe { display: none; }
   .pp-peek { top: auto; bottom: calc(200px + var(--safe-b)); }
   .pp-panel { padding: 9px 12px 12px; }

@@ -171,9 +171,7 @@ export class FactBook3D {
   _dur(seconds) { return this.reduced ? Math.min(0.2, seconds * 0.28) : seconds; }
 
   _isMobileLayout() {
-    return !!window.matchMedia?.(
-      '(max-width: 720px), (orientation: portrait) and (max-width: 1000px)',
-    ).matches;
+    return !!window.matchMedia?.('(max-width: 1000px)').matches;
   }
 
   _isLandscapeMobile() {
