@@ -403,7 +403,7 @@ export class Screens {
             </section>` : ''}
           <section class="pp-leaderboard__panel" role="tabpanel" id="leaderboard-panel" aria-labelledby="leaderboard-tab-${activeMode}" tabindex="0" data-el="panel"></section>
         </div>
-      </div>`, { escapable: true, onEscape: () => this._finishLeaderboard(state), cls: 'is-fact' });
+      </div>`, { escapable: true, onEscape: () => this._finishLeaderboard(state), cls: 'is-fact is-leaderboard' });
 
     node.querySelector('[data-act="close"]').addEventListener('click', () => { sfx('ui.back'); this._finishLeaderboard(state); });
     const tabs = node.querySelector('[data-el="tabs"]');
@@ -663,7 +663,7 @@ export class Screens {
           <p class="pp-credits__intro">${t('ui.creditsIntro')}</p>
           ${sections}
         </div>
-      </div>`, { escapable: true, onEscape: () => this._closeTo(onClose, focus), cls: 'is-fact' });
+      </div>`, { escapable: true, onEscape: () => this._closeTo(onClose, focus), cls: 'is-fact is-credits' });
     node.querySelector('[data-act="close"]').addEventListener('click', () => {
       sfx('ui.back');
       this._closeTo(onClose, focus);
