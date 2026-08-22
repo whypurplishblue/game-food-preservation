@@ -94,6 +94,19 @@ await jump(await methodIndex('drying'));
 await sleep(500);
 await shot('10-drying');
 
+// Desktop expansion reuses the mobile Explore surface: same full-stage model,
+// food cards and placement activity, opened from the inline viewer's icon.
+await page.click('.pp-fb__expand');
+await page.waitForFunction(() => window.__pp.game.factBook.state === 'mobile-model', null, { timeout: 5000 });
+await sleep(500);
+await shot('10b-drying-expanded');
+await page.click('.pp-fb__mobilefood:nth-child(1)');
+await sleep(300);
+await shot('10c-drying-expanded-food-flight');
+await page.click('.pp-fb__mobileback');
+await page.waitForFunction(() => window.__pp.game.factBook.state === 'reading', null, { timeout: 5000 });
+await sleep(500);
+
 // rotate the rack: the model must move and the page must not
 const vp = await page.$('.pp-fb__viewport');
 const bb = await vp.boundingBox();
