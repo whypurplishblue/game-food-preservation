@@ -157,6 +157,8 @@ export class FactBook3D {
     this._autoplayRun = 0;          // invalidates a finishing success flourish when a new food is chosen
     this._mobilePlacementRun = 0;   // invalidates an interrupted mobile card-to-station flight
     this._mobileModelOpen = false;
+    this._modelFullscreenOpener = null;
+    this._modelFullscreenFromDesktop = false;
     this._mobileActivity = null;
   }
 
@@ -432,13 +434,14 @@ export class FactBook3D {
         <button class="pp-fb__mobilepanel-explore" type="button" hidden></button>
         <section class="pp-fb__viewersec" hidden>
           <div class="pp-fb__seclabel"><span></span></div>
-          <div class="pp-fb__viewer">
-            <div class="pp-fb__viewport" tabindex="0" role="application"></div>
-            <span class="pp-fb__hint"></span>
-            <button class="pp-fb__reset" type="button">&#8635;</button>
-            <button class="pp-fb__backfood" type="button" hidden></button>
-            <button class="pp-fb__animate" type="button" hidden>
-              <span class="pp-fb__animatelabel"></span>
+           <div class="pp-fb__viewer">
+             <div class="pp-fb__viewport" tabindex="0" role="application"></div>
+             <span class="pp-fb__hint"></span>
+             <button class="pp-fb__reset" type="button">&#8635;</button>
+             <button class="pp-fb__expand" type="button">⤢</button>
+             <button class="pp-fb__backfood" type="button" hidden></button>
+             <button class="pp-fb__animate" type="button" hidden>
+               <span class="pp-fb__animatelabel"></span>
             </button>
           </div>
         </section>
@@ -487,6 +490,7 @@ export class FactBook3D {
       viewport: q('.pp-fb__viewport'),
       hint: q('.pp-fb__hint'),
       reset: q('.pp-fb__reset'),
+      expand: q('.pp-fb__expand'),
       backFood: q('.pp-fb__backfood'),
       animate: q('.pp-fb__animate'),
       animateLabel: q('.pp-fb__animatelabel'),
@@ -508,6 +512,9 @@ export class FactBook3D {
     this.ui.prev.setAttribute('aria-label', t('ui.prevPage'));
     this.ui.next.setAttribute('aria-label', t('ui.nextPage'));
     this.ui.reset.setAttribute('aria-label', t('ui.resetView'));
+    this.ui.expand.setAttribute('aria-label', t('ui.open3d'));
+    this.ui.expand.title = t('ui.open3d');
+    this.ui.expand.hidden = true;
     this.ui.mobilePanelExplore.textContent = t('ui.open3d');
     this.ui.mobilePanelExplore.setAttribute('aria-label', t('ui.open3d'));
   }
@@ -675,6 +682,7 @@ export class FactBook3D {
 
     this.live.textContent = `${s.label} — ${s.title}`;
     this._loadMethodModel(mv);
+    this._updateModelExpand();
     // Content just changed height — recheck once the browser has laid it out.
     requestAnimationFrame(() => {
       this._drawMobileArt(s);
@@ -1089,6 +1097,18 @@ export class FactBook3D {
     const visible = this.isOpen && this._isMobileLayout() && isMethod && !this._mobileModelOpen;
     this.mobileExplore.hidden = !visible;
     this.ui.mobilePanelExplore.hidden = true;
+    this._updateModelExpand();
+  }
+
+  _updateModelExpand() {
+    const expand = this.ui?.expand;
+    if (!expand) return;
+    const spread = this.model?.spreads?.[this.index];
+    const visible = this.isOpen && !this._isMobileLayout() && this.state === 'reading' &&
+      spread?.kind === 'method' && !!this._methodDesc && !this._inspecting && !this._mobileModelOpen;
+    expand.hidden = !visible;
+    expand.setAttribute('aria-label', t('ui.open3d'));
+    expand.title = t('ui.open3d');
   }
 
   _drawMobileArt(spread = this.model?.spreads?.[this.index]) {
@@ -1112,14 +1132,17 @@ export class FactBook3D {
     canvas.setAttribute('aria-label', label);
   }
 
-  /** Open the current method's model as a focused mobile reading state. */
-  openMobileModel() {
-    if (!this.isOpen || !this._isMobileLayout() || this.state !== 'reading') return;
+  /** Open the current method's model as the shared full-screen reading state. */
+  openModelFullscreen({ preservePose = false, opener = null } = {}) {
+    if (!this.isOpen || this.state !== 'reading') return;
+    if (!this._isMobileLayout() && !preservePose) return;
     if (!this._mv || !this._methodDesc || this._mobileModelOpen) return;
     sfx('ui.tap');
     this._cancelAutoplay();
     this._disposeInspected();
     this._mobileModelOpen = true;
+    this._modelFullscreenOpener = opener;
+    this._modelFullscreenFromDesktop = preservePose && !this._isMobileLayout();
     this.state = 'mobile-model';
     this.wrap.classList.add('is-mobile-model');
     this.mobileModel.hidden = false;
@@ -1134,26 +1157,45 @@ export class FactBook3D {
     this.mobileViewport.setAttribute('aria-label', `${t('ui.interactive3d')}: ${this._mv.name}`);
     this.mobileAnimate.hidden = !this._mv.playable;
     this._setAnimatePlaying(false);
-    // The full-screen mobile viewer is an activity surface, not a turntable:
-    // keep the station still so the food cards remain easy to read and grab.
-    this.methodViewer.use(this._methodDesc, { spin: 0 });
+    // The full-screen viewer is an activity surface, not a turntable: keep the
+    // station still so the food cards remain easy to read and grab. Desktop
+    // expansion carries the inline camera pose into the larger surface.
+    this.methodViewer.use(this._methodDesc, { spin: 0, keepAngles: preservePose });
     this._buildMobileActivity();
     this._updateMobileExplore();
     requestAnimationFrame(() => this.mobileBack.focus({ preventScroll: true }));
   }
 
-  closeMobileModel({ sound = true, focus = true } = {}) {
+  openMobileModel() {
+    this.openModelFullscreen({ preservePose: false, opener: this.mobileExplore });
+  }
+
+  closeModelFullscreen({ sound = true, focus = true } = {}) {
     if (!this._mobileModelOpen) return;
     if (sound) sfx('ui.back');
+    const opener = this._modelFullscreenOpener;
+    const fromDesktop = this._modelFullscreenFromDesktop;
     this._cancelAutoplay();
     this._disposeMobileActivity();
     this._mobileModelOpen = false;
+    this._modelFullscreenOpener = null;
+    this._modelFullscreenFromDesktop = false;
     this.wrap.classList.remove('is-mobile-model');
     this.mobileModel.hidden = true;
     this.mobileAnimate.hidden = true;
     this.state = this._inspecting ? 'food' : 'reading';
+    if (this._methodDesc) {
+      this.methodViewer.use(this._methodDesc, { spin: this.reduced ? 0 : 0.16, keepAngles: true });
+    }
     this._updateMobileExplore();
-    if (focus) requestAnimationFrame(() => this.bookZone.focus({ preventScroll: true }));
+    if (focus) requestAnimationFrame(() => {
+      const target = fromDesktop && opener?.isConnected && !opener.hidden ? opener : this.bookZone;
+      target.focus({ preventScroll: true });
+    });
+  }
+
+  closeMobileModel(options) {
+    this.closeModelFullscreen(options);
   }
 
   /** Focus one food in the big viewer, with a way back that is not "close" (§25). */
@@ -1174,6 +1216,7 @@ export class FactBook3D {
     this.ui.viewport.focus({ preventScroll: true });
     this.state = 'food';
     this.live.textContent = fv.name;
+    this._updateModelExpand();
   }
 
   backToMethod() {
@@ -1185,6 +1228,7 @@ export class FactBook3D {
     this.ui.viewerLabel.textContent = t('ui.interactive3d');
     if (this._methodDesc) this.methodViewer.use(this._methodDesc, { spin: this.reduced ? 0 : 0.16 });
     this.state = 'reading';
+    this._updateModelExpand();
   }
 
   // ================================================================= animate
@@ -1364,6 +1408,9 @@ export class FactBook3D {
     this.mobileAnimate.addEventListener('click', () => this.animateMethod());
     this.mobileExplore.addEventListener('click', () => this.openMobileModel());
     this.ui.mobilePanelExplore.addEventListener('click', () => this.openMobileModel());
+    this.ui.expand.addEventListener('click', () => this.openModelFullscreen({
+      preservePose: true, opener: this.ui.expand,
+    }));
     this.mobileBack.addEventListener('click', () => this.closeMobileModel());
     this.ui.backFood.addEventListener('click', () => this.backToMethod());
     this.ui.animate.addEventListener('click', () => this.animateMethod());
@@ -1478,6 +1525,7 @@ export class FactBook3D {
       this.methodViewer.entry = 1;
       this.ui.inner.style.opacity = '1';
       this.state = this._inspecting ? 'food' : 'reading';
+      this._updateMobileExplore();
       this._prefetch();
     });
   }
@@ -1537,11 +1585,16 @@ export class FactBook3D {
     this.ui.prev.setAttribute('aria-label', t('ui.prevPage'));
     this.ui.next.setAttribute('aria-label', t('ui.nextPage'));
     this.ui.reset.setAttribute('aria-label', t('ui.resetView'));
+    this.ui.expand.setAttribute('aria-label', t('ui.open3d'));
+    this.ui.expand.title = t('ui.open3d');
     this.onClose = onClose;
     this.isOpen = true;
     this._mobileModelOpen = false;
+    this._modelFullscreenOpener = null;
+    this._modelFullscreenFromDesktop = false;
     this.wrap.classList.remove('is-mobile-model');
     this.mobileModel.hidden = true;
+    this.ui.expand.hidden = true;
     this.mobileExplore.textContent = t('ui.open3d');
     this.mobileExplore.setAttribute('aria-label', t('ui.open3d'));
     this.mobileModelHeadNote.textContent = t('ui.dragToRotate');
@@ -1600,6 +1653,7 @@ export class FactBook3D {
       this.state = 'reading';
       this.wrap.classList.add('is-open');
       this._describeBookZone();
+      this._updateMobileExplore();
       this.bookZone.focus({ preventScroll: true });
     });
   }
