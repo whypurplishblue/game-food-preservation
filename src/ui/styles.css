@@ -20,6 +20,7 @@
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
+  --overlay-utility-rail: 72px;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --learn-accent: #4fc3f7;
   --learn-accent-dark: #1479aa;
@@ -521,6 +522,18 @@ html, body {
 }
 .pp-screens.is-open { display: grid; }
 
+/* Leaderboard and credits share the viewport with the global language control.
+   Give those panels a dedicated top rail so their header close button stays
+   below the control instead of being covered by it when the panel is tall. */
+.pp-screens.is-leaderboard,
+.pp-screens.is-credits {
+  padding-top: calc(var(--overlay-utility-rail) + var(--safe-t));
+}
+.pp-screens.is-leaderboard > .pp-leaderboard,
+.pp-screens.is-credits > .pp-credits {
+  max-height: calc(100vh - var(--overlay-utility-rail) - 16px - var(--safe-t) - var(--safe-b));
+}
+
 /* ======================================================== quick controls ==
    QuickControls is shared by menu overlays and the gameplay HUD. Keep mute
    visually compact with a speaker icon while its action name remains exposed
@@ -952,7 +965,7 @@ html, body {
   .pp-leaderboard__status, .pp-leaderboard__loading, .pp-leaderboard__empty, .pp-leaderboard__error { min-height: 92px; padding: 12px 8px; }
   .pp-quick__mute, .pp-quick__language { min-height: 44px; padding: 7px 10px; font-size: 12px; }
 }
-@media (max-width: 720px) and (orientation: portrait) {
+@media (max-width: 1000px) and (orientation: portrait) {
   .pp-mode-select__cards { grid-template-columns: 1fr; }
   .pp-mode-select { padding: 14px 12px; }
   .pp-mode-select__header { padding-inline: 0; }
@@ -996,7 +1009,7 @@ html, body {
   .pp-lang { padding: 6px 12px; }
   .pp-title__credits { white-space: nowrap; }
 }
-@media (max-width: 720px), (max-height: 460px), (max-aspect-ratio: 11/10) {
+@media (max-width: 1000px), (max-height: 460px), (max-aspect-ratio: 11/10) {
   .pp-memory, .pp-microbe { display: none; }
   .pp-peek { top: auto; bottom: calc(200px + var(--safe-b)); }
   .pp-panel { padding: 9px 12px 12px; }
