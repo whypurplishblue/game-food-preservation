@@ -522,10 +522,10 @@ html, body {
 .pp-screens.is-open { display: grid; }
 
 /* ======================================================== quick controls ==
-   QuickControls is shared by menu overlays and the gameplay HUD.  Keep the
-   controls text-labelled so their purpose is clear without an icon font, and
-   keep the popover in the same stacking context as its trigger for reliable
-   keyboard and touch dismissal. */
+   QuickControls is shared by menu overlays and the gameplay HUD. Keep mute
+   visually compact with a speaker icon while its action name remains exposed
+   through the accessible label and tooltip. Keep the popover in the same
+   stacking context as its trigger for reliable keyboard and touch dismissal. */
 .pp-quick {
   position: relative; display: inline-flex; align-items: center; gap: 8px;
   pointer-events: auto; z-index: 85; min-width: 0;
@@ -536,16 +536,22 @@ html, body {
   max-inline-size: calc(100% - 24px - var(--safe-l) - var(--safe-r));
 }
 /* The Fact Book owns the same top-right corner for its close button. Keep the
-   audio control available, but place it in a small utility rail underneath. */
+   audio control on the same row, immediately to its left. */
 .pp-quick.is-overlay.is-factbook {
-  inset-block-start: calc(68px + var(--safe-t));
+  inset-block-start: calc(16px + var(--safe-t));
+  inset-inline-end: calc(68px + var(--safe-r));
 }
 .pp-quick.is-overlay.is-factbook .pp-quick__mute {
+  min-width: 44px;
+  width: 44px;
+  padding-inline: 8px;
+  gap: 0;
   background: rgba(255, 255, 255, 0.88);
   border-color: #cfe0ea;
   color: #16294d;
   box-shadow: 0 4px 12px rgba(23, 52, 82, 0.14);
 }
+.pp-quick.is-overlay.is-factbook .pp-quick__label { display: none; }
 .pp-quick.is-hud { flex: 0 1 auto; align-self: flex-start; }
 .pp-quick button { font-family: var(--font); touch-action: manipulation; }
 .pp-quick__mute, .pp-quick__language {

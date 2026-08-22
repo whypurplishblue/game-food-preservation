@@ -66,6 +66,16 @@ await session({ width: 1600, height: 900 }, async (page) => {
       const z = document.querySelector('.pp-fb__bookzone');
       return z.getAttribute('role') === 'button' && !!z.getAttribute('aria-label') && z.tabIndex >= 0;
     }));
+  check('audio control is icon-only but accessible',
+    await page.evaluate(() => {
+      const buttons = [...document.querySelectorAll('.pp-quick [data-quick="mute"]')];
+      return buttons.length > 0 && buttons.every((button) => {
+        const label = button.querySelector('.pp-quick__label');
+        const icon = button.querySelector('.pp-quick__icon');
+        return !!icon?.textContent.trim() && !label?.textContent.trim() &&
+          !!button.getAttribute('aria-label') && !!button.title;
+      });
+    }));
   // Opened from the keyboard, to prove the reader can still open it early.
   await page.focus('.pp-fb__bookzone');
   await page.keyboard.press('Enter');
@@ -125,6 +135,22 @@ await session({ width: 1600, height: 900 }, async (page) => {
 
   await page.evaluate(() => window.__pp.game.factBook.goToMethod('drying'));
   await settle(page);
+  await page.waitForFunction(() =>
+    document.querySelector('.pp-fb__lead')?.classList.contains('is-exam'),
+    null, { timeout: 5000 });
+  const desktopMethodLayout = await page.evaluate(() => {
+    const inner = document.querySelector('.pp-fb__panelinner');
+    const lead = document.querySelector('.pp-fb__lead');
+    return {
+      examAtTop: lead?.classList.contains('is-exam') && !!lead.textContent.trim(),
+      noDuplicateExamSection: !document.querySelector('.pp-fb__examsec'),
+      noVerticalScroll: inner && inner.scrollHeight <= inner.clientHeight + 1,
+    };
+  });
+  check('exam note replaces the method information at the top', desktopMethodLayout.examAtTop);
+  check('desktop method panel fits without vertical scrolling', desktopMethodLayout.noVerticalScroll,
+    `${desktopMethodLayout.noVerticalScroll ? 'fits' : 'overflows'}`);
+  check('the lower duplicate exam section is removed', desktopMethodLayout.noDuplicateExamSection);
   const dryIdx = await state(page);
 
   // --- rotating the model must not reach the book
@@ -201,6 +227,13 @@ await session({ width: 1600, height: 900 }, async (page) => {
     await page.evaluate(() => !window.__pp.game.factBook.book.turning));
   check('play resumes', await page.evaluate(() => window.__pp.game.mode === 'playing'));
   check('the HUD comes back', await page.evaluate(() => !window.__pp.hud.root.classList.contains('is-hidden')));
+  check('audio control stays icon-only in the HUD',
+    await page.evaluate(() => {
+      const button = document.querySelector('.pp-quick.is-hud [data-quick="mute"]');
+      return !!button && !!button.querySelector('.pp-quick__icon')?.textContent.trim() &&
+        !button.querySelector('.pp-quick__label')?.textContent.trim() &&
+        !!button.getAttribute('aria-label') && !!button.title;
+    }));
 
   // Completing the final learning method schedules a quiz after the teaching
   // banner. The result screen must not win that delay and cover the quiz.
@@ -255,13 +288,540 @@ await session({ width: 820, height: 1180 }, async (page) => {
   await page.evaluate(() => window.__pp.game.factBook.goToMethod('pickling'));
   await settle(page);
   await sleep(400);
-  const stacked = await page.evaluate(() => {
+  const mobileBook = await page.evaluate(() => {
     const b = document.querySelector('.pp-fb__bookzone').getBoundingClientRect();
     const p = document.querySelector('.pp-fb__panel').getBoundingClientRect();
-    return p.top >= b.bottom - 2;
+    const nav = document.querySelector('.pp-fb__nav');
+    const tabs = document.querySelector('.pp-fb__tabs');
+    const visible = (element) => {
+      if (!element || getComputedStyle(element).display === 'none') return false;
+      const r = element.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0;
+    };
+    return {
+      panelHidden: getComputedStyle(document.querySelector('.pp-fb__panel')).display === 'none' && p.height === 0,
+      bookUsesStage: b.height > window.innerHeight * 0.65,
+      navigationHidden: [nav, tabs].every((element) =>
+        element && getComputedStyle(element).display === 'none'),
+      controlsVisible: [
+        document.querySelector('.pp-fb__close'),
+        document.querySelector('.pp-quick.is-overlay.is-factbook'),
+      ].every(visible),
+    };
   });
-  check('narrow layout stacks book above panel', stacked);
+  check('mobile preview shows the book and utility controls', mobileBook.panelHidden && mobileBook.bookUsesStage && mobileBook.controlsVisible);
+  check('mobile preview hides navigation but keeps controls', mobileBook.navigationHidden);
   await page.screenshot({ path: `${OUT}/20-narrow.png` });
+});
+
+// ------------------------------------------------------ landscape phone
+await session({ width: 667, height: 375 }, async (page) => {
+  console.log('\n[landscape phone 667x375]');
+  await page.click('[data-act="fact"]');
+  await page.waitForFunction(() => window.__pp.game.factBook?.isOpen, null, { timeout: 15000 });
+  await page.evaluate(() => clearTimeout(window.__pp.game.factBook._openTimer));
+  const closedPanel = await page.evaluate(() => {
+    const panel = document.querySelector('.pp-fb__panel');
+    const style = getComputedStyle(panel);
+    return {
+      opacity: Number(style.opacity),
+      pointerEvents: style.pointerEvents,
+      visible: style.display !== 'none' && panel.getBoundingClientRect().width > 0 &&
+        Number(style.opacity) > 0.01,
+    };
+  });
+  check('landscape mobile panel waits for the book to open',
+    closedPanel.opacity < 0.1 && closedPanel.pointerEvents === 'none' && !closedPanel.visible,
+    JSON.stringify(closedPanel));
+  await page.evaluate(() => window.__pp.game.factBook.openBook());
+  await settle(page);
+  const mobileBook = await page.evaluate(() => {
+    const book = document.querySelector('.pp-fb__bookzone').getBoundingClientRect();
+    const panel = document.querySelector('.pp-fb__panel');
+    const inner = document.querySelector('.pp-fb__panelinner');
+    const art = document.querySelector('.pp-fb__mobileart');
+    const explore = document.querySelector('.pp-fb__mobile-explore');
+    const navigation = [
+      document.querySelector('.pp-fb__nav'),
+      document.querySelector('.pp-fb__tabs'),
+    ];
+    const visible = (element) => {
+      if (!element || getComputedStyle(element).display === 'none') return false;
+      const r = element.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0;
+    };
+    return {
+      bookUsesStage: book.height > window.innerHeight * 0.45,
+      panelVisible: getComputedStyle(panel).display !== 'none' && panel.getBoundingClientRect().width > 260,
+      referenceCard: getComputedStyle(panel).borderRadius !== '0px' &&
+        getComputedStyle(panel).backgroundColor !== 'rgba(0, 0, 0, 0)',
+      panelScrollable: inner.scrollHeight > inner.clientHeight,
+      overviewArtVisible: art.width > 0 && art.height > 0 && !art.closest('[hidden]'),
+      navigationHidden: navigation.every((element) =>
+        element && getComputedStyle(element).display === 'none'),
+      controlsVisible: [
+        document.querySelector('.pp-fb__close'),
+        document.querySelector('.pp-quick.is-overlay.is-factbook'),
+      ].every(visible),
+    };
+  });
+  check('landscape phone preview shows the book and information panel',
+    mobileBook.bookUsesStage && mobileBook.panelVisible && mobileBook.referenceCard &&
+    mobileBook.navigationHidden && mobileBook.controlsVisible);
+  check('landscape phone content card is vertically scrollable', mobileBook.panelScrollable);
+  check('landscape phone overview includes its illustration', mobileBook.overviewArtVisible);
+  check('landscape phone preview hides page arrows and dots', mobileBook.navigationHidden);
+  await page.screenshot({ path: `${OUT}/20b-landscape-phone.png` });
+
+  await page.evaluate(() => window.__pp.game.factBook.goToMethod('pickling'));
+  await settle(page);
+  const mobileMethod = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    const panel = document.querySelector('.pp-fb__panel');
+    const inner = document.querySelector('.pp-fb__panelinner');
+    const art = document.querySelector('.pp-fb__mobileart');
+    const artSection = document.querySelector('.pp-fb__mobileartsec');
+    const explore = document.querySelector('.pp-fb__mobile-explore');
+    const chips = [...document.querySelectorAll('.pp-fb__card.is-mobile-chip')];
+    return {
+      methodTitle: document.querySelector('.pp-fb__title')?.textContent === fb._mv?.name,
+      methodArtVisible: !!art && art.width > 0 && art.height > 0 && !artSection.hidden,
+      exploreVisible: !!explore && !explore.hidden && getComputedStyle(explore).display !== 'none' &&
+        !!explore.textContent.trim(),
+      exploreUnderBook: !!explore && explore.getBoundingClientRect().left < panel.getBoundingClientRect().left &&
+        explore.getBoundingClientRect().top > document.querySelector('.pp-fb__bookzone').getBoundingClientRect().top,
+      panelExploreHidden: document.querySelector('.pp-fb__mobilepanel-explore')?.hidden === true,
+      inlineViewerHidden: getComputedStyle(document.querySelector('.pp-fb__viewersec')).display === 'none',
+      foodChips: chips.length === fb._mv.foods.length && chips.every((chip) =>
+        chip.tagName === 'SPAN' && !chip.querySelector('.pp-fb__cardslot')),
+      alsoWorksChips: document.querySelectorAll('.pp-fb__alsosec .pp-fb__chip').length === fb._mv.alsoWorks.length,
+      scrollable: inner.scrollHeight > inner.clientHeight,
+      cardBackground: getComputedStyle(panel).backgroundColor !== 'rgba(0, 0, 0, 0)',
+    };
+  });
+  check('mobile method card keeps its readable content layout',
+    mobileMethod.methodTitle && mobileMethod.methodArtVisible && mobileMethod.cardBackground);
+  check('mobile method page offers a static illustration', mobileMethod.methodArtVisible);
+  check('mobile method page offers a 3D model action below the book',
+    mobileMethod.exploreVisible && mobileMethod.exploreUnderBook && mobileMethod.panelExploreHidden,
+    JSON.stringify(mobileMethod));
+  check('mobile method hides the inline 3D viewer', mobileMethod.inlineViewerHidden);
+  check('mobile method renders foods as text-only chips', mobileMethod.foodChips);
+  check('mobile method keeps also-works foods separate', mobileMethod.alsoWorksChips);
+  check('mobile method content can scroll vertically', mobileMethod.scrollable);
+  await page.screenshot({ path: `${OUT}/20b-method-landscape.png` });
+  await page.click('.pp-fb__mobile-explore');
+  await page.waitForFunction(() => window.__pp.game.factBook.state === 'mobile-model', null, { timeout: 5000 });
+  const mobileModel = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    const viewport = document.querySelector('.pp-fb__mobileviewport').getBoundingClientRect();
+    const overlay = document.querySelector('.pp-fb__mobilemodel');
+    const back = document.querySelector('.pp-fb__mobileback');
+    const animate = document.querySelector('.pp-fb__mobileanimate');
+    const controlState = (element) => {
+      const r = element?.getBoundingClientRect();
+      return {
+        visible: !!element && getComputedStyle(element).display !== 'none' &&
+          r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0,
+        rect: r ? `${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)}x${Math.round(r.height)}` : 'missing',
+        style: element ? `${getComputedStyle(element).visibility}/${getComputedStyle(element).opacity}/z${getComputedStyle(element).zIndex}` : 'missing',
+      };
+    };
+    const controls = [
+      controlState(document.querySelector('.pp-fb__close')),
+      controlState(document.querySelector('.pp-quick.is-overlay.is-factbook')),
+    ];
+    return {
+      open: !overlay.hidden && getComputedStyle(overlay).display !== 'none',
+      fillsStage: viewport.width > window.innerWidth * 0.8 && viewport.height > window.innerHeight * 0.55,
+      titleMatchesMethod: document.querySelector('.pp-fb__mobilemodeltitle')?.textContent === fb._mv?.name,
+      modelLoaded: !!fb.methodViewer.holder,
+      backVisible: getComputedStyle(back).display !== 'none' && !back.hidden,
+      animateVisible: getComputedStyle(animate).display !== 'none' && !animate.hidden &&
+        animate.getBoundingClientRect().width > 0 && animate.getBoundingClientRect().height > 0,
+      controlsVisible: controls.every((control) => control.visible),
+      controlRects: controls.map((control) => control.rect),
+    };
+  });
+  check('mobile method opens a full-screen interactive model',
+    mobileModel.open && mobileModel.fillsStage && mobileModel.titleMatchesMethod && mobileModel.modelLoaded);
+  check('mobile model has a clear way back to the book', mobileModel.backVisible);
+  check('mobile model offers Watch it work', mobileModel.animateVisible);
+  check('mobile model keeps mute and close controls visible', mobileModel.controlsVisible,
+    mobileModel.controlRects.join('; '));
+  const stillAz = await page.evaluate(() => window.__pp.game.factBook.methodViewer._targetAz);
+  await sleep(450);
+  const stillAzAfter = await page.evaluate(() => window.__pp.game.factBook.methodViewer._targetAz);
+  check('mobile Explore 3D does not rotate on its own', Math.abs(stillAzAfter - stillAz) < 0.001,
+    `delta=${(stillAzAfter - stillAz).toFixed(4)}`);
+
+  const mobileActivity = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    const labels = [...document.querySelectorAll('.pp-fb__mobilefood')];
+    const ids = labels.map((label) => label.dataset.foodId);
+    const primaryIds = fb._mv.foods.map((food) => food.id);
+    const alsoIds = new Set((fb._mv.alsoWorks || []).map((food) => food.id));
+    const rects = labels.map((label) => label.getBoundingClientRect());
+    return {
+      expectedCount: primaryIds.length,
+      actualCount: labels.length,
+      idsMatchPrimary: ids.length === primaryIds.length && ids.every((id, i) => id === primaryIds[i]),
+      excludesAlsoWorks: ids.every((id) => !alsoIds.has(id)),
+      labelsVisible: labels.length > 0 && labels.every((label, i) => !label.hidden &&
+        getComputedStyle(label).display !== 'none' && rects[i].width > 0 && rects[i].height > 0),
+      labelsHaveLocalizedText: labels.every((label) => label.textContent.trim().length > 0),
+      thumbnailsVisible: labels.length > 0 && labels.every((label) => {
+        const thumb = label.querySelector('.pp-fb__mobilefoodthumb');
+        return thumb instanceof HTMLCanvasElement && thumb.width > 0 && thumb.height > 0 &&
+          getComputedStyle(thumb).display !== 'none';
+      }),
+      distinctPositions: new Set(rects.map((rect) => `${Math.round(rect.left)},${Math.round(rect.top)}`)).size === labels.length,
+      squareCards: labels.length > 0 && labels.every((label, i) => {
+        const style = getComputedStyle(label);
+        return Math.abs(rects[i].width - rects[i].height) < 12 &&
+          style.borderRadius !== '999px' && style.display === 'flex';
+      }),
+      noInlineFoodSlots: !document.querySelector('.pp-fb__mobilefoodlayer .pp-fb__cardslot'),
+    };
+  });
+  check('mobile Explore 3D shows exactly the taught primary foods',
+    mobileActivity.actualCount === mobileActivity.expectedCount && mobileActivity.idsMatchPrimary);
+  check('mobile food labels are visible and positioned separately',
+    mobileActivity.labelsVisible && mobileActivity.labelsHaveLocalizedText &&
+      mobileActivity.thumbnailsVisible && mobileActivity.distinctPositions,
+    JSON.stringify(mobileActivity));
+  check('mobile Explore 3D uses square food cards', mobileActivity.squareCards,
+    JSON.stringify(mobileActivity));
+  check('mobile food activity excludes also-works foods', mobileActivity.excludesAlsoWorks);
+  const mobileCards = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    const labels = [...document.querySelectorAll('.pp-fb__mobilefood')];
+    const layer = document.querySelector('.pp-fb__mobilefoodlayer');
+    const layerRect = layer.getBoundingClientRect();
+    const rects = labels.map((label) => label.getBoundingClientRect());
+    return {
+      staticThumbnails: labels.every((label) => !!label.querySelector('.pp-fb__mobilefoodthumb')),
+      noInline3dSlots: !document.querySelector('.pp-fb__mobilefoodlayer .pp-fb__cardslot'),
+      foodsHidden: fb._mobileActivity.entries.every((entry) => !entry.food.group.visible),
+      verticalColumn: rects.every((rect) => rect.left >= layerRect.left &&
+        rect.right <= layerRect.right + 2 && rect.top >= layerRect.top &&
+        rect.bottom <= layerRect.bottom + 2),
+      cardGap: rects.length < 2 || rects.slice(1).every((rect, i) => rect.top > rects[i].bottom - 1),
+    };
+  });
+  check('mobile food cards show static thumbnails with hidden 3D foods',
+    mobileCards.staticThumbnails && mobileCards.noInline3dSlots && mobileCards.foodsHidden,
+    JSON.stringify(mobileCards));
+  check('mobile food cards form a vertical list on the left',
+    mobileCards.verticalColumn && mobileCards.cardGap, JSON.stringify(mobileCards));
+  await page.screenshot({ path: `${OUT}/20c-landscape-foods.png` });
+
+  const firstFoodSelector = '.pp-fb__mobilefood:nth-child(1)';
+  const secondFoodSelector = '.pp-fb__mobilefood:nth-child(2)';
+  await page.click(firstFoodSelector);
+  const flightStart = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    const activity = fb._mobileActivity;
+    const entry = activity.entries[0];
+    const token = document.querySelector('.pp-fb__mobileflighttoken');
+    const tokenRect = token?.getBoundingClientRect();
+    const sourceRect = entry.label.getBoundingClientRect();
+    return {
+      tokenVisible: !!token && tokenRect.width > 0 && tokenRect.height > 0 &&
+        getComputedStyle(token).opacity !== '0',
+      tokenStartsAtCard: !!token && Math.hypot(
+        tokenRect.left + tokenRect.width / 2 - (sourceRect.left + sourceRect.width / 2),
+        tokenRect.top + tokenRect.height / 2 - (sourceRect.top + sourceRect.height / 2),
+      ) < 28,
+      stationEmpty: !activity.station.food && !activity.station.busy,
+      realFoodHidden: !entry.food.group.visible,
+      flightActive: !!activity.flight && activity.flight.entry === entry,
+    };
+  });
+  check('tapping a food card starts a visible handoff from the card',
+    flightStart.tokenVisible && flightStart.tokenStartsAtCard && flightStart.stationEmpty &&
+      flightStart.realFoodHidden && flightStart.flightActive, JSON.stringify(flightStart));
+  await page.screenshot({ path: `${OUT}/20d-landscape-food-flight-start.png` });
+
+  const modelBox = await page.locator('.pp-fb__mobileviewport').boundingBox();
+  const azBeforeFlightDrag = await page.evaluate(() => window.__pp.game.factBook.methodViewer._targetAz);
+  if (modelBox) {
+    await page.mouse.move(modelBox.x + modelBox.width * 0.68, modelBox.y + modelBox.height * 0.52);
+    await page.mouse.down();
+    await page.mouse.move(modelBox.x + modelBox.width * 0.78, modelBox.y + modelBox.height * 0.52);
+    await page.mouse.up();
+  }
+  const azDuringFlightDrag = await page.evaluate(() => window.__pp.game.factBook.methodViewer._targetAz);
+  check('model rotation is held while the food is in flight',
+    Math.abs(azDuringFlightDrag - azBeforeFlightDrag) < 0.001,
+    `delta=${(azDuringFlightDrag - azBeforeFlightDrag).toFixed(4)}`);
+
+  await sleep(220);
+  const flightMid = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    const activity = fb._mobileActivity;
+    const flight = activity.flight;
+    return {
+      flightProgress: flight?.elapsed || 0,
+      tokenMoved: !!flight && Math.hypot(
+        flight.current.x - flight.start.x, flight.current.y - flight.start.y,
+      ) > 8,
+      stationEmpty: !activity.station.food && !activity.station.busy,
+      realFoodHidden: !activity.entries[0].food.group.visible,
+      tokenVisible: !!document.querySelector('.pp-fb__mobileflighttoken'),
+    };
+  });
+  check('the handoff travels toward the method before accepting the food',
+    flightMid.flightProgress > 100 && flightMid.tokenMoved && flightMid.stationEmpty &&
+      flightMid.realFoodHidden && flightMid.tokenVisible, JSON.stringify(flightMid));
+  await page.screenshot({ path: `${OUT}/20e-landscape-food-flight-mid.png` });
+
+  await sleep(150);
+  const flightNearTarget = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    const activity = fb._mobileActivity;
+    const flight = activity.flight;
+    if (!flight) return { flightStillVisible: false, nearTarget: false };
+    const target = fb._mobileFlightTarget(activity);
+    return {
+      flightStillVisible: true,
+      nearTarget: Math.hypot(flight.current.x - target.x, flight.current.y - target.y) < 110,
+    };
+  });
+  check('the handoff reaches the projected station target',
+    flightNearTarget.flightStillVisible && flightNearTarget.nearTarget,
+    JSON.stringify(flightNearTarget));
+
+  await page.waitForFunction(() => {
+    const fb = window.__pp.game.factBook;
+    return !!fb._autoplay && !!fb._mobileActivity?.active && !!fb._mobileActivity.station.food;
+  }, null, { timeout: 3000 });
+  const accepted = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    const entry = fb._mobileActivity.entries[0];
+    return {
+      acceptedFood: fb._mobileActivity.station.food?.foodId === entry.fv.id,
+      stationBusy: fb._mobileActivity.station.busy,
+      autoplayRunning: !!fb._autoplay,
+      flightCleared: !fb._mobileActivity.flight &&
+        document.querySelectorAll('.pp-fb__mobileflighttoken').length === 0,
+      cardPlaced: entry.label.classList.contains('is-placed') && !entry.label.disabled &&
+        entry.label.getAttribute('aria-pressed') === 'true',
+      foodVisible: entry.food.group.visible,
+    };
+  });
+  check('the handoff lands, accepts the food, and starts the station demonstration',
+    accepted.acceptedFood && accepted.stationBusy && accepted.autoplayRunning &&
+      accepted.flightCleared && accepted.cardPlaced && accepted.foodVisible,
+    JSON.stringify(accepted));
+  await sleep(450);
+  await page.screenshot({ path: `${OUT}/20f-landscape-food-landed.png` });
+
+  const azBeforePlacedDrag = await page.evaluate(() => window.__pp.game.factBook.methodViewer._targetAz);
+  if (modelBox) {
+    await page.mouse.move(modelBox.x + modelBox.width * 0.68, modelBox.y + modelBox.height * 0.52);
+    await page.mouse.down();
+    await page.mouse.move(modelBox.x + modelBox.width * 0.78, modelBox.y + modelBox.height * 0.52);
+    await page.mouse.up();
+  }
+  const azAfterPlacedDrag = await page.evaluate(() => window.__pp.game.factBook.methodViewer._targetAz);
+  check('manual model rotation resumes after the food is placed',
+    Math.abs(azAfterPlacedDrag - azBeforePlacedDrag) > 0.01,
+    `delta=${(azAfterPlacedDrag - azBeforePlacedDrag).toFixed(4)}`);
+
+  await page.click('.pp-fb__mobilemodelreset');
+  await page.waitForFunction(() => {
+    const fb = window.__pp.game.factBook;
+    return !fb._autoplay && !fb._mobileActivity?.station.food && !fb._mobileActivity?.active;
+  }, null, { timeout: 3000 });
+
+  await page.click(firstFoodSelector);
+  await sleep(220);
+  const midflightReplacementId = await page.evaluate(() =>
+    window.__pp.game.factBook._mobileActivity.entries[1]?.fv.id);
+  await page.click(secondFoodSelector);
+  const midflightReplacement = await page.evaluate((id) => {
+    const fb = window.__pp.game.factBook;
+    const activity = fb._mobileActivity;
+    const oldEntry = activity.entries[0];
+    const next = activity.entries.find((entry) => entry.fv.id === id);
+    return {
+      activeNewEntry: activity.active?.fv.id === id,
+      newFlightActive: activity.flight?.entry?.fv.id === id,
+      stationStillEmpty: !activity.station.food && !activity.station.busy,
+      oldFoodRemoved: !oldEntry.food.group.visible && !oldEntry.placed &&
+        !oldEntry.label.classList.contains('is-placing'),
+      newFoodStillHidden: !next.food.group.visible,
+    };
+  }, midflightReplacementId);
+  check('a new tap interrupts an in-flight food and starts the replacement flight',
+    midflightReplacement.activeNewEntry && midflightReplacement.newFlightActive &&
+      midflightReplacement.stationStillEmpty && midflightReplacement.oldFoodRemoved &&
+      midflightReplacement.newFoodStillHidden, JSON.stringify(midflightReplacement));
+  await page.screenshot({ path: `${OUT}/20g-landscape-food-replace-flight.png` });
+
+  await page.waitForFunction((id) => {
+    const fb = window.__pp.game.factBook;
+    return fb._mobileActivity?.station.food?.foodId === id && !!fb._autoplay;
+  }, midflightReplacementId, { timeout: 3000 });
+  const midflightReplacementLanded = await page.evaluate((id) => {
+    const fb = window.__pp.game.factBook;
+    const activity = fb._mobileActivity;
+    const oldEntry = activity.entries[0];
+    const next = activity.entries.find((entry) => entry.fv.id === id);
+    return {
+      stationFood: activity.station.food?.foodId === id,
+      oldFoodRemoved: !oldEntry.food.group.visible,
+      newFoodVisible: next.food.group.visible,
+      autoplayRunning: !!fb._autoplay,
+    };
+  }, midflightReplacementId);
+  check('the replacement food reaches the station and starts its demonstration',
+    midflightReplacementLanded.stationFood && midflightReplacementLanded.oldFoodRemoved &&
+      midflightReplacementLanded.newFoodVisible && midflightReplacementLanded.autoplayRunning,
+    JSON.stringify(midflightReplacementLanded));
+  await page.screenshot({ path: `${OUT}/20h-landscape-food-replaced.png` });
+
+  await page.click(firstFoodSelector);
+  await page.waitForFunction(() => {
+    const fb = window.__pp.game.factBook;
+    return fb._mobileActivity?.station.food?.foodId === fb._mobileActivity.entries[0]?.fv.id &&
+      !!fb._autoplay;
+  }, null, { timeout: 3000 });
+  const dockedReplacement = await page.evaluate((id) => {
+    const fb = window.__pp.game.factBook;
+    const activity = fb._mobileActivity;
+    const oldEntry = activity.entries.find((entry) => entry.fv.id === id);
+    const next = activity.entries[0];
+    return {
+      stationFood: activity.station.food?.foodId === next.fv.id,
+      oldFoodRemoved: !oldEntry.food.group.visible && !oldEntry.placed,
+      newFoodVisible: next.food.group.visible && next.placed,
+      autoplayRunning: !!fb._autoplay,
+    };
+  }, midflightReplacementId);
+  check('a placed food can be replaced and re-animated by tapping another card',
+    dockedReplacement.stationFood && dockedReplacement.oldFoodRemoved &&
+      dockedReplacement.newFoodVisible && dockedReplacement.autoplayRunning,
+    JSON.stringify(dockedReplacement));
+
+  await page.click('.pp-fb__mobilemodelreset');
+  await page.waitForFunction(() => {
+    const fb = window.__pp.game.factBook;
+    return !fb._autoplay && !fb._mobileActivity?.station.food && !fb._mobileActivity?.active;
+  }, null, { timeout: 3000 });
+  const resetActivity = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    const activity = fb._mobileActivity;
+    return {
+      foodsHome: activity.entries.every((entry) => entry.food.group.position.distanceTo(entry.home) < 0.02),
+      foodsHidden: activity.entries.every((entry) => !entry.food.group.visible && entry.food.state === 'idle'),
+      cardsEnabled: activity.entries.every((entry) => !entry.label.disabled && !entry.label.classList.contains('is-placed')),
+      flightLayerEmpty: document.querySelectorAll('.pp-fb__mobileflighttoken').length === 0 &&
+        activity.flight === null,
+      cameraReset: Math.abs(fb.methodViewer._targetAz - fb.methodViewer.home.az) < 0.001 &&
+        Math.abs(fb.methodViewer._targetEl - fb.methodViewer.home.el) < 0.001,
+      ringHidden: activity.station.ring?.visible === false && activity.station._targetHighlight === 0,
+    };
+  });
+  check('reset clears the selected food and restores the camera',
+    resetActivity.foodsHome && resetActivity.foodsHidden && resetActivity.cardsEnabled &&
+      resetActivity.flightLayerEmpty &&
+      resetActivity.cameraReset && resetActivity.ringHidden,
+    JSON.stringify(resetActivity));
+
+  await page.click(firstFoodSelector);
+  await sleep(180);
+  await page.click('.pp-fb__mobileback');
+  await page.waitForFunction(() => window.__pp.game.factBook.state === 'reading', null, { timeout: 5000 });
+  const backCleanup = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    return {
+      modelClosed: !fb._mobileModelOpen,
+      activityDisposed: !fb._mobileActivity,
+      stationReleased: !fb._method?.station?.food,
+      flightLayerEmpty: document.querySelectorAll('.pp-fb__mobileflighttoken').length === 0,
+    };
+  });
+  check('Back to book cancels an active food handoff cleanly',
+    backCleanup.modelClosed && backCleanup.activityDisposed && backCleanup.stationReleased &&
+      backCleanup.flightLayerEmpty, JSON.stringify(backCleanup));
+
+  await page.click('.pp-fb__mobile-explore');
+  await page.waitForFunction(() => window.__pp.game.factBook.state === 'mobile-model', null, { timeout: 5000 });
+  await page.click(firstFoodSelector);
+  await sleep(180);
+  await page.click('.pp-fb__close');
+  await page.waitForFunction(() => !window.__pp.game.factBook.isOpen, null, { timeout: 8000 });
+  const closeCleanup = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    return {
+      activityDisposed: !fb._mobileActivity,
+      flightLayerEmpty: document.querySelectorAll('.pp-fb__mobileflighttoken').length === 0,
+    };
+  });
+  check('closing the Fact Book cancels an active food handoff cleanly',
+    closeCleanup.activityDisposed && closeCleanup.flightLayerEmpty, JSON.stringify(closeCleanup));
+
+  await openBook(page);
+  await page.evaluate(() => window.__pp.game.factBook.goToMethod('pickling'));
+  await settle(page);
+  await page.click('.pp-fb__mobile-explore');
+  await page.waitForFunction(() => window.__pp.game.factBook.state === 'mobile-model', null, { timeout: 5000 });
+
+  await page.click('.pp-fb__mobileanimate');
+  await page.waitForFunction(() => window.__pp.game.factBook._autoplay != null, null, { timeout: 3000 });
+  check('mobile Watch it work starts the station animation', await page.evaluate(() =>
+    document.querySelector('.pp-fb__mobileanimate')?.classList.contains('is-playing')));
+  await page.screenshot({ path: `${OUT}/20c-landscape-model.png` });
+  await page.click('.pp-fb__mobileback');
+  await page.waitForFunction(() => window.__pp.game.factBook.state === 'reading', null, { timeout: 5000 });
+  check('back to book returns to the method spread', await page.evaluate(() =>
+    !window.__pp.game.factBook._mobileModelOpen && document.querySelector('.pp-fb__mobilemodel')?.hidden));
+
+  await page.evaluate(() => window.__pp.game.factBook.goToMethod('smoking'));
+  await settle(page);
+  await page.click('.pp-fb__mobile-explore');
+  await page.waitForFunction(() => window.__pp.game.factBook.state === 'mobile-model', null, { timeout: 5000 });
+  const referenceFood = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    const labels = [...document.querySelectorAll('.pp-fb__mobilefood')];
+    const banana = fb._mobileActivity?.entries.find((entry) => entry.fv.id === 'bananas');
+    return {
+      countMatches: labels.length === fb._mv.foods.length,
+      labelsMatchFoods: labels.map((label) => label.dataset.foodId).join(',') === fb._mv.foods.map((food) => food.id).join(','),
+      referenceAdapterIsIllustrated: !!banana?.food.model?.isSprite,
+      cardHasStaticThumbnail: !!banana?.label && !!banana.label.querySelector('.pp-fb__mobilefoodthumb') &&
+        !banana.label.querySelector('.pp-fb__cardslot'),
+      alsoWorksAbsent: !(fb._mv.alsoWorks || []).some((food) => labels.some((label) => label.dataset.foodId === food.id)),
+    };
+  });
+  check('reference-only foods keep their illustrated adapter without drawing in cards',
+    referenceFood.countMatches && referenceFood.labelsMatchFoods &&
+      referenceFood.referenceAdapterIsIllustrated && referenceFood.cardHasStaticThumbnail,
+    JSON.stringify(referenceFood));
+  check('reference-only activity still excludes also-works foods', referenceFood.alsoWorksAbsent);
+  await page.click('.pp-fb__mobileback');
+  await page.waitForFunction(() => window.__pp.game.factBook.state === 'reading', null, { timeout: 5000 });
+
+  await page.evaluate(() => window.__pp.game.factBook.goToMethod('boiling'));
+  await settle(page);
+  await page.click('.pp-fb__mobile-explore');
+  await page.waitForFunction(() => window.__pp.game.factBook.state === 'mobile-model', null, { timeout: 5000 });
+  const staticDiorama = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    return {
+      nonPlayable: !fb._mv.playable,
+      modelLoaded: !!fb.methodViewer.holder,
+      noFoodActivity: !fb._mobileActivity && document.querySelectorAll('.pp-fb__mobilefood').length === 0,
+      watchHidden: document.querySelector('.pp-fb__mobileanimate')?.hidden === true,
+    };
+  });
+  check('non-playable methods remain static dioramas without drag activity',
+    staticDiorama.nonPlayable && staticDiorama.modelLoaded && staticDiorama.noFoodActivity && staticDiorama.watchHidden,
+    JSON.stringify(staticDiorama));
+  await page.click('.pp-fb__mobileback');
+  await page.waitForFunction(() => window.__pp.game.factBook.state === 'reading', null, { timeout: 5000 });
 });
 
 // --------------------------------------------------------- reduced motion
@@ -317,6 +877,27 @@ await session({ width: 1600, height: 900 }, async (page) => {
   check('navigation-page numbering follows the chosen language',
     pageCount.includes('页') && !pageCount.includes('Page'), pageCount);
   await page.screenshot({ path: `${OUT}/21-zh.png` });
+
+  await page.setViewportSize({ width: 667, height: 375 });
+  await sleep(300);
+  await page.click('.pp-fb__mobile-explore');
+  await page.waitForFunction(() => window.__pp.game.factBook.state === 'mobile-model', null, { timeout: 5000 });
+  const localizedMobile = await page.evaluate(() => {
+    const fb = window.__pp.game.factBook;
+    const labels = [...document.querySelectorAll('.pp-fb__mobilefood')];
+    const expected = fb._mv.foods.map((food) => food.name);
+    return {
+      labelsLocalized: labels.map((label) => label.textContent.trim()).join('|') === expected.join('|'),
+      instructionLocalized: document.querySelector('.pp-fb__mobilemodelhint')?.textContent.includes('点击食物卡片'),
+      resetLocalized: document.querySelector('.pp-fb__mobilemodelreset')?.getAttribute('aria-label') === '重置视角和食物互动',
+      watchLocalized: document.querySelector('.pp-fb__mobileanimatelabel')?.textContent === '看看它如何运作',
+    };
+  });
+  check('mobile food labels and activity controls redraw in the chosen language',
+    localizedMobile.labelsLocalized && localizedMobile.instructionLocalized &&
+      localizedMobile.resetLocalized && localizedMobile.watchLocalized,
+    JSON.stringify(localizedMobile));
+  await page.click('.pp-fb__mobileback');
 });
 
 console.log(errors.length ? `\nCONSOLE ERRORS:\n${[...new Set(errors)].join('\n')}` : '\nno page errors');

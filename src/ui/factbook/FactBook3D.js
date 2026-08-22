@@ -23,7 +23,8 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { t } from '../../content/i18n.js';
 import { buildFactBook } from './viewModel.js';
 import {
-  renderPage, PAGE_W as TEX_W, PAGE_H as TEX_H, drawIcon, iconForMethod, drawFoodGlyph, hexOf,
+  renderPage, PAGE_W as TEX_W, PAGE_H as TEX_H, drawIcon, iconForMethod, drawFoodGlyph,
+  drawMobileArt, hexOf,
 } from './pageArt.js';
 import { BookMesh, PAGE_W, PAGE_H } from './BookMesh.js';
 import { ObjectViewer } from './Viewer.js';
@@ -40,13 +41,65 @@ const lerp = (a, b, t) => a + (b - a) * t;
 
 /** How long the shut book is held on screen before it opens itself (§38). */
 const AUTO_OPEN_MS = 1000;
-
+const MOBILE_FOOD_FLIGHT_MS = 640;
+const MOBILE_FOOD_ACCEPT_AT = 0.82;
+const MOBILE_FOOD_LANDING_MS = 220;
 const el = (tag, cls, text) => {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
   if (text != null) e.textContent = text;
   return e;
 };
+
+function buildMobileFood(fv) {
+  const group = new THREE.Group();
+  group.name = `FactBookFood:${fv.id}`;
+  let model;
+  let disposeModel;
+
+  if (fv.model) {
+    const built = buildFoodObject(fv);
+    if (!built) return null;
+    model = built.object;
+    disposeModel = built.dispose;
+  } else {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 192;
+    drawFoodGlyph(canvas.getContext('2d'), fv.id, 192);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = 4;
+    const material = new THREE.SpriteMaterial({
+      map: texture, transparent: true, depthWrite: false, toneMapped: false,
+    });
+    model = new THREE.Sprite(material);
+    model.scale.setScalar(0.92);
+    disposeModel = () => {
+      model.material?.map?.dispose?.();
+      model.material?.dispose?.();
+      model.geometry?.dispose?.();
+    };
+  }
+
+  group.add(model);
+  // The extra group scale keeps food readable beside normalized stations while
+  // the station remains free to resize `food.model` during its mechanism.
+  group.scale.setScalar(0.55);
+  const food = {
+    foodId: fv.id,
+    group,
+    model,
+    baseScale: model.scale.x || 1,
+    state: 'idle',
+    swarm: { setActivity() {} },
+    dispose() {
+      group.remove(model);
+      disposeModel?.();
+    },
+  };
+  group.userData.food = food;
+  return food;
+}
 
 /**
  * A deterministic tween: start value, elapsed time, duration, easing, and an
@@ -101,6 +154,10 @@ export class FactBook3D {
     this._modelCache = new Map();   // methodId -> built model, current spread +/- 1
     this._foodCache = new Map();    // foodId   -> built thumbnail, kept for the session
     this._autoplay = null;          // StationAutoplay | null — "watch it work" in progress
+    this._autoplayRun = 0;          // invalidates a finishing success flourish when a new food is chosen
+    this._mobilePlacementRun = 0;   // invalidates an interrupted mobile card-to-station flight
+    this._mobileModelOpen = false;
+    this._mobileActivity = null;
   }
 
   get reduced() {
@@ -110,6 +167,16 @@ export class FactBook3D {
 
   /** Durations, cut to a blink when the reader has asked for less motion. */
   _dur(seconds) { return this.reduced ? Math.min(0.2, seconds * 0.28) : seconds; }
+
+  _isMobileLayout() {
+    return !!window.matchMedia?.(
+      '(max-width: 720px), (orientation: portrait) and (max-width: 1000px)',
+    ).matches;
+  }
+
+  _isLandscapeMobile() {
+    return this._isMobileLayout() && !!window.matchMedia?.('(orientation: landscape)').matches;
+  }
 
   // ======================================================== build (once only)
   _build() {
@@ -137,6 +204,12 @@ export class FactBook3D {
     body.append(this.bookZone, this.nav, this.panel);
     wrap.appendChild(body);
 
+    this.mobileExplore = el('button', 'pp-fb__mobile-explore', t('ui.open3d'));
+    this.mobileExplore.type = 'button';
+    this.mobileExplore.hidden = true;
+    this.mobileExplore.setAttribute('aria-label', t('ui.open3d'));
+    this.bookZone.appendChild(this.mobileExplore);
+
     this.closeBtn = el('button', 'pp-fb__close', '✕');
     this.closeBtn.type = 'button';
     this.closeBtn.setAttribute('aria-label', t('ui.close'));
@@ -145,6 +218,39 @@ export class FactBook3D {
     this.tabs = el('nav', 'pp-fb__tabs');
     this.tabs.setAttribute('aria-label', t('ui.factBookMethods'));
     wrap.appendChild(this.tabs);
+
+    this.mobileModel = el('section', 'pp-fb__mobilemodel');
+    this.mobileModel.hidden = true;
+    this.mobileModel.setAttribute('aria-label', t('ui.interactive3d'));
+    const mobileModelHead = el('header', 'pp-fb__mobilemodelhead');
+    this.mobileBack = el('button', 'pp-fb__mobileback', `‹ ${t('ui.backToBook')}`);
+    this.mobileBack.type = 'button';
+    this.mobileBack.setAttribute('aria-label', t('ui.backToBook'));
+    this.mobileModelTitle = el('h2', 'pp-fb__mobilemodeltitle');
+    this.mobileModelHeadNote = el('p', 'pp-fb__mobilemodelnote', t('ui.dragToRotate'));
+    mobileModelHead.append(this.mobileBack, this.mobileModelTitle, this.mobileModelHeadNote);
+    this.mobileViewport = el('div', 'pp-fb__mobileviewport');
+    this.mobileViewport.tabIndex = 0;
+    this.mobileViewport.setAttribute('role', 'application');
+    this.mobileViewport.setAttribute('aria-label', t('ui.interactive3d'));
+    this.mobileFlightLayer = el('div', 'pp-fb__mobileflightlayer');
+    this.mobileFoodLayer = el('div', 'pp-fb__mobilefoodlayer');
+    this.mobileFoodLayer.setAttribute('aria-label', t('ui.suitableFoods'));
+    this.mobileModelReset = el('button', 'pp-fb__mobilemodelreset', '↻');
+    this.mobileModelReset.type = 'button';
+    this.mobileModelReset.setAttribute('aria-label', t('ui.resetView'));
+    this.mobileAnimate = el('button', 'pp-fb__mobileanimate');
+    this.mobileAnimate.type = 'button';
+    this.mobileAnimate.hidden = true;
+    this.mobileAnimateLabel = el('span', 'pp-fb__mobileanimatelabel', t('ui.watchItWork'));
+    this.mobileAnimate.appendChild(this.mobileAnimateLabel);
+    this.mobileAnimate.setAttribute('aria-label', t('ui.watchItWork'));
+    this.mobileModelHint = el('span', 'pp-fb__mobilemodelhint', t('ui.dragToRotate'));
+    this.mobileModel.append(
+      mobileModelHead, this.mobileViewport, this.mobileFlightLayer, this.mobileFoodLayer, this.mobileModelReset,
+      this.mobileAnimate, this.mobileModelHint,
+    );
+    wrap.appendChild(this.mobileModel);
 
     this.live = el('p', 'pp-sr');
     this.live.setAttribute('aria-live', 'polite');
@@ -310,11 +416,20 @@ export class FactBook3D {
     // Static structure only; every string is written with textContent below.
     this.panel.innerHTML = `
       <div class="pp-fb__panelinner">
+        <p class="pp-fb__mobileeyebrow"></p>
         <header class="pp-fb__head">
           <h2 class="pp-fb__title"></h2>
           <div class="pp-fb__badges"></div>
         </header>
+        <div class="pp-fb__mobileaccent" aria-hidden="true"></div>
         <p class="pp-fb__lead"></p>
+        <p class="pp-fb__mobilebody"></p>
+        <section class="pp-fb__mobileartsec" hidden>
+          <div class="pp-fb__seclabel pp-fb__mobileartlabel"><span></span></div>
+          <canvas class="pp-fb__mobileart" role="img"></canvas>
+        </section>
+        <p class="pp-fb__mobilemechanism"></p>
+        <button class="pp-fb__mobilepanel-explore" type="button" hidden></button>
         <section class="pp-fb__viewersec" hidden>
           <div class="pp-fb__seclabel"><span></span></div>
           <div class="pp-fb__viewer">
@@ -334,10 +449,6 @@ export class FactBook3D {
         <section class="pp-fb__alsosec" hidden>
           <div class="pp-fb__seclabel pp-fb__seclabel--quiet"><span></span></div>
           <div class="pp-fb__chips"></div>
-        </section>
-        <section class="pp-fb__examsec" hidden>
-          <div class="pp-fb__seclabel"><span></span></div>
-          <p class="pp-fb__exam"></p>
         </section>
         <section class="pp-fb__listsec" hidden>
           <div class="pp-fb__seclabel"><span></span></div>
@@ -360,9 +471,17 @@ export class FactBook3D {
     const qn = (s) => this.nav.querySelector(s);
     this.ui = {
       inner: q('.pp-fb__panelinner'),
+      mobileEyebrow: q('.pp-fb__mobileeyebrow'),
       title: q('.pp-fb__title'),
       badges: q('.pp-fb__badges'),
+      mobileAccent: q('.pp-fb__mobileaccent'),
       lead: q('.pp-fb__lead'),
+      mobileBody: q('.pp-fb__mobilebody'),
+      mobileArtSec: q('.pp-fb__mobileartsec'),
+      mobileArtLabel: q('.pp-fb__mobileartlabel span'),
+      mobileArt: q('.pp-fb__mobileart'),
+      mobileMechanism: q('.pp-fb__mobilemechanism'),
+      mobilePanelExplore: q('.pp-fb__mobilepanel-explore'),
       viewerSec: q('.pp-fb__viewersec'),
       viewerLabel: q('.pp-fb__viewersec .pp-fb__seclabel span'),
       viewport: q('.pp-fb__viewport'),
@@ -377,9 +496,6 @@ export class FactBook3D {
       alsoSec: q('.pp-fb__alsosec'),
       alsoLabel: q('.pp-fb__alsosec .pp-fb__seclabel span'),
       chips: q('.pp-fb__chips'),
-      examSec: q('.pp-fb__examsec'),
-      examLabel: q('.pp-fb__examsec .pp-fb__seclabel span'),
-      exam: q('.pp-fb__exam'),
       listSec: q('.pp-fb__listsec'),
       listLabel: q('.pp-fb__listsec .pp-fb__seclabel span'),
       list: q('.pp-fb__list'),
@@ -392,6 +508,8 @@ export class FactBook3D {
     this.ui.prev.setAttribute('aria-label', t('ui.prevPage'));
     this.ui.next.setAttribute('aria-label', t('ui.nextPage'));
     this.ui.reset.setAttribute('aria-label', t('ui.resetView'));
+    this.ui.mobilePanelExplore.textContent = t('ui.open3d');
+    this.ui.mobilePanelExplore.setAttribute('aria-label', t('ui.open3d'));
   }
 
   /** One tab per method, straight off the curriculum — never a written list. */
@@ -424,9 +542,13 @@ export class FactBook3D {
 
     const isMethod = s.kind === 'method';
     const mv = isMethod ? s.method : null;
+    this._updateMobileExplore();
     this.panel.style.setProperty('--m', hexOf(mv ? mv.colour : 0x3f7fa8));
     this.panel.style.setProperty('--m-accent', hexOf(mv ? mv.accent : 0x8fc7e4));
 
+    u.mobileEyebrow.textContent = isMethod
+      ? t('ui.inThisChapter')
+      : s.kind === 'importance' ? t('ui.theEnd') : t('ui.inThisChapter');
     u.title.textContent = s.title;
     u.badges.textContent = '';
     if (isMethod) {
@@ -438,10 +560,22 @@ export class FactBook3D {
       );
     }
 
-    // The panel is the DEEPER read: a method leads with `detail`, while the
-    // book page carries `explain` — the same sentence is not printed twice.
-    u.lead.textContent = isMethod ? (mv.detail || mv.explain || '') : this._sectionLead(s);
+    // Put the exam note in the first reading position. It replaces the short
+    // detail paragraph there, so the desktop panel can show the useful method
+    // content without making the reader scroll before seeing the model.
+    const hasExam = Boolean(isMethod && mv.exam);
+    u.lead.textContent = hasExam ? mv.exam : isMethod ? (mv.detail || mv.explain || '') : this._sectionLead(s);
+    u.lead.classList.toggle('is-exam', hasExam);
     u.lead.hidden = !u.lead.textContent;
+    u.mobileAccent.style.background = hexOf(mv ? mv.colour : 0x3f7fa8);
+    u.mobileBody.textContent = isMethod ? (mv.detail || mv.explain || '') : '';
+    u.mobileBody.hidden = !u.mobileBody.textContent;
+    u.mobileMechanism.textContent = isMethod ? (mv.mechLong || '') : '';
+    u.mobileMechanism.hidden = !u.mobileMechanism.textContent;
+    u.mobileArtSec.hidden = !isMethod && s.kind !== 'divider' && s.kind !== 'importance';
+    u.mobileArtLabel.textContent = isMethod
+      ? t('ui.howItWorks')
+      : s.kind === 'importance' ? t('ui.theEnd') : t('ui.inThisChapter');
 
     if (isMethod) {
       u.viewerSec.hidden = false;
@@ -451,6 +585,9 @@ export class FactBook3D {
       u.viewerSec.hidden = true;
     }
     this._mv = mv;
+    u.mobilePanelExplore.textContent = t('ui.open3d');
+    u.mobilePanelExplore.setAttribute('aria-label', t('ui.open3d'));
+    u.mobilePanelExplore.hidden = true;
     // Only a playable method has a station with a real sequence to replay; a
     // Fact-Book-only method's model is a diorama that already animates on its
     // own (§ models.js DIORAMAS), so there is nothing here to press play on.
@@ -459,14 +596,16 @@ export class FactBook3D {
 
     this._clearCards();
     if (isMethod && mv.foods.length) {
+      const mobileTextChips = this._isLandscapeMobile();
       u.foodSec.hidden = false;
       u.foodLabel.textContent = t('ui.suitableFoods');
       u.cards.textContent = '';
       for (const fv of mv.foods) {
-        const card = el('button', 'pp-fb__card');
-        card.type = 'button';
-        const slot = el('div', 'pp-fb__cardslot');
-        if (!fv.model) {
+        const card = el(mobileTextChips ? 'span' : 'button', 'pp-fb__card');
+        if (!mobileTextChips) card.type = 'button';
+        if (mobileTextChips) card.classList.add('is-mobile-chip');
+        const slot = mobileTextChips ? null : el('div', 'pp-fb__cardslot');
+        if (!fv.model && slot) {
           // §26: a food the notes name but the game has no model for is still
           // taught — an illustration stands in for the missing asset.
           const cv = el('canvas', 'pp-fb__glyph');
@@ -475,11 +614,12 @@ export class FactBook3D {
           slot.appendChild(cv);
           card.classList.add('is-illustration');
         }
-        card.append(slot, el('span', 'pp-fb__cardname', fv.name));
-        if (fv.model) {
+        if (slot) card.appendChild(slot);
+        card.appendChild(el('span', 'pp-fb__cardname', fv.name));
+        if (fv.model && !mobileTextChips) {
           card.setAttribute('aria-label', t('ui.inspectFood', { food: fv.name }));
           card.addEventListener('click', () => this.inspectFood(fv));
-        } else {
+        } else if (!mobileTextChips) {
           card.setAttribute('aria-label', fv.name);
           card.disabled = true;
         }
@@ -499,14 +639,6 @@ export class FactBook3D {
       for (const fv of mv.alsoWorks) u.chips.appendChild(el('span', 'pp-fb__chip', fv.name));
     } else {
       u.alsoSec.hidden = true;
-    }
-
-    if (isMethod && mv.exam) {
-      u.examSec.hidden = false;
-      u.examLabel.textContent = t('ui.examNote');
-      u.exam.textContent = mv.exam;
-    } else {
-      u.examSec.hidden = true;
     }
 
     const list = this._sectionList(s);
@@ -544,7 +676,10 @@ export class FactBook3D {
     this.live.textContent = `${s.label} — ${s.title}`;
     this._loadMethodModel(mv);
     // Content just changed height — recheck once the browser has laid it out.
-    requestAnimationFrame(() => this._updatePanelFade());
+    requestAnimationFrame(() => {
+      this._drawMobileArt(s);
+      this._updatePanelFade();
+    });
   }
 
   /** Fade the panel's bottom (and top, once scrolled) edge against its actual overflow. */
@@ -604,6 +739,8 @@ export class FactBook3D {
   _loadMethodModel(mv) {
     const id = mv ? mv.id : null;
     if (this._modelId === id) return;
+    if (this._mobileModelOpen) this._cancelAutoplay();
+    if (this._mobileModelOpen) this._disposeMobileActivity();
     this._modelId = id;
     this._cancelAutoplay();
     this._disposeInspected();
@@ -659,6 +796,366 @@ export class FactBook3D {
     this._inspecting = null;
   }
 
+  _mobileActivityHint() {
+    return this._mobileActivity ? t('ui.selectFoodCard') : t('ui.dragToRotate');
+  }
+
+  _buildMobileActivity() {
+    this._disposeMobileActivity();
+    this.mobileFoodLayer.textContent = '';
+
+    const station = this._method?.station;
+    if (!this._mv?.playable || !station) {
+      this.mobileModelHint.textContent = t('ui.dragToRotate');
+      return;
+    }
+
+    const activity = { station, entries: [], active: null, flight: null, landing: 0 };
+    // The mobile activity is click-to-place, so the ring is not presented as
+    // a drop target. The station still owns all of its normal visuals.
+    station.ring && (station.ring.visible = false);
+    station.setHighlight(false);
+
+    for (const fv of this._mv.foods) {
+      const food = buildMobileFood(fv);
+      if (!food) continue;
+      food.group.position.set(0, 0, 0);
+      food.group.visible = false;
+      this.methodViewer.pivot.add(food.group);
+
+      const label = el('button', 'pp-fb__mobilefood');
+      label.type = 'button';
+      label.dataset.foodId = fv.id;
+      label.setAttribute('aria-pressed', 'false');
+      label.setAttribute('aria-label', `${fv.name}. ${t('ui.selectFoodCard')}`);
+      const thumb = el('canvas', 'pp-fb__mobilefoodthumb');
+      thumb.width = thumb.height = 128;
+      drawFoodGlyph(thumb.getContext('2d'), fv.id, 128);
+      thumb.setAttribute('aria-hidden', 'true');
+      label.append(thumb, el('span', 'pp-fb__mobilefoodname', fv.name));
+      this.mobileFoodLayer.appendChild(label);
+
+      activity.entries.push({
+        fv, food, label, thumb,
+        home: food.group.position.clone(),
+        groupBaseScale: food.group.scale.x,
+        placed: false,
+      });
+    }
+
+    this._mobileActivity = activity;
+    this.mobileModelHint.textContent = this._mobileActivityHint();
+  }
+
+  _disposeMobileActivity() {
+    const activity = this._mobileActivity;
+    if (!activity) {
+      this.mobileFlightLayer?.replaceChildren();
+      this.mobileFoodLayer?.replaceChildren();
+      return;
+    }
+    this._cancelMobileFlight(activity, { immediate: true });
+    if (activity.station.food) activity.station.release();
+    activity.station.setHighlight(false);
+    if (activity.station.ring) activity.station.ring.visible = false;
+    for (const entry of activity.entries) {
+      entry.food.group.removeFromParent();
+      entry.food.dispose();
+      entry.label.remove();
+    }
+    this.mobileFlightLayer.replaceChildren();
+    this.mobileFoodLayer.replaceChildren();
+    this._mobileActivity = null;
+  }
+
+  resetMobileActivity() {
+    sfx('ui.tap');
+    this.methodViewer.reset();
+    // Hold the idle turn briefly so the reset pose is actually readable before
+    // the model resumes its gentle presentation spin.
+    this.methodViewer._idle = 2.5;
+    const activity = this._mobileActivity;
+    if (!activity) return;
+    this._cancelMobileFlight(activity, { immediate: true });
+    this._cancelAutoplay();
+    if (activity.station.food) activity.station.release();
+    activity.station.setHighlight(false);
+    if (activity.station.ring) activity.station.ring.visible = false;
+    activity.landing = 0;
+    activity.active = null;
+    for (const entry of activity.entries) {
+      entry.food.group.position.copy(entry.home);
+      entry.food.group.rotation.set(0, 0, 0);
+      entry.food.model.rotation.set(0, 0, 0);
+      entry.food.group.scale.setScalar(entry.groupBaseScale);
+      entry.food.group.visible = false;
+      entry.food.state = 'idle';
+      entry.placed = false;
+      entry.label.hidden = false;
+      entry.label.disabled = false;
+      entry.label.classList.remove('is-placed');
+      entry.label.setAttribute('aria-pressed', 'false');
+    }
+    this.mobileModelHint.textContent = this._mobileActivityHint();
+    this.live.textContent = t('ui.selectFoodCard');
+    this._updateMobileFoodLabels();
+  }
+
+  _chooseMobileFood(entry) {
+    const activity = this._mobileActivity;
+    if (!activity || activity.active === entry) return;
+    this._clearMobileSelection(activity);
+    activity.active = entry;
+    entry.placed = true;
+    entry.food.group.visible = false;
+    for (const item of activity.entries) {
+      item.label.disabled = false;
+      item.label.classList.toggle('is-placed', item === entry);
+      item.label.setAttribute('aria-pressed', item === entry ? 'true' : 'false');
+    }
+    entry.label.classList.add('is-placed');
+    activity.station.setHighlight(false);
+    if (activity.station.ring) activity.station.ring.visible = false;
+    this._startMobileFoodFlight(activity, entry);
+  }
+
+  /** Release the selected food so another card can take its place immediately. */
+  _clearMobileSelection(activity) {
+    this._cancelMobileFlight(activity, { immediate: false });
+    this._cancelAutoplay();
+    const previous = activity.active;
+    if (activity.station.food) activity.station.release();
+    activity.station.setHighlight(false);
+    if (activity.station.ring) activity.station.ring.visible = false;
+    activity.landing = 0;
+    if (!previous) return;
+    previous.food.group.position.copy(previous.home);
+    previous.food.group.rotation.set(0, 0, 0);
+    previous.food.model.rotation.set(0, 0, 0);
+    previous.food.group.scale.setScalar(previous.groupBaseScale);
+    previous.food.group.visible = false;
+    previous.food.state = 'idle';
+    previous.placed = false;
+    previous.label.classList.remove('is-placed');
+    previous.label.setAttribute('aria-pressed', 'false');
+    activity.active = null;
+  }
+
+  _mobileFlightSource(entry) {
+    const root = this.mobileModel.getBoundingClientRect();
+    const rect = entry.label.getBoundingClientRect();
+    return {
+      x: rect.left + rect.width * 0.5 - root.left,
+      y: rect.top + rect.height * 0.5 - root.top,
+    };
+  }
+
+  _mobileFlightTarget(activity) {
+    const root = this.mobileModel.getBoundingClientRect();
+    const vp = this.mobileViewport.getBoundingClientRect();
+    const dock = activity.station.dockPoint;
+    const local = this._methodDesc?.holder?.worldToLocal(dock.clone());
+    const projected = local && this.methodViewer.project(local, {
+      x: vp.left, y: vp.top, w: vp.width, h: vp.height,
+    });
+    return {
+      x: (projected?.x ?? vp.left + vp.width * 0.58) - root.left,
+      y: (projected?.y ?? vp.top + vp.height * 0.55) - root.top,
+    };
+  }
+
+  _makeMobileFlightToken(entry) {
+    const token = el('div', 'pp-fb__mobileflighttoken');
+    const thumb = el('canvas', 'pp-fb__mobileflightthumb');
+    thumb.width = entry.thumb.width;
+    thumb.height = entry.thumb.height;
+    thumb.getContext('2d').drawImage(entry.thumb, 0, 0);
+    thumb.setAttribute('aria-hidden', 'true');
+    token.appendChild(thumb);
+    this.mobileFlightLayer.appendChild(token);
+    return token;
+  }
+
+  _startMobileFoodFlight(activity, entry) {
+    this._cancelMobileFlight(activity, { immediate: true });
+    const run = ++this._mobilePlacementRun;
+    const token = this._makeMobileFlightToken(entry);
+    const start = this._mobileFlightSource(entry);
+    const flight = {
+      run, activity, entry, token, start, current: { ...start }, elapsed: 0, accepted: false,
+    };
+    activity.flight = flight;
+    token.style.left = `${start.x}px`;
+    token.style.top = `${start.y}px`;
+    token.style.transform = 'translate(-50%, -50%) scale(0.92)';
+    token.style.opacity = '1';
+  }
+
+  _acceptMobileFlightFood(flight) {
+    const { activity, entry } = flight;
+    flight.accepted = true;
+    activity.station.accept(entry.food);
+    entry.food.group.visible = true;
+    entry.food.group.scale.setScalar(entry.groupBaseScale * 0.72);
+  }
+
+  _completeMobileFoodFlight(flight) {
+    const { activity, entry } = flight;
+    if (activity.flight !== flight || flight.run !== this._mobilePlacementRun) return;
+    entry.food.group.scale.setScalar(entry.groupBaseScale);
+    entry.label.classList.remove('is-placing');
+    flight.token.remove();
+    activity.flight = null;
+    activity.landing = MOBILE_FOOD_LANDING_MS;
+    if (activity.station.ring) activity.station.ring.visible = true;
+    activity.station.setHighlight(true);
+    sfx('food.drop');
+    this.live.textContent = t('ui.foodDropped', {
+      food: entry.fv.name, method: this._mv.name,
+    });
+    const run = ++this._autoplayRun;
+    this._autoplay = new StationAutoplay(activity.station);
+    this._setAnimatePlaying(true);
+    if (this._autoplay.done) this._finishAutoplay(this._autoplay, run);
+  }
+
+  _cancelMobileFlight(activity, { immediate = false } = {}) {
+    this._mobilePlacementRun++;
+    const flight = activity?.flight;
+    if (!flight) return;
+    activity.flight = null;
+    flight.entry.label.classList.remove('is-placing');
+    if (immediate) {
+      flight.token.remove();
+      return;
+    }
+    const token = flight.token;
+    token.style.transition = 'opacity 140ms ease, transform 140ms ease';
+    token.style.opacity = '0';
+    token.style.transform = `${token.style.transform} scale(0.68)`;
+    window.setTimeout(() => token.remove(), 160);
+  }
+
+  _updateMobileFoodFlight(dt) {
+    const activity = this._mobileActivity;
+    if (!activity) return;
+    if (activity.landing > 0) {
+      activity.landing = Math.max(0, activity.landing - dt * 1000);
+      if (!activity.landing) {
+        activity.station.setHighlight(false);
+        if (activity.station.ring) activity.station.ring.visible = false;
+      }
+    }
+    const flight = activity.flight;
+    if (!flight || flight.run !== this._mobilePlacementRun) return;
+    flight.elapsed += dt * 1000;
+    const p = clamp01(flight.elapsed / MOBILE_FOOD_FLIGHT_MS);
+    const travel = easeInOutCubic(p);
+    const target = this._mobileFlightTarget(activity);
+    const arc = THREE.MathUtils.clamp(Math.abs(target.y - flight.start.y) * 0.18 + 28, 28, 84);
+    const x = lerp(flight.start.x, target.x, travel);
+    const y = lerp(flight.start.y, target.y, travel) - Math.sin(Math.PI * travel) * arc;
+    flight.current = { x, y };
+
+    let scale = 0.92 + Math.sin(Math.PI * Math.min(1, p / MOBILE_FOOD_ACCEPT_AT)) * 0.1;
+    let opacity = 1;
+    if (p >= MOBILE_FOOD_ACCEPT_AT) {
+      const cross = clamp01((p - MOBILE_FOOD_ACCEPT_AT) / (1 - MOBILE_FOOD_ACCEPT_AT));
+      if (!flight.accepted) this._acceptMobileFlightFood(flight);
+      flight.entry.food.group.scale.setScalar(lerp(
+        flight.entry.groupBaseScale * 0.72, flight.entry.groupBaseScale, cross,
+      ));
+      scale = lerp(1.02, 0.34, cross);
+      opacity = 1 - cross;
+    }
+    flight.token.style.left = `${x}px`;
+    flight.token.style.top = `${y}px`;
+    flight.token.style.transform = `translate(-50%, -50%) scale(${scale})`;
+    flight.token.style.opacity = `${opacity}`;
+    if (p >= 1) this._completeMobileFoodFlight(flight);
+  }
+
+  _updateMobileFoodLabels() {
+    const activity = this._mobileActivity;
+    if (!activity) return;
+    for (const entry of activity.entries) {
+      entry.label.hidden = false;
+    }
+  }
+
+  _updateMobileExplore() {
+    if (!this.mobileExplore) return;
+    const isMethod = this.model?.spreads?.[this.index]?.kind === 'method';
+    const visible = this.isOpen && this._isMobileLayout() && isMethod && !this._mobileModelOpen;
+    this.mobileExplore.hidden = !visible;
+    this.ui.mobilePanelExplore.hidden = true;
+  }
+
+  _drawMobileArt(spread = this.model?.spreads?.[this.index]) {
+    const canvas = this.ui?.mobileArt;
+    if (!canvas || !spread || !this._isMobileLayout()) return;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width < 4 || rect.height < 4) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.max(1, Math.round(rect.width * dpr));
+    const height = Math.max(1, Math.round(rect.height * dpr));
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawMobileArt(ctx, spread, rect.width, rect.height);
+    const label = spread.kind === 'method'
+      ? `${t('ui.howItWorks')}: ${spread.method.name}`
+      : spread.title;
+    canvas.setAttribute('aria-label', label);
+  }
+
+  /** Open the current method's model as a focused mobile reading state. */
+  openMobileModel() {
+    if (!this.isOpen || !this._isMobileLayout() || this.state !== 'reading') return;
+    if (!this._mv || !this._methodDesc || this._mobileModelOpen) return;
+    sfx('ui.tap');
+    this._cancelAutoplay();
+    this._disposeInspected();
+    this._mobileModelOpen = true;
+    this.state = 'mobile-model';
+    this.wrap.classList.add('is-mobile-model');
+    this.mobileModel.hidden = false;
+    this.mobileModel.setAttribute('aria-label', `${t('ui.interactive3d')}: ${this._mv.name}`);
+    this.mobileModelTitle.textContent = this._mv.name;
+    this.mobileModelHeadNote.textContent = this._mv.mechLabel || t('ui.interactive3d');
+    this.mobileModelHint.textContent = this._mv.playable
+      ? t('ui.selectFoodCard') : t('ui.dragToRotate');
+    this.mobileBack.textContent = `‹ ${t('ui.backToBook')}`;
+    this.mobileBack.setAttribute('aria-label', t('ui.backToBook'));
+    this.mobileModelReset.setAttribute('aria-label', t('ui.resetActivity'));
+    this.mobileViewport.setAttribute('aria-label', `${t('ui.interactive3d')}: ${this._mv.name}`);
+    this.mobileAnimate.hidden = !this._mv.playable;
+    this._setAnimatePlaying(false);
+    // The full-screen mobile viewer is an activity surface, not a turntable:
+    // keep the station still so the food cards remain easy to read and grab.
+    this.methodViewer.use(this._methodDesc, { spin: 0 });
+    this._buildMobileActivity();
+    this._updateMobileExplore();
+    requestAnimationFrame(() => this.mobileBack.focus({ preventScroll: true }));
+  }
+
+  closeMobileModel({ sound = true, focus = true } = {}) {
+    if (!this._mobileModelOpen) return;
+    if (sound) sfx('ui.back');
+    this._cancelAutoplay();
+    this._disposeMobileActivity();
+    this._mobileModelOpen = false;
+    this.wrap.classList.remove('is-mobile-model');
+    this.mobileModel.hidden = true;
+    this.mobileAnimate.hidden = true;
+    this.state = this._inspecting ? 'food' : 'reading';
+    this._updateMobileExplore();
+    if (focus) requestAnimationFrame(() => this.bookZone.focus({ preventScroll: true }));
+  }
+
   /** Focus one food in the big viewer, with a way back that is not "close" (§25). */
   inspectFood(fv) {
     const built = buildFoodObject(fv);
@@ -698,41 +1195,50 @@ export class FactBook3D {
    * in the kitchen does, with nobody dragging or holding anything.
    */
   animateMethod() {
-    if (this.state !== 'reading' || this._autoplay) return;
+    if ((this.state !== 'reading' && this.state !== 'mobile-model') || this._autoplay) return;
     const station = this._method?.station;
     if (!station) return;
     sfx('ui.tap');
+    const run = ++this._autoplayRun;
     this._autoplay = new StationAutoplay(station);
     this._setAnimatePlaying(true);
-    if (this._autoplay.done) this._finishAutoplay();
+    if (this._autoplay.done) this._finishAutoplay(this._autoplay, run);
   }
 
   /** Ends the sequence early with the machine reset, never mid-pose (§ cache). */
   _cancelAutoplay() {
-    if (!this._autoplay) return;
-    this._autoplay.station.resetVisuals();
+    this._autoplayRun++;
+    if (this._autoplay) this._autoplay.station.resetVisuals();
     this._autoplay = null;
     this._setAnimatePlaying(false);
   }
 
-  async _finishAutoplay() {
-    const { station } = this._autoplay;
+  async _finishAutoplay(autoplay = this._autoplay, run = this._autoplayRun) {
+    if (!autoplay || autoplay !== this._autoplay) return;
+    const { station } = autoplay;
     this._autoplay = null;
     // Never let a station's success flourish wedge the demo (§ Game._finishInteraction).
     await Promise.race([
       Promise.resolve(station.playSuccess()),
       new Promise((r) => setTimeout(r, 2500)),
     ]);
+    // A mobile card may have replaced the food while the previous success
+    // flourish was still awaiting its timer. Do not reset the new station run.
+    if (run !== this._autoplayRun) return;
     station.resetVisuals();
     this._setAnimatePlaying(false);
   }
 
   _setAnimatePlaying(playing) {
-    const btn = this.ui.animate;
-    if (!btn) return;
-    btn.disabled = playing;
-    btn.classList.toggle('is-playing', playing);
-    this.ui.animateLabel.textContent = t(playing ? 'ui.watching' : 'ui.watchItWork');
+    const label = t(playing ? 'ui.watching' : 'ui.watchItWork');
+    for (const btn of [this.ui?.animate, this.mobileAnimate]) {
+      if (!btn) continue;
+      btn.disabled = playing;
+      btn.classList.toggle('is-playing', playing);
+      btn.setAttribute('aria-label', label);
+    }
+    if (this.ui?.animateLabel) this.ui.animateLabel.textContent = label;
+    if (this.mobileAnimateLabel) this.mobileAnimateLabel.textContent = label;
   }
 
   // ===================================================================== input
@@ -742,6 +1248,8 @@ export class FactBook3D {
 
     zone.addEventListener('pointerdown', (e) => {
       if (!this.isOpen) return;
+      if (this._mobileModelOpen) return;
+      if (e.target.closest('.pp-fb__mobile-explore')) return;
       if (this.state === 'closed') { this.openBook(); return; }
       if (this.state !== 'reading' && this.state !== 'food') return;
       const r = zone.getBoundingClientRect();
@@ -791,46 +1299,72 @@ export class FactBook3D {
       this.openBook();
     });
 
-    // ---- viewer zone: model rotation only, and it never reaches the book.
-    const vp = this.ui.viewport;
-    let rot = null;
-    vp.addEventListener('pointerdown', (e) => {
-      rot = { x: e.clientX, y: e.clientY };
-      try { vp.setPointerCapture(e.pointerId); } catch { /* no capture available */ }
-      vp.classList.add('is-grabbing');
-      e.stopPropagation();
-    });
-    vp.addEventListener('pointermove', (e) => {
-      if (!rot) return;
-      const r = vp.getBoundingClientRect();
-      this.methodViewer.rotateBy((e.clientX - rot.x) / Math.max(1, r.width),
-        (e.clientY - rot.y) / Math.max(1, r.height));
-      rot = { x: e.clientX, y: e.clientY };
-    });
-    const endRot = (e) => {
-      if (!rot) return;
-      rot = null;
-      vp.classList.remove('is-grabbing');
-      try { vp.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+    // ---- viewer zones: model rotation only, and they never reach the book.
+    const wireViewerZone = (vp) => {
+      let rot = null;
+      vp.addEventListener('pointerdown', (e) => {
+        if (this._mobileModelOpen && this._mobileActivity?.flight) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        rot = { x: e.clientX, y: e.clientY };
+        try { vp.setPointerCapture(e.pointerId); } catch { /* no capture available */ }
+        vp.classList.add('is-grabbing');
+        e.stopPropagation();
+      });
+      vp.addEventListener('pointermove', (e) => {
+        if (!rot) return;
+        const r = vp.getBoundingClientRect();
+        this.methodViewer.rotateBy((e.clientX - rot.x) / Math.max(1, r.width),
+          (e.clientY - rot.y) / Math.max(1, r.height));
+        rot = { x: e.clientX, y: e.clientY };
+      });
+      const endRot = (e) => {
+        if (!rot) return;
+        rot = null;
+        vp.classList.remove('is-grabbing');
+        try { vp.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+      };
+      vp.addEventListener('pointerup', endRot);
+      vp.addEventListener('pointercancel', endRot);
+      vp.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        if (this._mobileModelOpen && this._mobileActivity?.flight) return;
+        this.methodViewer.zoomBy(e.deltaY);
+      }, { passive: false });
+      vp.addEventListener('keydown', (e) => {
+        if (this._mobileModelOpen && this._mobileActivity?.flight) {
+          e.preventDefault();
+          return;
+        }
+        const step = 0.07;
+        if (e.key === 'ArrowLeft') this.methodViewer.rotateBy(-step, 0);
+        else if (e.key === 'ArrowRight') this.methodViewer.rotateBy(step, 0);
+        else if (e.key === 'ArrowUp') this.methodViewer.rotateBy(0, -step);
+        else if (e.key === 'ArrowDown') this.methodViewer.rotateBy(0, step);
+        else return;
+        e.preventDefault();
+        e.stopPropagation();
+      });
     };
-    vp.addEventListener('pointerup', endRot);
-    vp.addEventListener('pointercancel', endRot);
-    vp.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      this.methodViewer.zoomBy(e.deltaY);
-    }, { passive: false });
-    vp.addEventListener('keydown', (e) => {
-      const step = 0.07;
-      if (e.key === 'ArrowLeft') this.methodViewer.rotateBy(-step, 0);
-      else if (e.key === 'ArrowRight') this.methodViewer.rotateBy(step, 0);
-      else if (e.key === 'ArrowUp') this.methodViewer.rotateBy(0, -step);
-      else if (e.key === 'ArrowDown') this.methodViewer.rotateBy(0, step);
-      else return;
-      e.preventDefault();
+    wireViewerZone(this.ui.viewport);
+    wireViewerZone(this.mobileViewport);
+
+    this.mobileFoodLayer.addEventListener('click', (e) => {
+      const label = e.target.closest('.pp-fb__mobilefood');
+      const entry = label && this._mobileActivity?.entries.find((item) => item.label === label);
+      if (!entry) return;
       e.stopPropagation();
+      this._chooseMobileFood(entry);
     });
 
     this.ui.reset.addEventListener('click', () => { sfx('ui.tap'); this.methodViewer.reset(); });
+    this.mobileModelReset.addEventListener('click', () => this.resetMobileActivity());
+    this.mobileAnimate.addEventListener('click', () => this.animateMethod());
+    this.mobileExplore.addEventListener('click', () => this.openMobileModel());
+    this.ui.mobilePanelExplore.addEventListener('click', () => this.openMobileModel());
+    this.mobileBack.addEventListener('click', () => this.closeMobileModel());
     this.ui.backFood.addEventListener('click', () => this.backToMethod());
     this.ui.animate.addEventListener('click', () => this.animateMethod());
     this.ui.prev.addEventListener('click', () => this.go(-1));
@@ -842,7 +1376,12 @@ export class FactBook3D {
 
     this._onKey = (e) => {
       if (!this.isOpen) return;
-      if (e.key === 'Escape') { e.preventDefault(); this.close(); }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (this._mobileModelOpen) this.closeMobileModel();
+        else this.close();
+      }
+      else if (this._mobileModelOpen) return;
       else if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); this.go(1); }
       else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); this.go(-1); }
       else if (e.key === 'Home') { e.preventDefault(); this.jumpTo(0); }
@@ -955,6 +1494,7 @@ export class FactBook3D {
 
   go(dir) {
     if (!this.isOpen || this.state === 'opening' || this.state === 'closing') return;
+    if (this._mobileModelOpen) return;
     if (this.state === 'turn' || this.state === 'drag') return;
     if (!this._canGo(dir)) return;
     this._beginTurn(dir);
@@ -970,6 +1510,7 @@ export class FactBook3D {
     index = THREE.MathUtils.clamp(index, 0, this.model.spreads.length - 1);
     if (index === this.index) return;
     if (!this.isOpen || this.state === 'turn' || this.state === 'drag') return;
+    if (this._mobileModelOpen) return;
     if (this.state === 'opening' || this.state === 'closing') return;
     this._beginTurn(index > this.index ? 1 : -1, index);
     this._endTurn(true);
@@ -983,6 +1524,8 @@ export class FactBook3D {
   // ================================================================= lifecycle
   open(onClose) {
     this._build();
+    this._cancelAutoplay();
+    this._disposeMobileActivity();
     // The Fact Book instance survives closing so its WebGL resources can be
     // reused. Its prose must not: buildFactBook() resolves every curriculum
     // string in the language that is active at the time it is called.
@@ -996,6 +1539,20 @@ export class FactBook3D {
     this.ui.reset.setAttribute('aria-label', t('ui.resetView'));
     this.onClose = onClose;
     this.isOpen = true;
+    this._mobileModelOpen = false;
+    this.wrap.classList.remove('is-mobile-model');
+    this.mobileModel.hidden = true;
+    this.mobileExplore.textContent = t('ui.open3d');
+    this.mobileExplore.setAttribute('aria-label', t('ui.open3d'));
+    this.mobileModelHeadNote.textContent = t('ui.dragToRotate');
+    this.mobileModelHint.textContent = t('ui.dragToRotate');
+    this.mobileBack.textContent = `‹ ${t('ui.backToBook')}`;
+    this.mobileBack.setAttribute('aria-label', t('ui.backToBook'));
+    this.mobileModelReset.setAttribute('aria-label', t('ui.resetActivity'));
+    this.mobileAnimateLabel.textContent = t('ui.watchItWork');
+    this.mobileAnimate.setAttribute('aria-label', t('ui.watchItWork'));
+    this.mobileAnimate.hidden = true;
+    this._setAnimatePlaying(false);
     this.wrap.hidden = false;
     this.wrap.classList.remove('is-open');
     this.index = 0;
@@ -1050,6 +1607,7 @@ export class FactBook3D {
   close() {
     if (!this.isOpen || this.state === 'closing') return;
     clearTimeout(this._openTimer);
+    this.closeMobileModel({ sound: false, focus: false });
     this.state = 'closing';
     sfx('ui.back');
     this.wrap.classList.remove('is-open');
@@ -1105,7 +1663,11 @@ export class FactBook3D {
 
     this.methodViewer.update(dt, this._elapsed);
     if (!this._inspecting) this._method?.update?.(dt, this._elapsed);
-    if (this._autoplay && !this._inspecting && this._autoplay.advance(dt)) this._finishAutoplay();
+    this._updateMobileFoodFlight(dt);
+    const autoplay = this._autoplay;
+    if (autoplay && !this._inspecting && autoplay.advance(dt)) {
+      this._finishAutoplay(autoplay, this._autoplayRun);
+    }
     this.thumbViewer.update(dt, this._elapsed);
   }
 
@@ -1119,6 +1681,9 @@ export class FactBook3D {
     this._frameBook();
     this._updatePanelFade();
     this._updateTabsFade();
+    this._updateMobileExplore();
+    this._drawMobileArt();
+    this._updateMobileFoodLabels();
   }
 
   /**
@@ -1244,6 +1809,17 @@ export class FactBook3D {
     }
 
     const r = this.renderer;
+    if (this._mobileModelOpen) {
+      r.setScissorTest(false);
+      r.setViewport(0, 0, w, h);
+      r.setClearColor(0x000000, 0);
+      r.clear(true, true, false);
+      this.methodViewer.camera.aspect = w / h;
+      this.methodViewer.camera.updateProjectionMatrix();
+      r.render(this.methodViewer.scene, this.methodViewer.camera);
+      this._updateMobileFoodLabels();
+      return;
+    }
     r.setScissorTest(false);
     r.setViewport(0, 0, w, h);
     r.setClearColor(0x000000, 0);
@@ -1261,7 +1837,7 @@ export class FactBook3D {
 
     // One shared thumbnail scene, re-pointed at each card in turn: a food card
     // costs a viewport change, not a scene, a canvas or a render target.
-    if (this._cardEls.length) {
+    if (!this._isMobileLayout() && this._cardEls.length) {
       let drew = false;
       for (const card of this._cardEls) {
         if (!card.fv.model) continue;
