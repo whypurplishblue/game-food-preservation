@@ -48,11 +48,12 @@ export class QuickControls {
     this.muteBtn.type = 'button';
     this.muteBtn.dataset.quick = 'mute';
     this.muteBtn.setAttribute('aria-pressed', 'false');
-    // Keep the visible control compact while retaining the full action label
-    // in the DOM for assistive technology and existing interaction checks.
+    // Keep the icon separate from the label span so placements can control
+    // their visual treatment without removing the spoken action label.
+    this.muteIcon = make('span', 'pp-quick__icon');
     this.muteLabel = make('span', 'pp-quick__label');
     this.muteAssistiveLabel = make('span', 'pp-sr');
-    this.muteBtn.append(this.muteLabel, this.muteAssistiveLabel);
+    this.muteBtn.append(this.muteIcon, this.muteLabel, this.muteAssistiveLabel);
     this.muteBtn.addEventListener('click', () => {
       const value = !this.muted;
       // Update immediately for a responsive control. Game persists the value
@@ -139,8 +140,10 @@ export class QuickControls {
     const label = this.muted
       ? fallbackText('ui.unmute', 'Unmute')
       : fallbackText('ui.mute', 'Mute');
-    const compactLabel = fallbackText('ui.audio', 'Audio');
-    this.muteLabel.textContent = `${this.muted ? '🔇' : '🔊'} ${compactLabel}`;
+    this.muteIcon.textContent = this.muted ? '🔇' : '🔊';
+    // The icon is the only visible label in every placement. The action name
+    // remains available through aria-label, title, and the screen-reader span.
+    this.muteLabel.textContent = '';
     this.muteAssistiveLabel.textContent = label;
     this.muteBtn.setAttribute('aria-label', label);
     this.muteBtn.title = label;
