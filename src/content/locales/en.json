@@ -289,7 +289,7 @@
       "long": "High temperature kills microorganisms."
     },
     "changes_environment": {
-      "short": "Vinegar, sugar or salt",
+      "short": "Prevents microorganisms from growing",
       "long": "High acidity or a high concentration of sugar or salt prevents microorganisms from growing."
     },
     "seals_surface": {
@@ -356,7 +356,7 @@
     "pickling": {
       "name": "Pickling",
       "verb": "Pickle it",
-      "mechanismShort": "Vinegar, sugar or salt",
+      "mechanismShort": "Prevents microorganisms from growing",
       "explain": "High acidity or high concentration of sugar or salt prevents microorganisms from growing.",
       "exam": "Pickling preserves food because vinegar, sugar or salt prevents the growth of microorganisms.",
       "hint": "Into the jar, then pour a solution over it.",

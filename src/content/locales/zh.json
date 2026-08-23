@@ -288,7 +288,7 @@
       "long": "高温杀死微生物。"
     },
     "changes_environment": {
-      "short": "醋、糖或盐",
+      "short": "防止微生物生长",
       "long": "高酸性或高浓度的糖或盐可防止微生物生长。"
     },
     "seals_surface": {
@@ -355,7 +355,7 @@
     "pickling": {
       "name": "腌制",
       "verb": "腌制它",
-      "mechanismShort": "醋、糖或盐",
+      "mechanismShort": "防止微生物生长",
       "explain": "高酸性或高浓度的糖或盐可防止微生物生长。",
       "exam": "腌制保存食物，因为醋、糖或盐可防止微生物生长。",
       "hint": "放进罐子，然后倒入溶液。",

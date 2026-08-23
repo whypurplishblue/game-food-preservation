@@ -288,7 +288,7 @@
       "long": "Suhu tinggi membunuh mikroorganisma."
     },
     "changes_environment": {
-      "short": "Cuka, gula atau garam",
+      "short": "Menghalang pertumbuhan mikroorganisma",
       "long": "Keasidan tinggi atau kepekatan gula atau garam yang tinggi menghalang pertumbuhan mikroorganisma."
     },
     "seals_surface": {
@@ -355,7 +355,7 @@
     "pickling": {
       "name": "Penjerukan",
       "verb": "Jeruk",
-      "mechanismShort": "Cuka, gula atau garam",
+      "mechanismShort": "Menghalang pertumbuhan mikroorganisma",
       "explain": "Keasidan tinggi atau kepekatan gula atau garam yang tinggi menghalang pertumbuhan mikroorganisma.",
       "exam": "Penjerukan mengawet makanan kerana cuka, gula atau garam menghalang pertumbuhan mikroorganisma.",
       "hint": "Masukkan ke dalam balang, kemudian tuang larutan.",
