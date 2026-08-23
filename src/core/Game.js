@@ -952,6 +952,10 @@ export class Game {
   _askQuiz(methodId, foodId, afterMistake = false) {
     this.mode = 'quiz';
     this.input.setEnabled(false);
+    // The quiz is a focused modal. Pause and Fact Book already sit beneath
+    // its backdrop; hide the higher-stacking quick control as well so mute
+    // does not float over the question.
+    this.quickControls?.setVisible(false);
     this.quizAsked++;
     // Learning mode always checks causal understanding (why the method works);
     // arcade mode keeps its adaptive, varied question mix.
@@ -981,6 +985,7 @@ export class Game {
         this._noteMiss(q.methodId);
       }
       this.mode = 'playing';
+      this._setQuickContext('hud', false);
       this.input.setEnabled(true);
       this._checkStageEnd();
     }, {
