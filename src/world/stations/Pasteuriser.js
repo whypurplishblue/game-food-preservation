@@ -314,11 +314,11 @@ export class Pasteuriser extends Station {
         this.processToken.position.z += 0.25;
       }
       if (this.food) {
-        const w = this.root.localToWorld(pt.clone());
-        this.food.group.position.lerp(w, 1 - Math.pow(0.002, dt));
+        const target = this.foodTarget(pt.clone());
+        this.food.group.position.lerp(target, 1 - Math.pow(0.002, dt));
       }
     } else if (this._loading && this.food) {
-      const target = this.root.localToWorld(new THREE.Vector3(-0.56, 1.15, 0.2));
+      const target = this.foodTarget(new THREE.Vector3(-0.56, 1.15, 0.2));
       this.food.group.position.lerp(target, 1 - Math.pow(0.004, dt));
     }
 

@@ -292,6 +292,72 @@ export class Station {
     return this.root.localToWorld(new THREE.Vector3(0, 1.05, 0.35));
   }
 
+  /** Convert a world-space station target into the docked food parent's space. */
+  foodParentPoint(worldPoint, out = worldPoint) {
+    out.copy(worldPoint);
+    const parent = this.food?.group?.parent;
+    if (parent) parent.worldToLocal(out);
+    return out;
+  }
+
+  /** Convert a point authored on this station into the docked food parent's space. */
+  foodTarget(localPoint, out = localPoint, source = this.root) {
+    out.copy(localPoint);
+    source.localToWorld(out);
+    return this.foodParentPoint(out, out);
+  }
+
+  /** Fit a food model into a host-local box and return its target in root space. */
+  fitFoodToBox(food, host, min, max, outTarget) {
+    const model = food?.model;
+    if (!model) return 1;
+    const baseScale = Number.isFinite(food.baseScale) ? food.baseScale : model.scale.x || 1;
+    const worldBox = new THREE.Box3();
+    const localBox = new THREE.Box3();
+    const corner = new THREE.Vector3();
+    const boundsInHost = () => {
+      model.updateWorldMatrix(true, true);
+      worldBox.setFromObject(model);
+      localBox.makeEmpty();
+      for (const x of [worldBox.min.x, worldBox.max.x]) {
+        for (const y of [worldBox.min.y, worldBox.max.y]) {
+          for (const z of [worldBox.min.z, worldBox.max.z]) {
+            corner.set(x, y, z);
+            host.worldToLocal(corner);
+            localBox.expandByPoint(corner);
+          }
+        }
+      }
+      return localBox;
+    };
+
+    model.scale.setScalar(baseScale);
+    this.root.updateWorldMatrix(true, true);
+    host.updateWorldMatrix(true, true);
+    food.group.updateWorldMatrix(true, true);
+    const size = boundsInHost().getSize(new THREE.Vector3());
+    const capacity = new THREE.Vector3().subVectors(max, min);
+    const k = Math.max(0.01, Math.min(
+      1,
+      capacity.x / Math.max(1e-5, size.x),
+      capacity.y / Math.max(1e-5, size.y),
+      capacity.z / Math.max(1e-5, size.z),
+    ));
+
+    model.scale.setScalar(baseScale * k);
+    const fittedCentre = boundsInHost().getCenter(new THREE.Vector3());
+    const desiredCentre = new THREE.Vector3().addVectors(min, max).multiplyScalar(0.5);
+    host.localToWorld(fittedCentre);
+    host.localToWorld(desiredCentre);
+    const groupOrigin = food.group.getWorldPosition(new THREE.Vector3());
+    this.root.worldToLocal(fittedCentre);
+    this.root.worldToLocal(desiredCentre);
+    this.root.worldToLocal(groupOrigin);
+    outTarget.copy(desiredCentre).sub(fittedCentre).add(groupOrigin);
+    model.scale.setScalar(baseScale);
+    return k;
+  }
+
   // ------------------------------------------------------------ subclass API
   /** @abstract build the machine geometry into this.body */
   build() {}
@@ -315,7 +381,7 @@ export class Station {
     this.stepIndex = 0;
     food.state = 'processing';
     const p = this.dockPoint;
-    food.group.position.copy(p);
+    food.group.position.copy(this.foodParentPoint(p));
     return this.getSteps(food);
   }
 
