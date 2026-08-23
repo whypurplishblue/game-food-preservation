@@ -137,6 +137,32 @@ const STAGE_MIX = {
 };
 
 /**
+ * Learning mode is a lesson, not a dice roll. Every method asks the same
+ * curriculum-centred question: why does this method preserve food? The method
+ * has just been named by the teaching banner, so asking the child to repeat its
+ * name would test short-term recognition instead of scientific understanding.
+ */
+export const LEARNING_QUESTION_TYPES = Object.freeze({
+  drying: 'mechanism',
+  freezing: 'mechanism',
+  cooling: 'mechanism',
+  vacuum: 'mechanism',
+  pickling: 'mechanism',
+  salting: 'mechanism',
+  pasteurising: 'mechanism',
+  smoking: 'mechanism',
+  canning: 'mechanism',
+});
+
+export function makeLearningQuestion({ methodId, foodId, rnd = Math.random }) {
+  const type = LEARNING_QUESTION_TYPES[methodId] || 'mechanism';
+  if (type === 'method') return methodQuestion(methodId, rnd);
+  if (type === 'microbe') return microbeQuestion(methodId, rnd);
+  if (type === 'food' && foodId) return foodQuestion(foodId, methodId, rnd);
+  return mechanismQuestion(methodId, rnd);
+}
+
+/**
  * @param {boolean} afterMistake suppress the "which method did we just use?"
  *   type. Asking it after a wrong drop is incoherent — no method was used — and
  *   it wasted the single most teachable moment in the run on a nonsense
@@ -174,4 +200,10 @@ export function buildFullBank() {
     for (const f of m.foods) out.push(foodQuestion(f, m.id, () => 0.5));
   }
   return out;
+}
+
+/** The exact one-question-per-method sequence used by Learning mode. */
+export function buildLearningBank() {
+  return Object.keys(LEARNING_QUESTION_TYPES).map((methodId) =>
+    makeLearningQuestion({ methodId, foodId: METHODS[methodId].foods[0], rnd: () => 0.5 }));
 }

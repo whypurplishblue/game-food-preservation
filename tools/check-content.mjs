@@ -29,7 +29,10 @@ await new Promise((r) => setTimeout(r, 1500));
 
 const results = await page.evaluate(() => {
   const { content, game } = window.__pp;
-  const { METHODS, FOODS, STAGES, LEARNING_STAGES, STATION_METHODS, buildFullBank, i18n } = content;
+  const {
+    METHODS, FOODS, STAGES, LEARNING_STAGES, STATION_METHODS,
+    buildFullBank, buildLearningBank, LEARNING_QUESTION_TYPES, i18n,
+  } = content;
   const out = {};
 
   out.validation = window.__ppValidation || [];
@@ -68,6 +71,17 @@ const results = await page.evaluate(() => {
       if (/^(quiz|methods|mechanisms|foods)\./.test(o.label)) out.quiz.push(`untranslated option: ${o.label}`);
     }
     if (!q.teachback) out.quiz.push(`${q.type}/${q.methodId}: no teachback`);
+  }
+  const learningBank = buildLearningBank();
+  if (learningBank.length !== Object.keys(LEARNING_QUESTION_TYPES).length) {
+    out.quiz.push(`learning bank: expected ${Object.keys(LEARNING_QUESTION_TYPES).length}, got ${learningBank.length}`);
+  }
+  for (const q of learningBank) {
+    const expected = LEARNING_QUESTION_TYPES[q.methodId];
+    if (q.type !== expected) out.quiz.push(`learning ${q.methodId}: expected ${expected}, got ${q.type}`);
+    if (q.options.filter((o) => o.correct).length !== 1) {
+      out.quiz.push(`learning ${q.methodId}: does not have exactly one correct answer`);
+    }
   }
 
   // --- locale coverage: every displayable id in every language

@@ -14,7 +14,7 @@ import {
   LEARNING_STAGES, LEARNING_SCORING,
 } from '../content/curriculum.js';
 import { t, methodName, foodName, mechShort, methodMechShort, onLangChange, setLang } from '../content/i18n.js';
-import { makeQuestion } from '../content/quiz.js';
+import { makeLearningQuestion, makeQuestion } from '../content/quiz.js';
 import { PALETTE } from '../world/Palette.js';
 import { slotsFor, PREP_CENTRE, PREP_RADIUS } from '../world/Kitchen.js';
 import { Food } from '../world/Food.js';
@@ -953,7 +953,11 @@ export class Game {
     this.mode = 'quiz';
     this.input.setEnabled(false);
     this.quizAsked++;
-    const q = makeQuestion({ methodId, foodId, stageId: this.stageId, afterMistake });
+    // Learning mode always checks causal understanding (why the method works);
+    // arcade mode keeps its adaptive, varied question mix.
+    const q = this.gameMode === 'learning'
+      ? makeLearningQuestion({ methodId, foodId })
+      : makeQuestion({ methodId, foodId, stageId: this.stageId, afterMistake });
     this.quiz.ask(q, (correct) => {
       if (correct) {
         this.quizRight++;
