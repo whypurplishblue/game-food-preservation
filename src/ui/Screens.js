@@ -11,6 +11,7 @@ import { t, tList, methodName, mechShort, methodMechShort, foodName } from '../c
 import { METHODS, FOODS, SCORING } from '../content/curriculum.js';
 import { CREDIT_CATEGORIES } from '../content/credits.js';
 import { sfx, audio } from '../core/Audio.js';
+import { TitleEffects } from './TitleEffects.js';
 
 const el = (tag, cls, html) => {
   const e = document.createElement(tag);
@@ -32,6 +33,7 @@ export class Screens {
     root.appendChild(this.el);
     this._current = null;
     this._leaderboardState = null;
+    this.titleEffects = new TitleEffects();
     this._onKey = (e) => {
       if (e.key === 'Escape' && this._escapable) {
         // Clear the handler before invoking it. A close callback can render a
@@ -45,6 +47,8 @@ export class Screens {
   }
 
   _open(html, { escapable = false, onEscape = null, cls = '' } = {}) {
+    this.titleEffects.destroy();
+    this.el.inert = false;
     this.el.hidden = false;
     this.el.className = `pp-screens is-open ${cls}`;
     this.el.innerHTML = html;
@@ -56,6 +60,7 @@ export class Screens {
   }
 
   close() {
+    this.titleEffects.destroy();
     this._leaderboardState && (this._leaderboardState.closed = true);
     this._leaderboardState = null;
     this._current = null;
@@ -142,7 +147,17 @@ export class Screens {
         <p class="pp-home__hint pp-title__hint">${t('a11y.menuKeyboardHelp')}</p>
       </div>`, { cls: 'is-title' });
 
-    node.querySelector('[data-act="play"]').addEventListener('click', () => { sfx('ui.tap'); onPlay?.(); });
+    const play = node.querySelector('[data-act="play"]');
+    requestAnimationFrame(() => this.titleEffects.playIntro(node.querySelector('.pp-title__logo')));
+    play.addEventListener('click', async (event) => {
+      if (play.disabled) return;
+      play.disabled = true;
+      node.inert = true;
+      sfx('ui.tap');
+      const completed = await this.titleEffects.playRipple(play, event);
+      if (completed) onPlay?.();
+      else node.inert = false;
+    });
     node.querySelector('[data-act="boards"]').addEventListener('click', () => {
       sfx('ui.open');
       // Home's contextual leaderboard starts on Learning. Game can ignore the
