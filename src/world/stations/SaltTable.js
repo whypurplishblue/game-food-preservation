@@ -14,6 +14,9 @@ import { Station } from './Station.js';
 import { PALETTE } from '../Palette.js';
 import { plastic, metal, matte, roundedBox, cyl, sphere, blob, mesh } from '../Materials.js';
 
+const FOOD_AREA_MIN = new THREE.Vector3(-0.34, 1.24, 0.16);
+const FOOD_AREA_MAX = new THREE.Vector3(0.64, 1.62, 0.80);
+
 export class SaltTable extends Station {
   build() {
     const wood = matte(0xb5794a, 0.82);
@@ -157,6 +160,10 @@ export class SaltTable extends Station {
 
     this._coverage = 0;
     this._rawProgress = 0;
+    this._fitForFood = null;
+    this._foodFitK = 1;
+    this._foodTargetRoot = new THREE.Vector3();
+    this._foodTargetParent = new THREE.Vector3();
   }
 
   getSteps() {
@@ -165,6 +172,18 @@ export class SaltTable extends Station {
       { kind: 'scrub', id: 'spread', textKey: 'station.salting.spread', icon: 'hand', reps: 6,
         ms: 2200, meterKey: 'methods.salting.coverage' },
     ];
+  }
+
+  accept(food) {
+    const steps = super.accept(food);
+    this._foodFitK = this.fitFoodToBox(
+      food, this.body, FOOD_AREA_MIN, FOOD_AREA_MAX, this._foodTargetRoot,
+    );
+    this._fitForFood = food;
+    this.foodTarget(this._foodTargetRoot, this._foodTargetParent);
+    food.group.position.copy(this._foodTargetParent);
+    food.model.scale.setScalar(food.baseScale * this._foodFitK);
+    return steps;
   }
 
   onStepProgress(index, progress) {
@@ -192,7 +211,7 @@ export class SaltTable extends Station {
 
     if (this.food) {
       // Food shrinks slightly as moisture is drawn out.
-      this.food.model.scale.setScalar(this.food.baseScale * (1 - progress * 0.11));
+      this.food.model.scale.setScalar(this.food.baseScale * this._foodFitK * (1 - progress * 0.11));
       this.food.model.rotation.z = Math.sin(progress * Math.PI * 12) * 0.06;  // being rubbed
     }
   }
@@ -207,8 +226,8 @@ export class SaltTable extends Station {
 
   /** Give Fact Book autoplay the food that gameplay normally docks here. */
   beginAutoplay() {
-    this._demoActive = true;
-    this.demoFood.visible = true;
+    this._demoActive = !this.food;
+    this.demoFood.visible = this._demoActive;
   }
 
   async playSuccess() {
@@ -217,6 +236,14 @@ export class SaltTable extends Station {
   }
 
   resetVisuals() {
+    const previousFood = this.food || this._fitForFood;
+    if (!this.food && previousFood?.model) {
+      previousFood.model.scale.setScalar(previousFood.baseScale);
+      this._fitForFood = null;
+      this._foodFitK = 1;
+    } else if (this.food?.model) {
+      this.food.model.scale.setScalar(this.food.baseScale * this._foodFitK);
+    }
     this._coverage = 0;
     this._rawProgress = 0;
     this._scooping = false;
@@ -262,8 +289,8 @@ export class SaltTable extends Station {
 
     // Food position while being salted
     if (this.food && (this._scooping || this._coverage > 0)) {
-      const target = this.root.localToWorld(new THREE.Vector3(0.15, 1.42, 0.48));
-      this.food.group.position.lerp(target, 1 - Math.pow(0.004, dt));
+      this.foodTarget(this._foodTargetRoot, this._foodTargetParent);
+      this.food.group.position.lerp(this._foodTargetParent, 1 - Math.pow(0.004, dt));
     }
 
     for (const b of this.beads) {

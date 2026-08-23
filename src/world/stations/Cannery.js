@@ -16,6 +16,9 @@ import { Station } from './Station.js';
 import { PALETTE } from '../Palette.js';
 import { plastic, metal, matte, glass, hot, roundedBox, cyl, torus, sphere, mesh } from '../Materials.js';
 
+const CAN_FOOD_MIN = new THREE.Vector3(-0.36, 0.12, -0.36);
+const CAN_FOOD_MAX = new THREE.Vector3(0.36, 0.78, 0.36);
+
 export class Cannery extends Station {
   build() {
     const steel = metal(PALETTE.steel, { rough: 0.3 });
@@ -110,6 +113,10 @@ export class Cannery extends Station {
     this._heat = 0;
     this._sealT = 0;
     this._loading = false;
+    this._fitForFood = null;
+    this._foodFitK = 1;
+    this._foodTargetRoot = new THREE.Vector3();
+    this._foodTargetParent = new THREE.Vector3();
   }
 
   _drawGauge(temp) {
@@ -133,6 +140,18 @@ export class Cannery extends Station {
       { kind: 'hold', id: 'cook', textKey: 'station.canning.heat', icon: 'flame', ms: 2600, hot: true },
       { kind: 'twist', id: 'seal', textKey: 'station.canning.seal', turns: 2, hintKey: 'station.canning.twistHint' },
     ];
+  }
+
+  accept(food) {
+    const steps = super.accept(food);
+    this._foodFitK = this.fitFoodToBox(
+      food, this.can, CAN_FOOD_MIN, CAN_FOOD_MAX, this._foodTargetRoot,
+    );
+    this._fitForFood = food;
+    this.foodTarget(this._foodTargetRoot, this._foodTargetParent);
+    food.group.position.copy(this._foodTargetParent);
+    food.model.scale.setScalar(food.baseScale * this._foodFitK);
+    return steps;
   }
 
   onStepProgress(index, progress) {
@@ -172,6 +191,14 @@ export class Cannery extends Station {
   }
 
   resetVisuals() {
+    const previousFood = this.food || this._fitForFood;
+    if (!this.food && previousFood?.model) {
+      previousFood.model.scale.setScalar(previousFood.baseScale);
+      this._fitForFood = null;
+      this._foodFitK = 1;
+    } else if (this.food?.model) {
+      this.food.model.scale.setScalar(this.food.baseScale * this._foodFitK);
+    }
     this._heat = 0;
     this._sealT = 0;
     this._loading = false;
@@ -204,10 +231,10 @@ export class Cannery extends Station {
 
     if (this._loading && this.food) {
       // Sinks into the can, and disappears under the rim as it fills.
-      const target = this.root.localToWorld(new THREE.Vector3(0, 1.62, 0.22));
-      this.food.group.position.lerp(target, 1 - Math.pow(0.005, dt));
+      this.foodTarget(this._foodTargetRoot, this._foodTargetParent);
+      this.food.group.position.lerp(this._foodTargetParent, 1 - Math.pow(0.005, dt));
       this.food.model.rotation.y += dt * 0.9;
-      this.food.model.scale.setScalar(this.food.baseScale * (1 - this._sealT * 0.55));
+      this.food.model.scale.setScalar(this.food.baseScale * this._foodFitK * (1 - this._sealT * 0.55));
     }
   }
 }

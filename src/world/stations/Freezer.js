@@ -314,7 +314,7 @@ export class Freezer extends Station {
 
     if (this._loading && this.food) {
       this._loadT += dt;
-      const target = this.root.localToWorld(new THREE.Vector3(0, 1.50, 0.05));
+      const target = this.foodTarget(new THREE.Vector3(0, 1.50, 0.05));
       this.food.group.position.lerp(target, 1 - Math.pow(0.004, dt));
       this.food.model.rotation.y += dt * 1.2;
     }

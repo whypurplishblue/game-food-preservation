@@ -21,6 +21,208 @@ const check = (name, ok, extra = '') => {
   if (!ok) failures++;
 };
 
+/**
+ * Inspect a selected Pickling food in the jar's own frame.  The tall cylinder
+ * is the jar wall; the small inset from its bounds is an explicit, readable
+ * interior envelope rather than a screenshot/pixel threshold.  A rectangular
+ * envelope is intentionally used here: it is conservative for the food's
+ * generated meshes and does not pretend the food is a perfect circle.
+ */
+const inspectPicklingPlacement = (page, expectedFoodId) => page.evaluate((expectedId) => {
+  const T = window.__ppTHREE;
+  const fb = window.__pp.game.factBook;
+  const activity = fb._mobileActivity;
+  const station = activity?.station;
+  const food = station?.food;
+  if (!T || !activity || !station || !food) {
+    return { expectedId, foodId: food?.foodId || null, fitWithinInterior: false, verticalCentered: false };
+  }
+
+  const inFrame = (host, object) => {
+    host.updateWorldMatrix(true, true);
+    object.updateWorldMatrix(true, true);
+    const world = new T.Box3().setFromObject(object);
+    const local = new T.Box3();
+    const point = new T.Vector3();
+    for (const x of [world.min.x, world.max.x]) {
+      for (const y of [world.min.y, world.max.y]) {
+        for (const z of [world.min.z, world.max.z]) {
+          local.expandByPoint(host.worldToLocal(point.set(x, y, z)));
+        }
+      }
+    }
+    return local;
+  };
+
+  const foodBox = inFrame(station.jar, food.model);
+  const jarMeshes = [];
+  station.jar.traverse((object) => {
+    if (!object.isMesh) return;
+    const box = inFrame(station.jar, object);
+    const size = box.getSize(new T.Vector3());
+    // The vessel wall is the only tall mesh in the jar.  This avoids coupling
+    // the assertion to child indexes when animated liquid/lid pieces change.
+    if (size.y > 0.75 && size.x < 1.2 && size.z < 1.2) jarMeshes.push({ box, size });
+  });
+  jarMeshes.sort((a, b) => b.size.y - a.size.y);
+  const vessel = jarMeshes[0]?.box || inFrame(station.jar, station.jar);
+  const vesselSize = vessel.getSize(new T.Vector3());
+  const wallInset = 0.08;
+  const floorInset = 0.08;
+  const interior = {
+    minX: vessel.min.x + wallInset,
+    maxX: vessel.max.x - wallInset,
+    minY: vessel.min.y + floorInset,
+    maxY: vessel.max.y - floorInset,
+    minZ: vessel.min.z + wallInset,
+    maxZ: vessel.max.z - wallInset,
+  };
+  const foodCenter = foodBox.getCenter(new T.Vector3());
+  const interiorCenterY = (interior.minY + interior.maxY) * 0.5;
+  const epsilon = 0.025;
+  const verticalTolerance = 0.18;
+  const fitWithinInterior = foodBox.min.x >= interior.minX - epsilon &&
+    foodBox.max.x <= interior.maxX + epsilon &&
+    foodBox.min.y >= interior.minY - epsilon &&
+    foodBox.max.y <= interior.maxY + epsilon &&
+    foodBox.min.z >= interior.minZ - epsilon &&
+    foodBox.max.z <= interior.maxZ + epsilon;
+  const verticalDelta = Math.abs(foodCenter.y - interiorCenterY);
+  const result = {
+    expectedId,
+    foodId: food.foodId,
+    visible: food.group.visible,
+    foodParent: food.group.parent?.name || '',
+    foodBox: { min: foodBox.min.toArray(), max: foodBox.max.toArray(), size: foodBox.getSize(new T.Vector3()).toArray(), center: foodCenter.toArray() },
+    vesselBox: { min: vessel.min.toArray(), max: vessel.max.toArray(), size: vesselSize.toArray() },
+    interior,
+    fitWithinInterior,
+    verticalDelta,
+    verticalTolerance,
+    verticalCentered: verticalDelta <= verticalTolerance,
+  };
+  return result;
+}, expectedFoodId);
+
+const inspectFoodEnvelope = (page, hostKey, min, max) => page.evaluate(({ hostKey, min, max }) => {
+  const T = window.__ppTHREE;
+  const station = window.__pp.game.factBook._mobileActivity?.station;
+  const food = station?.food;
+  const host = station?.[hostKey];
+  if (!T || !food || !host) return { fits: false, reason: 'missing food or host' };
+  host.updateWorldMatrix(true, true);
+  food.model.updateWorldMatrix(true, true);
+  const world = new T.Box3().setFromObject(food.model);
+  const local = new T.Box3();
+  const point = new T.Vector3();
+  for (const x of [world.min.x, world.max.x]) for (const y of [world.min.y, world.max.y]) {
+    for (const z of [world.min.z, world.max.z]) {
+      local.expandByPoint(host.worldToLocal(point.set(x, y, z)));
+    }
+  }
+  const epsilon = 0.03;
+  const fits = local.min.x >= min[0] - epsilon && local.max.x <= max[0] + epsilon &&
+    local.min.y >= min[1] - epsilon && local.max.y <= max[1] + epsilon &&
+    local.min.z >= min[2] - epsilon && local.max.z <= max[2] + epsilon;
+  return { fits, min: local.min.toArray(), max: local.max.toArray(), envelope: { min, max } };
+}, { hostKey, min, max });
+
+/**
+ * Verify that a placed food and its station still form one assembly as the
+ * turntable rotates.  Both are measured in the viewer pivot's local frame, so
+ * this is independent of camera projection and does not rely on pixels.
+ */
+const placedAssemblyRotationCheck = (page) => page.evaluate(() => {
+  const T = window.__ppTHREE;
+  const fb = window.__pp.game.factBook;
+  const activity = fb._mobileActivity;
+  const pivot = fb.methodViewer.pivot;
+  const station = activity?.station;
+  const food = station?.food;
+  if (!T || !pivot || !station || !food) return null;
+  const relative = () => station.root.worldToLocal(food.group.getWorldPosition(new T.Vector3())).toArray();
+  pivot.updateWorldMatrix(true, true);
+  const before = relative();
+  const oldY = pivot.rotation.y;
+  pivot.rotation.y += 0.31;
+  pivot.updateWorldMatrix(true, true);
+  const after = relative();
+  pivot.rotation.y = oldY;
+  pivot.updateWorldMatrix(true, true);
+  return Math.hypot(...before.map((v, i) => v - after[i]));
+});
+
+/**
+ * Vacuum is a useful cross-check for the shared placement contract: its film
+ * target is derived from the actual food bounds.  Keep this to finite geometry
+ * and envelope relationships, rather than asserting an exact animation frame.
+ */
+const inspectVacuumGeometry = (page) => page.evaluate(() => {
+  const T = window.__ppTHREE;
+  const fb = window.__pp.game.factBook;
+  const activity = fb._mobileActivity;
+  const station = activity?.station;
+  const food = station?.food;
+  if (!T || !station || !food) return { ok: false, reason: 'no docked food' };
+
+  const inFrame = (host, object) => {
+    host.updateWorldMatrix(true, true);
+    object.updateWorldMatrix(true, true);
+    const world = new T.Box3().setFromObject(object);
+    const local = new T.Box3();
+    const point = new T.Vector3();
+    for (const x of [world.min.x, world.max.x]) {
+      for (const y of [world.min.y, world.max.y]) {
+        for (const z of [world.min.z, world.max.z]) {
+          local.expandByPoint(host.worldToLocal(point.set(x, y, z)));
+        }
+      }
+    }
+    return local;
+  };
+  const pose = station._targetPose;
+  const open = station._openPose;
+  const foodBox = inFrame(station.body, food.model);
+  const finite = (value) => Number.isFinite(value);
+  const poseFinite = pose && ['cx', 'cz', 'halfX', 'halfZ', 'bottom', 'top'].every((key) => finite(pose[key]));
+  const poseInsideOpen = poseFinite && pose.halfX <= open.halfX + 0.001 &&
+    pose.halfZ <= open.halfZ + 0.001 && pose.bottom >= open.bottom - 0.001 &&
+    pose.top <= Math.min(open.top, station._lidPumpClearance()) + 0.001;
+  const envelopeEpsilon = 0.06;
+  const foodWithinPose = poseFinite && foodBox.min.x >= pose.cx - pose.halfX - envelopeEpsilon &&
+    foodBox.max.x <= pose.cx + pose.halfX + envelopeEpsilon &&
+    foodBox.min.z >= pose.cz - pose.halfZ - envelopeEpsilon &&
+    foodBox.max.z <= pose.cz + pose.halfZ + envelopeEpsilon &&
+    foodBox.min.y >= pose.bottom - envelopeEpsilon &&
+    foodBox.max.y <= pose.top + envelopeEpsilon;
+  const surfaces = ['filmTop', 'filmBottom', 'filmFront', 'filmBack', 'filmLeft', 'filmRight'].map((key) => {
+    const surface = station[key];
+    const positions = surface?.geometry?.attributes?.position?.array;
+    const box = surface ? new T.Box3().setFromObject(surface) : new T.Box3();
+    return {
+      key,
+      visible: !!surface?.visible,
+      nonEmpty: !box.isEmpty(),
+      finite: !!positions && Array.from(positions).every(Number.isFinite),
+    };
+  });
+  const surfacesHealthy = surfaces.length === 6 && surfaces.every((surface) =>
+    surface.visible && surface.nonEmpty && surface.finite);
+  return {
+    ok: !!station.bag?.visible && poseFinite && poseInsideOpen && foodWithinPose && surfacesHealthy,
+    foodId: food.foodId,
+    filmProgress: station._filmProgress,
+    fitK: station._fitK,
+    targetFitK: station._targetFitK,
+    pose,
+    foodBox: { min: foodBox.min.toArray(), max: foodBox.max.toArray() },
+    poseFinite,
+    poseInsideOpen,
+    foodWithinPose,
+    surfaces,
+  };
+});
+
 const browser = await chromium.launch({
   executablePath: process.env.PP_CHROME || undefined,
   args: ['--use-gl=angle', '--enable-unsafe-swiftshader', '--no-sandbox'],
@@ -671,12 +873,19 @@ await session({ width: 667, height: 375 }, async (page) => {
       flightMid.realFoodHidden && flightMid.tokenVisible, JSON.stringify(flightMid));
   await page.screenshot({ path: `${OUT}/20e-landscape-food-flight-mid.png` });
 
-  await sleep(150);
+  await page.waitForFunction(() => {
+    const fb = window.__pp.game.factBook;
+    const activity = fb._mobileActivity;
+    const flight = activity?.flight;
+    if (!flight) return !!activity?.station?.food;
+    const target = fb._mobileFlightTarget(activity);
+    return Math.hypot(flight.current.x - target.x, flight.current.y - target.y) < 110;
+  }, null, { timeout: 2000 });
   const flightNearTarget = await page.evaluate(() => {
     const fb = window.__pp.game.factBook;
     const activity = fb._mobileActivity;
     const flight = activity.flight;
-    if (!flight) return { flightStillVisible: false, nearTarget: false };
+    if (!flight) return { flightStillVisible: false, nearTarget: !!activity.station.food };
     const target = fb._mobileFlightTarget(activity);
     return {
       flightStillVisible: true,
@@ -684,7 +893,7 @@ await session({ width: 667, height: 375 }, async (page) => {
     };
   });
   check('the handoff reaches the projected station target',
-    flightNearTarget.flightStillVisible && flightNearTarget.nearTarget,
+    flightNearTarget.nearTarget,
     JSON.stringify(flightNearTarget));
 
   await page.waitForFunction(() => {
@@ -710,8 +919,67 @@ await session({ width: 667, height: 375 }, async (page) => {
       accepted.flightCleared && accepted.cardPlaced && accepted.foodVisible,
     JSON.stringify(accepted));
   await sleep(450);
+
+  // The two primary Pickling foods must both fit the live jar, not merely land
+  // somewhere near its plinth.  Measure in jar-local coordinates so this also
+  // catches the normalized-holder / food-pivot parent-space mismatch.
+  const picklingFoodIds = await page.evaluate(() =>
+    window.__pp.game.factBook._mv.foods.map((food) => food.id));
+  check('Pickling Explore 3D exposes both primary foods', picklingFoodIds.length === 2,
+    picklingFoodIds.join(', '));
+  const firstPicklingPlacement = await inspectPicklingPlacement(page, picklingFoodIds[0]);
+  check(`Pickling fits ${firstPicklingPlacement.foodId || picklingFoodIds[0]} inside the jar`,
+    firstPicklingPlacement.foodId === picklingFoodIds[0] &&
+      firstPicklingPlacement.visible && firstPicklingPlacement.fitWithinInterior,
+    JSON.stringify(firstPicklingPlacement));
+  check(`Pickling centres ${firstPicklingPlacement.foodId || picklingFoodIds[0]} vertically`,
+    firstPicklingPlacement.foodId === picklingFoodIds[0] && firstPicklingPlacement.verticalCentered,
+    JSON.stringify({ delta: firstPicklingPlacement.verticalDelta, tolerance: firstPicklingPlacement.verticalTolerance }));
+
+  await page.waitForFunction(() => {
+    const station = window.__pp.game.factBook._mobileActivity?.station;
+    return station?._fill > 0.3 && station._fill < 0.9 && !!station._pouringBottle;
+  }, null, { timeout: 6000 });
+  const pouringBottleAboveJar = await page.evaluate(() => {
+    const T = window.__ppTHREE;
+    const station = window.__pp.game.factBook._mobileActivity?.station;
+    const bottle = station?._pouringBottle;
+    if (!T || !station?.jar || !bottle) return null;
+    const centreWorld = new T.Box3().setFromObject(bottle).getCenter(new T.Vector3());
+    const centreBody = station.body.worldToLocal(centreWorld);
+    const mouthWorld = station.jar.localToWorld(new T.Vector3(0, 1.04, 0));
+    const mouthBody = station.body.worldToLocal(mouthWorld);
+    return { bottleY: centreBody.y, mouthY: mouthBody.y };
+  });
+  check('Pickling pouring bottle stays above the jar',
+    !!pouringBottleAboveJar && pouringBottleAboveJar.bottleY > pouringBottleAboveJar.mouthY,
+    JSON.stringify(pouringBottleAboveJar));
+  await page.waitForFunction(() => !window.__pp.game.factBook._autoplay, null, { timeout: 7000 });
+  const completedPicklingPlacement = await inspectPicklingPlacement(page, picklingFoodIds[0]);
+  check('Pickling food remains fitted after the animation completes',
+    completedPicklingPlacement.fitWithinInterior && completedPicklingPlacement.verticalCentered,
+    JSON.stringify(completedPicklingPlacement));
+
+  if (picklingFoodIds[1]) {
+    await page.click(secondFoodSelector);
+    await page.waitForFunction((id) => {
+      const fb = window.__pp.game.factBook;
+      return fb._mobileActivity?.station?.food?.foodId === id && !!fb._autoplay &&
+        !fb._mobileActivity?.flight;
+    }, picklingFoodIds[1], { timeout: 5000 });
+    await sleep(450);
+    const secondPicklingPlacement = await inspectPicklingPlacement(page, picklingFoodIds[1]);
+    check(`Pickling fits ${secondPicklingPlacement.foodId || picklingFoodIds[1]} inside the jar`,
+      secondPicklingPlacement.foodId === picklingFoodIds[1] &&
+        secondPicklingPlacement.visible && secondPicklingPlacement.fitWithinInterior,
+      JSON.stringify(secondPicklingPlacement));
+    check(`Pickling centres ${secondPicklingPlacement.foodId || picklingFoodIds[1]} vertically`,
+      secondPicklingPlacement.foodId === picklingFoodIds[1] && secondPicklingPlacement.verticalCentered,
+      JSON.stringify({ delta: secondPicklingPlacement.verticalDelta, tolerance: secondPicklingPlacement.verticalTolerance }));
+  }
   await page.screenshot({ path: `${OUT}/20f-landscape-food-landed.png` });
 
+  const assemblyDelta = await placedAssemblyRotationCheck(page);
   const azBeforePlacedDrag = await page.evaluate(() => window.__pp.game.factBook.methodViewer._targetAz);
   if (modelBox) {
     await page.mouse.move(modelBox.x + modelBox.width * 0.68, modelBox.y + modelBox.height * 0.52);
@@ -723,6 +991,9 @@ await session({ width: 667, height: 375 }, async (page) => {
   check('manual model rotation resumes after the food is placed',
     Math.abs(azAfterPlacedDrag - azBeforePlacedDrag) > 0.01,
     `delta=${(azAfterPlacedDrag - azBeforePlacedDrag).toFixed(4)}`);
+  check('placed food stays attached while the viewer rotates',
+    Number.isFinite(assemblyDelta) && assemblyDelta < 1e-5,
+    `relative delta=${Number.isFinite(assemblyDelta) ? assemblyDelta.toFixed(4) : 'missing'}`);
 
   await page.click('.pp-fb__mobilemodelreset');
   await page.waitForFunction(() => {
@@ -873,6 +1144,58 @@ await session({ width: 667, height: 375 }, async (page) => {
   await page.waitForFunction(() => window.__pp.game.factBook.state === 'reading', null, { timeout: 5000 });
   check('back to book returns to the method spread', await page.evaluate(() =>
     !window.__pp.game.factBook._mobileModelOpen && document.querySelector('.pp-fb__mobilemodel')?.hidden));
+
+  // Vacuum's bag is driven from the same docked food bounds.  Wait until the
+  // pump has made measurable progress so the six film surfaces are live, then
+  // check their finite geometry and fitted envelope against the food.
+  await page.evaluate(() => window.__pp.game.factBook.goToMethod('vacuum'));
+  await settle(page);
+  await page.click('.pp-fb__mobile-explore');
+  await page.waitForFunction(() => window.__pp.game.factBook.state === 'mobile-model', null, { timeout: 5000 });
+  const vacuumFoodId = await page.$eval('.pp-fb__mobilefood:nth-child(1)', (node) => node.dataset.foodId);
+  await page.click('.pp-fb__mobilefood:nth-child(1)');
+  await page.waitForFunction((id) => {
+    const fb = window.__pp.game.factBook;
+    return fb._mobileActivity?.station?.food?.foodId === id && !!fb._autoplay &&
+      !fb._mobileActivity?.flight;
+  }, vacuumFoodId, { timeout: 5000 });
+  await page.waitForFunction(() => {
+    const station = window.__pp.game.factBook._mobileActivity?.station;
+    return !!station?.food && station._filmProgress > 0.9;
+  }, null, { timeout: 12000 });
+  const vacuumGeometry = await inspectVacuumGeometry(page);
+  check('Vacuum Explore 3D keeps the fitted food and film geometry finite', vacuumGeometry.ok,
+    JSON.stringify(vacuumGeometry));
+  await page.click('.pp-fb__mobileback');
+  await page.waitForFunction(() => window.__pp.game.factBook.state === 'reading', null, { timeout: 5000 });
+
+  for (const checkCase of [
+    { method: 'salting', host: 'body', min: [-0.34, 1.24, 0.16], max: [0.64, 1.62, 0.80] },
+    { method: 'canning', host: 'can', min: [-0.36, 0.12, -0.36], max: [0.36, 0.78, 0.36] },
+  ]) {
+    await page.evaluate((id) => window.__pp.game.factBook.goToMethod(id), checkCase.method);
+    await settle(page);
+    await page.click('.pp-fb__mobile-explore');
+    await page.waitForFunction(() => window.__pp.game.factBook.state === 'mobile-model', null, { timeout: 5000 });
+    await page.click('.pp-fb__mobilefood:nth-child(1)');
+    await page.waitForFunction(() => {
+      const fb = window.__pp.game.factBook;
+      return !!fb._mobileActivity?.station?.food && !fb._mobileActivity?.flight;
+    }, null, { timeout: 5000 });
+    await sleep(250);
+    const placement = await inspectFoodEnvelope(page, checkCase.host, checkCase.min, checkCase.max);
+    check(`${checkCase.method} keeps the selected food in its method area`, placement.fits,
+      JSON.stringify(placement));
+    if (checkCase.method === 'salting') {
+      const demoHidden = await page.evaluate(() => {
+        const station = window.__pp.game.factBook._mobileActivity?.station;
+        return !!station?.food && !station.demoFood?.visible && !station._demoActive;
+      });
+      check('salting hides its demonstration fillet when real food is selected', demoHidden);
+    }
+    await page.click('.pp-fb__mobileback');
+    await page.waitForFunction(() => window.__pp.game.factBook.state === 'reading', null, { timeout: 5000 });
+  }
 
   await page.evaluate(() => window.__pp.game.factBook.goToMethod('smoking'));
   await settle(page);

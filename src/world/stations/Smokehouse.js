@@ -218,7 +218,7 @@ export class Smokehouse extends Station {
 
     if (this._hanging && this.food) {
       this._hangT += dt;
-      const target = this.root.localToWorld(new THREE.Vector3(0, 1.48, 0.10));
+      const target = this.foodTarget(new THREE.Vector3(0, 1.48, 0.10));
       this.food.group.position.lerp(target, 1 - Math.pow(0.004, dt));
       this.food.group.rotation.z = Math.sin(elapsed * 1.6) * 0.08;
     }

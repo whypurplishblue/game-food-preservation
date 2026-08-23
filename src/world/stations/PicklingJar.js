@@ -21,6 +21,18 @@ const SOLUTION_LOOK = {
   salt_solution:  { colour: 0xdfeef5, bottle: 0xbcd8e6, fizz: 0xffffff },
 };
 
+// The food sits inside the jar body, below both opaque rims. These are jar
+// local coordinates (before the jar's 1.18 presentation scale), so measuring
+// the food in the same space also works when the Fact Book normalises the
+// station and leaves its selected food outside the station holder.
+const JAR_FOOD_ENVELOPE = Object.freeze({
+  halfX: 0.34,
+  halfZ: 0.34,
+  bottom: 0.13,
+  top: 0.95,
+  margin: 0.035,
+});
+
 export class PicklingJar extends Station {
   build() {
     const wood = matte(PALETTE.woodDark, 0.8);
@@ -150,7 +162,16 @@ export class PicklingJar extends Station {
     this._streamMid = new THREE.Vector3();
     this._up = new THREE.Vector3(0, 1, 0);
     this._foodScale = new THREE.Vector3();
-    this._dockTarget = new THREE.Vector3();
+    this._dockTargetParent = new THREE.Vector3();
+    this._fitForFood = null;
+    this._targetFitK = 1;
+    this._fitTargetRoot = new THREE.Vector3();
+    this._jarCentreLocal = new THREE.Vector3();
+    this._jarCentreWorld = new THREE.Vector3();
+    this._groupOriginWorld = new THREE.Vector3();
+    this._worldBox = new THREE.Box3();
+    this._jarBox = new THREE.Box3();
+    this._fitCorner = new THREE.Vector3();
   }
 
   getSteps() {
@@ -174,6 +195,16 @@ export class PicklingJar extends Station {
       // was pure motor filler between two steps that do teach.
       { kind: 'tap', id: 'twist', textKey: 'station.pickling.twist', icon: 'lid' },
     ];
+  }
+
+  /** Fit and place the ingredient before the Fact Book handoff reveals it. */
+  accept(food) {
+    const steps = super.accept(food);
+    this._prepareFoodFit(food);
+    this.foodTarget(this._fitTargetRoot, this._dockTargetParent);
+    food.group.position.copy(this._dockTargetParent);
+    food.model.scale.setScalar(food.baseScale * this._targetFitK);
+    return steps;
   }
 
   onStepProgress(index, progress, value) {
@@ -224,6 +255,15 @@ export class PicklingJar extends Station {
   }
 
   resetVisuals() {
+    // Fact Book completion resets the machine while leaving its selected food
+    // docked. Preserve that food's fitted pose; only release/reset should put
+    // the model back at its presentation scale for a later selection.
+    const previousFood = this.food || this._fitForFood;
+    if (!this.food && previousFood?.model && Number.isFinite(previousFood.baseScale)) {
+      previousFood.model.scale.setScalar(previousFood.baseScale);
+      this._fitForFood = null;
+      this._targetFitK = 1;
+    }
     this._fill = 0; this._chosen = null; this._loading = false;
     this._success = 0;
     this.liquid.scale.y = 0.001;
@@ -250,6 +290,84 @@ export class PicklingJar extends Station {
     }
     this._pouringBottle = null;
     this.jar.scale.setScalar(this._jarScale);
+  }
+
+  /**
+   * Measure a food's visible model in jar-local space and derive an absolute
+   * scale from its real bounds. The model is intentionally measured rather
+   * than the Food radius: the latter is a hit-test approximation and does not
+   * include the different silhouettes of the fruit and vegetable models.
+   */
+  _prepareFoodFit(food) {
+    if (!food?.model || this._fitForFood === food) return;
+
+    const model = food.model;
+    const baseScale = Number.isFinite(food.baseScale) ? food.baseScale : model.scale.x || 1;
+    model.scale.setScalar(baseScale);
+
+    this.root.updateWorldMatrix(true, true);
+    this.jar.updateWorldMatrix(true, true);
+    food.group.updateWorldMatrix(true, true);
+
+    const box = this._foodBoxInJarSpace(model);
+    const size = box.getSize(new THREE.Vector3());
+    const env = JAR_FOOD_ENVELOPE;
+    const usableX = Math.max(0.001, env.halfX * 2 - env.margin * 2);
+    const usableZ = Math.max(0.001, env.halfZ * 2 - env.margin * 2);
+    const usableY = Math.max(0.001, env.top - env.bottom - env.margin * 2);
+    const k = Math.min(
+      1,
+      usableX / Math.max(1e-5, size.x),
+      usableZ / Math.max(1e-5, size.z),
+      usableY / Math.max(1e-5, size.y),
+    );
+    // Never let a degenerate imported model produce a zero scale. For a real
+    // model k is bounded by the three dimensions above and remains <= 1.
+    this._targetFitK = Math.max(0.01, Number.isFinite(k) ? k : 1);
+
+    // Re-measure after fitting. FoodFactory centres procedural and downloaded
+    // models, but keeping this offset measured makes an off-centre asset safe.
+    model.scale.setScalar(baseScale * this._targetFitK);
+    const fitted = this._foodBoxInJarSpace(model);
+    fitted.getCenter(this._fitCorner);
+    this._jarCentreLocal.set(0, (env.bottom + env.top) * 0.5, 0);
+    this._jarCentreWorld.copy(this._jarCentreLocal);
+    this.jar.localToWorld(this._jarCentreWorld);
+    const fittedCentreWorld = this._fitCorner.clone();
+    this.jar.localToWorld(fittedCentreWorld);
+    this._groupOriginWorld.copy(food.group.getWorldPosition(new THREE.Vector3()));
+    // Store the target in station-root space. The shared foodTarget() helper
+    // then performs the final root-world -> food-parent-local conversion on
+    // every frame, so the result survives Fact Book holder-scale transitions.
+    this.root.worldToLocal(this._jarCentreWorld);
+    this.root.worldToLocal(fittedCentreWorld);
+    this.root.worldToLocal(this._groupOriginWorld);
+    this._fitTargetRoot.copy(this._jarCentreWorld)
+      .sub(fittedCentreWorld)
+      .add(this._groupOriginWorld);
+
+    // The model ramps down from its normal presentation size in tick().
+    // Keep the absolute baseScale contract so re-selection never compounds a
+    // previous station's scale change.
+    model.scale.setScalar(baseScale);
+    this._fitForFood = food;
+  }
+
+  /** Return an axis-aligned model box expressed in the jar's local space. */
+  _foodBoxInJarSpace(model) {
+    model.updateWorldMatrix(true, true);
+    this._worldBox.setFromObject(model);
+    this._jarBox.makeEmpty();
+    for (const x of [this._worldBox.min.x, this._worldBox.max.x]) {
+      for (const y of [this._worldBox.min.y, this._worldBox.max.y]) {
+        for (const z of [this._worldBox.min.z, this._worldBox.max.z]) {
+          this._fitCorner.set(x, y, z);
+          this.jar.worldToLocal(this._fitCorner);
+          this._jarBox.expandByPoint(this._fitCorner);
+        }
+      }
+    }
+    return this._jarBox;
   }
 
   _updatePourStream() {
@@ -300,8 +418,11 @@ export class PicklingJar extends Station {
       const pouring = bottle === this._pouringBottle && this._fill > 0.015 && this._fill < 0.985;
       const home = bottle.userData.home;
       bottle.rotation.z = THREE.MathUtils.lerp(bottle.rotation.z, pouring ? -1.15 : 0, pourK);
-      bottle.position.x = THREE.MathUtils.lerp(bottle.position.x, pouring ? -0.58 : home.x, pourK);
-      bottle.position.y = THREE.MathUtils.lerp(bottle.position.y, pouring ? 2.02 : home.y, pourK);
+      // The bottle pivots around its base, so its origin must sit above and to
+      // the left of the mouth; the old lower target put most of it behind the
+      // jar body once tilted in the centred Fact Book view.
+      bottle.position.x = THREE.MathUtils.lerp(bottle.position.x, pouring ? -0.90 : home.x, pourK);
+      bottle.position.y = THREE.MathUtils.lerp(bottle.position.y, pouring ? 2.40 : home.y, pourK);
       bottle.position.z = THREE.MathUtils.lerp(bottle.position.z, pouring ? 0.12 : home.z, pourK);
     }
     this._updatePourStream();
@@ -327,10 +448,12 @@ export class PicklingJar extends Station {
     if (fizzing) this.fizzMesh.instanceMatrix.needsUpdate = true;
 
     if (this._loading && this.food) {
-      this._dockTarget.set(0, 1.62, 0.12);
-      this.root.localToWorld(this._dockTarget);
-      this.food.group.position.lerp(this._dockTarget, 1 - Math.pow(0.004, dt));
-      this._foodScale.setScalar(this.food.baseScale * 0.72);
+      this._prepareFoodFit(this.food);
+      // The shared parent-aware docking helper converts the station-root
+      // target into food.group's parent-local space for the Fact Book.
+      this.foodTarget(this._fitTargetRoot, this._dockTargetParent);
+      this.food.group.position.lerp(this._dockTargetParent, 1 - Math.pow(0.004, dt));
+      this._foodScale.setScalar(this.food.baseScale * this._targetFitK);
       this.food.model.scale.lerp(this._foodScale, 1 - Math.pow(0.02, dt));
     }
   }
