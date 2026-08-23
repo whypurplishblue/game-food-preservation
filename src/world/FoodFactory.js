@@ -388,6 +388,18 @@ export function buildFoodModel(modelId) {
   for (const child of [...g.children]) if (child.userData.isFace) child.removeFromParent();
   g.userData.face = null;
 
+  // Downloaded food assets may have their origin at a corner of the mesh rather
+  // than at its centre. This breaks every consumer that assumes the group origin
+  // is the food's middle: dock points, the blob shadow, the microbe swarm.
+  // Re-centre the model on its actual bounds; this is a no-op for procedural foods
+  // and models already centred.
+  const box = new THREE.Box3().setFromObject(g);
+  const centre = box.getCenter(new THREE.Vector3());
+  if (centre.lengthSq() > 1e-6) {
+    for (const child of g.children) child.position.sub(centre);
+    g.updateMatrixWorld(true);
+  }
+
   g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   if (!g.userData.radius) {
     const box = new THREE.Box3().setFromObject(g);

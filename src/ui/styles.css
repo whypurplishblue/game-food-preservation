@@ -444,7 +444,10 @@ html, body {
 .pp-quiz {
   position: absolute; inset: 0; z-index: 60; display: grid; place-items: center;
   background: rgba(21, 12, 28, .55); backdrop-filter: blur(4px);
-  padding: calc(30px + var(--safe-t)) 16px calc(16px + var(--safe-b));
+  /* The gameplay mute control stays in the HUD's top utility area while the
+     quiz is open. Keep the card below that rail so mute remains reachable
+     without sitting on top of the question. */
+  padding: calc(var(--overlay-utility-rail) + var(--safe-t)) 16px calc(16px + var(--safe-b));
   overflow: auto;
 }
 .pp-quiz.is-shock { animation: quizshake .36s ease; }
