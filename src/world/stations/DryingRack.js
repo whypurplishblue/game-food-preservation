@@ -207,8 +207,8 @@ export class DryingRack extends Station {
       this._hangT += dt;
       const swing = Math.sin(this._hangT * 3.2) * Math.exp(-this._hangT * 1.2) * 0.28;
       this.food.model.rotation.z = swing;
-      const world = this.root.localToWorld(new THREE.Vector3(0, this._hangY, 0));
-      this.food.group.position.lerp(world, 1 - Math.pow(0.005, dt));
+      const target = this.foodTarget(new THREE.Vector3(0, this._hangY, 0));
+      this.food.group.position.lerp(target, 1 - Math.pow(0.005, dt));
     }
   }
 }

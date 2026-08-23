@@ -497,13 +497,12 @@ export class VacuumSealer extends Station {
     model.rotation.y = 0;
   }
 
-  /** World point the docked food's box centre should sit at, this frame. */
+  /** Food-parent-local point where the docked food's box centre should sit. */
   _updateDockTarget() {
     if (!this._fittedFood) return;
     const open = this._openPose;
     this._dockLocal.set(open.cx, this._fitCenterY, open.cz).sub(this._fitOffset);
-    this.body.updateWorldMatrix(true, true);
-    this._dockTarget.copy(this.body.localToWorld(this._dockLocal.clone()));
+    this.foodTarget(this._dockLocal, this._dockTarget, this.body);
   }
 
   /**
@@ -904,7 +903,7 @@ export class VacuumSealer extends Station {
       this._updateFilm(0);
       // `_fittedFood` guards against the same un-set `_dockTarget` as tick()
       // above: without a fit yet, snapping to it would place the food at the
-      // world origin instead of leaving it where accept() docked it.
+      // parent origin instead of leaving it where accept() docked it.
       if (this.food && this._fittedFood) {
         // Snap into the bag before measuring the drape: a raycast against a
         // food still mid-flight to its dock point would sample the wrong
@@ -1033,8 +1032,8 @@ export class VacuumSealer extends Station {
     // Also require `_fittedFood`: `_dockTarget` only ever gets a real value
     // from _updateDockTarget(), which itself no-ops without a fitted food (see
     // above). Without this guard, a food docked before _fitFood() has run
-    // would lerp toward `_dockTarget`'s un-set (0,0,0) default — the world
-    // origin — instead of just holding still until fitting catches up.
+    // would lerp toward `_dockTarget`'s un-set (0,0,0) default — the food
+    // parent's origin — instead of just holding still until fitting catches up.
     if (this._loading && this.food && this._fittedFood) {
       this._updateDockTarget();
       this.food.group.position.lerp(this._dockTarget, 1 - Math.pow(0.004, dt));
