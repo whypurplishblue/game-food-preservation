@@ -520,7 +520,8 @@ html, body {
 .pp-screens {
   position: absolute; inset: 0; z-index: 70; display: none;
   place-items: center; padding: calc(16px + var(--safe-t)) 16px calc(16px + var(--safe-b));
-  background: rgba(21, 12, 28, .62); backdrop-filter: blur(6px);
+  background: rgba(21, 12, 28, .62);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
   overflow: auto;
 }
 .pp-screens.is-open { display: grid; }
