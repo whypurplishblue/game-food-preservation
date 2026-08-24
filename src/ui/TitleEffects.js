@@ -12,6 +12,10 @@ export class TitleEffects {
     this._raf = 0;
     this._canvas = null;
     this._ripple = null;
+    this._scanner = null;
+    this._scannerRaf = 0;
+    this._scannerResize = null;
+    this._scannerPointer = null;
   }
 
   playIntro(title) {
@@ -133,6 +137,107 @@ export class TitleEffects {
     return new Promise((resolve) => setTimeout(() => resolve(this._ripple === ripple && ripple.isConnected), RIPPLE_MS));
   }
 
+  mountScanner(screen, sourceCanvas, {
+    targets = [], found = [], status = null, progress = null,
+    progressText = (count, total) => `${count} / ${total}`,
+    completeText = () => 'Complete', onScan = null, onFound = null,
+  } = {}) {
+    if (!screen || !sourceCanvas || !targets.length) return;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const lens = document.createElement('div');
+    lens.className = 'pp-title-scanner';
+    lens.setAttribute('aria-hidden', 'true');
+    screen.appendChild(lens);
+
+    const foundSet = new Set(found);
+    const state = {
+      screen, sourceCanvas, lens, targets, foundSet, status, progress, onScan,
+      x: 0, y: 0, tx: 0, ty: 0, size: 0, scanned: -1, last: performance.now(),
+    };
+    this._scanner = state;
+    if (status) status.hidden = false;
+
+    const updateProgress = () => {
+      if (progress) progress.textContent = foundSet.size === targets.length
+        ? completeText()
+        : progressText(foundSet.size, targets.length);
+      status?.classList.toggle('is-complete', foundSet.size === targets.length);
+      screen.classList.toggle('is-scanner-complete', foundSet.size === targets.length);
+    };
+
+    const resize = () => {
+      if (this._scanner !== state) return;
+      const rect = lens.getBoundingClientRect();
+      state.size = Math.max(2, rect.width);
+      const screenRect = screen.getBoundingClientRect();
+      if (!state.x) {
+        state.x = state.tx = screenRect.width * 0.18;
+        state.y = state.ty = screenRect.height * 0.56;
+      }
+    };
+
+    const findTargets = (screenRect) => {
+      const revealReach = state.size * 0.48;
+      const findReach = state.size * 0.24;
+      let scanned = -1;
+      let nearest = Infinity;
+      targets.forEach((target, index) => {
+        if (foundSet.has(index)) return;
+        const dx = state.x - screenRect.width * target.x;
+        const dy = state.y - screenRect.height * target.y;
+        const distance = Math.hypot(dx, dy);
+        if (distance < revealReach && distance < nearest) {
+          nearest = distance;
+          scanned = index;
+        }
+        if (distance > findReach) return;
+        foundSet.add(index);
+        lens.classList.remove('is-hit');
+        void lens.offsetWidth;
+        lens.classList.add('is-hit');
+        onFound?.(index);
+        updateProgress();
+      });
+      if (scanned !== state.scanned) {
+        state.scanned = scanned;
+        lens.dataset.scanTarget = scanned < 0 ? '' : String(scanned);
+        lens.classList.toggle('has-target', scanned >= 0);
+        onScan?.(scanned);
+      }
+    };
+
+    const frame = (now) => {
+      if (this._scanner !== state || !screen.isConnected) return;
+      const dt = Math.min(0.05, Math.max(0, (now - state.last) / 1000));
+      state.last = now;
+      const follow = 1 - Math.pow(0.003, dt);
+      state.x += (state.tx - state.x) * follow;
+      state.y += (state.ty - state.y) * follow;
+      lens.style.transform = `translate3d(${state.x - state.size / 2}px, ${state.y - state.size / 2}px, 0)`;
+      findTargets(screen.getBoundingClientRect());
+      this._scannerRaf = requestAnimationFrame(frame);
+    };
+
+    const pointer = (event) => {
+      if (this._scanner !== state) return;
+      if (event.pointerType === 'touch' && event.buttons === 0 && event.type === 'pointermove') return;
+      const rect = screen.getBoundingClientRect();
+      state.tx = Math.max(state.size * 0.5, Math.min(rect.width - state.size * 0.5, event.clientX - rect.left));
+      state.ty = Math.max(state.size * 0.5, Math.min(rect.height - state.size * 0.5, event.clientY - rect.top));
+      lens.classList.add('has-input');
+    };
+
+    this._scannerResize = resize;
+    this._scannerPointer = pointer;
+    window.addEventListener('resize', resize, { passive: true });
+    screen.addEventListener('pointerdown', pointer, { passive: true });
+    screen.addEventListener('pointermove', pointer, { passive: true });
+    resize();
+    updateProgress();
+    this._scannerRaf = requestAnimationFrame(frame);
+  }
+
   destroy() {
     cancelAnimationFrame(this._raf);
     this._raf = 0;
@@ -140,5 +245,18 @@ export class TitleEffects {
     this._canvas = null;
     this._ripple?.remove();
     this._ripple = null;
+    cancelAnimationFrame(this._scannerRaf);
+    this._scannerRaf = 0;
+    if (this._scannerResize) window.removeEventListener('resize', this._scannerResize);
+    if (this._scannerPointer && this._scanner?.screen) {
+      this._scanner.screen.removeEventListener('pointerdown', this._scannerPointer);
+      this._scanner.screen.removeEventListener('pointermove', this._scannerPointer);
+    }
+    this._scanner?.screen?.classList.remove('is-scanner-complete');
+    this._scanner?.onScan?.(-1);
+    this._scanner?.lens?.remove();
+    this._scanner = null;
+    this._scannerResize = null;
+    this._scannerPointer = null;
   }
 }

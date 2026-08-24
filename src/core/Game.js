@@ -18,6 +18,7 @@ import { makeLearningQuestion, makeQuestion } from '../content/quiz.js';
 import { PALETTE } from '../world/Palette.js';
 import { layoutFor, PREP_CENTRE, PREP_RADIUS } from '../world/Kitchen.js';
 import { Food } from '../world/Food.js';
+import { MenuMicrobes, MENU_MICROBE_TARGETS } from '../world/MenuMicrobes.js';
 import { DryingRack } from '../world/stations/DryingRack.js';
 import { Freezer } from '../world/stations/Freezer.js';
 import { VacuumSealer } from '../world/stations/VacuumSealer.js';
@@ -83,6 +84,7 @@ export class Game {
     this._layoutAspect = null;
     this._builtStations = new Set();
     this._buildAllStations();
+    this.menuMicrobes = new MenuMicrobes(this.stage3d.camera);
     this._unsubLang = onLangChange(() => {
       for (const station of this.stations.values()) station.refreshLabels();
       for (const food of this.foods) food.refreshLabel();
@@ -361,11 +363,18 @@ export class Game {
     this.hud.setVisible(false);
     this.input.setEnabled(false);
     this._setQuickContext('overlay', true);
+    this.menuMicrobes.reset();
     this.screens.title({
       onPlay: () => this.showModeSelect(),
       onFactBook: () => this.openFactBook(() => this.showMenu()),
       onCredits: () => this.openCredits(() => this.showMenu()),
       onLeaderboard: () => this.openLeaderboard('learning', () => this.showMenu()),
+      scannerTargets: MENU_MICROBE_TARGETS,
+      scannerFound: () => this.menuMicrobes.foundIndices,
+      onScannerTarget: (index) => this.menuMicrobes.setScanned(index),
+      onScannerFound: (index) => {
+        if (this.menuMicrobes.markFound(index)) sfx('ui.open');
+      },
     });
   }
 
@@ -1406,6 +1415,8 @@ export class Game {
 
     // --- world + fx
     this.kitchen.update(dt, this.elapsed);
+    this.menuMicrobes.setVisible(this.screens._current?.kind === 'title');
+    this.menuMicrobes.update(dt);
     this.input.update();
     this.particles.update(dt, cam);
     this.popups.update(dt, cam);

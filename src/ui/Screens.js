@@ -48,6 +48,7 @@ export class Screens {
 
   _open(html, { escapable = false, onEscape = null, cls = '' } = {}) {
     this.titleEffects.destroy();
+    this.root.classList.toggle('is-title-open', cls.split(/\s+/).includes('is-title'));
     this.el.inert = false;
     this.el.hidden = false;
     this.el.className = `pp-screens is-open ${cls}`;
@@ -61,6 +62,7 @@ export class Screens {
 
   close() {
     this.titleEffects.destroy();
+    this.root.classList.remove('is-title-open');
     this._leaderboardState && (this._leaderboardState.closed = true);
     this._leaderboardState = null;
     this._current = null;
@@ -127,7 +129,10 @@ export class Screens {
 
   // ------------------------------------------------------------------ title
   title(opts) {
-    const { onPlay, onFactBook, onCredits, onLeaderboard } = opts || {};
+    const {
+      onPlay, onFactBook, onCredits, onLeaderboard,
+      scannerTargets = [], scannerFound = [], onScannerTarget = null, onScannerFound = null,
+    } = opts || {};
     this._setCurrent('title', () => this.title(opts));
     const node = this._open(`
       <div class="pp-home pp-title">
@@ -145,10 +150,26 @@ export class Screens {
           <button class="pp-btn pp-home__utility pp-title__utility" data-act="credits">© ${t('ui.credits')}</button>
         </nav>
         <p class="pp-home__hint pp-title__hint">${t('a11y.menuKeyboardHelp')}</p>
+      </div>
+      <div class="pp-title-scanner-status" data-el="scanner-status" aria-hidden="true" hidden>
+        <strong>${t('ui.microbeScanner')}</strong>
+        <span data-el="scanner-progress">${t('ui.microbesFound', { found: 0, total: scannerTargets.length })}</span>
       </div>`, { cls: 'is-title' });
 
     const play = node.querySelector('[data-act="play"]');
-    requestAnimationFrame(() => this.titleEffects.playIntro(node.querySelector('.pp-title__logo')));
+    requestAnimationFrame(() => {
+      this.titleEffects.playIntro(node.querySelector('.pp-title__logo'));
+      this.titleEffects.mountScanner(node, this.root.querySelector('#scene'), {
+        targets: scannerTargets,
+        found: typeof scannerFound === 'function' ? scannerFound() : scannerFound,
+        status: node.querySelector('[data-el="scanner-status"]'),
+        progress: node.querySelector('[data-el="scanner-progress"]'),
+        progressText: (found, total) => t('ui.microbesFound', { found, total }),
+        completeText: () => t('ui.scannerComplete'),
+        onScan: onScannerTarget,
+        onFound: onScannerFound,
+      });
+    });
     play.addEventListener('click', async (event) => {
       if (play.disabled) return;
       play.disabled = true;

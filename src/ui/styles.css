@@ -45,7 +45,8 @@ html, body {
 }
 
 #app { position: fixed; inset: 0; }
-#scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; transition: filter .2s ease, transform .2s ease; }
+#app.is-title-open #scene { filter: blur(6px); transform: scale(1.018); }
 
 .pp-sr {
   position: absolute; width: 1px; height: 1px; overflow: hidden;
@@ -524,6 +525,7 @@ html, body {
   overflow: auto;
 }
 .pp-screens.is-open { display: grid; }
+.pp-screens.is-title { backdrop-filter: none; }
 
 /* Leaderboard and credits share the viewport with the global language control.
    Give those panels a dedicated top rail so their header close button stays
@@ -779,7 +781,7 @@ html, body {
 .pp-leaderboard__close { flex: none; min-width: 44px; min-height: 44px; }
 
 .pp-title {
-  width: min(780px, 100%); text-align: center; display: grid; gap: 12px; justify-items: center;
+  position: relative; z-index: 4; width: min(780px, 100%); text-align: center; display: grid; gap: 12px; justify-items: center;
   animation: quizin .4s cubic-bezier(.34,1.6,.5,1);
 }
 .pp-title__logo { position: relative; display: grid; line-height: .92; margin: 0; }
@@ -803,6 +805,56 @@ html, body {
   0% { opacity: .92; transform: translate(-50%, -50%) scale(.02); }
   100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
 }
+.pp-title-scanner {
+  --scanner-size: clamp(132px, 27vmin, 216px);
+  position: absolute; z-index: 3; left: 0; top: 0;
+  width: var(--scanner-size); height: var(--scanner-size); pointer-events: none;
+  border: 5px solid rgba(207, 244, 255, .96); border-radius: 50%; overflow: hidden;
+  background: rgba(31, 75, 105, .18); opacity: .94;
+  box-shadow:
+    0 0 0 5px rgba(20, 121, 170, .78),
+    0 0 0 9px rgba(255, 246, 230, .54),
+    0 12px 30px rgba(7, 17, 31, .48),
+    inset 0 0 26px rgba(79, 195, 247, .38);
+  will-change: transform; transition: opacity .18s ease;
+}
+.pp-title-scanner::before,
+.pp-title-scanner::after {
+  content: ''; position: absolute; z-index: 2; pointer-events: none;
+}
+.pp-title-scanner::before {
+  inset: 13%; border: 2px solid rgba(255,255,255,.54); border-radius: 50%;
+  box-shadow: 0 0 16px rgba(79,195,247,.58);
+}
+.pp-title-scanner::after {
+  width: 18%; height: 18%; left: 41%; top: 41%; border: 2px solid rgba(255,255,255,.82);
+  border-radius: 50%; box-shadow: 0 0 12px rgba(255,255,255,.66);
+}
+.pp-title-scanner.has-input { opacity: 1; }
+.pp-title-scanner.has-target {
+  box-shadow:
+    0 0 0 5px rgba(255, 179, 0, .86),
+    0 0 0 9px rgba(255, 246, 230, .62),
+    0 0 28px rgba(255, 179, 0, .55),
+    0 12px 30px rgba(7, 17, 31, .48);
+}
+.pp-title-scanner.is-hit { animation: scanner-hit .46s cubic-bezier(.34,1.7,.5,1); }
+@keyframes scanner-hit {
+  35% { box-shadow: 0 0 0 9px rgba(102,187,106,.86), 0 0 36px rgba(102,187,106,.9), 0 12px 30px rgba(7,17,31,.48); }
+}
+.pp-title-scanner-status {
+  position: fixed; z-index: 5; left: calc(14px + var(--safe-l)); bottom: calc(14px + var(--safe-b));
+  display: grid; gap: 1px; min-width: 154px; padding: 8px 13px;
+  border: 2px solid rgba(207,244,255,.82); border-radius: 14px;
+  background: rgba(20,59,86,.82); color: var(--ui-cream); box-shadow: 0 6px 18px rgba(0,0,0,.24);
+  text-align: left; pointer-events: none; backdrop-filter: blur(5px);
+}
+.pp-title-scanner-status strong { color: #8edcff; font-size: 12px; letter-spacing: .045em; text-transform: uppercase; }
+.pp-title-scanner-status span { font-size: 11px; font-weight: 750; }
+.pp-title-scanner-status.is-complete { border-color: rgba(174,235,177,.9); background: rgba(35,104,58,.88); }
+.pp-title-scanner-status.is-complete strong { color: #d8ffda; }
+.pp-screens.is-scanner-complete [data-act="play"] { animation: scanner-play-ready .64s cubic-bezier(.34,1.7,.5,1); }
+@keyframes scanner-play-ready { 50% { transform: scale(1.035); box-shadow: 0 0 0 9px rgba(102,187,106,.34), var(--ui-shadow-sm); } }
 .pp-title__word1 {
   font-size: clamp(34px, min(8vw, 10vh), 84px); font-weight: 900; letter-spacing: -.02em;
   color: #4fc3f7; -webkit-text-stroke: 4px #143b56; paint-order: stroke fill;
@@ -1049,4 +1101,5 @@ html, body {
   .pp-home, .pp-mode-select, .pp-leaderboard { animation-duration: .01ms !important; }
   .pp-quick__mute, .pp-quick__language, .pp-leaderboard__tab { transition: none !important; }
   .pp-title-ripple { display: none; }
+  .pp-title-scanner, .pp-title-scanner-status { display: none !important; }
 }
