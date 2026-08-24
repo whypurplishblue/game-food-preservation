@@ -1268,6 +1268,15 @@ export class FactBook3D {
     // flourish was still awaiting its timer. Do not reset the new station run.
     if (run !== this._autoplayRun) return;
     station.resetVisuals();
+    const activity = this._mobileActivity;
+    const completedFood = activity?.active?.food;
+    if (activity?.station === station && completedFood && station.food === completedFood) {
+      // A completed Explore 3D demonstration consumes its food. Reuse the
+      // normal replacement cleanup so the model, station, and card state all
+      // agree before the next selection.
+      this._clearMobileSelection(activity);
+      this.live.textContent = t('ui.selectFoodCard');
+    }
     this._setAnimatePlaying(false);
   }
 

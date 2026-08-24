@@ -16,7 +16,7 @@ import {
 import { t, methodName, foodName, mechShort, methodMechShort, onLangChange, setLang } from '../content/i18n.js';
 import { makeLearningQuestion, makeQuestion } from '../content/quiz.js';
 import { PALETTE } from '../world/Palette.js';
-import { slotsFor, PREP_CENTRE, PREP_RADIUS } from '../world/Kitchen.js';
+import { layoutFor, PREP_CENTRE, PREP_RADIUS } from '../world/Kitchen.js';
 import { Food } from '../world/Food.js';
 import { DryingRack } from '../world/stations/DryingRack.js';
 import { Freezer } from '../world/stations/Freezer.js';
@@ -77,6 +77,10 @@ export class Game {
     this._saveExtras = {};
 
     this._tmpVec = new THREE.Vector3();
+    this._activeStationOrder = [];
+    this._activeSlots = [];
+    this._layoutMode = null;
+    this._layoutAspect = null;
     this._builtStations = new Set();
     this._buildAllStations();
     this._unsubLang = onLangChange(() => {
@@ -540,20 +544,42 @@ export class Game {
     });
   }
 
+  _applyStationLayout(layout) {
+    this._activeSlots = layout.slots;
+    this._layoutMode = layout.frame.mode;
+    this._layoutAspect = this.stage3d.camera.aspect;
+    this.stage3d.layoutMode = layout.frame.mode;
+    this.kitchen.setActiveSlots(layout.slots);
+    this.stage3d.frameHalfWidth = layout.frame.halfWidth;
+    this.stage3d.frameHalfHeight = layout.frame.halfHeight;
+
+    for (const [id, s] of this.stations) {
+      const idx = this._activeStationOrder.indexOf(id);
+      if (idx < 0 || !s.enabled) continue;
+      s.placeAt(layout.slots[idx]);
+    }
+  }
+
+  /** Reflow when a resize changes the layout mode or camera aspect. */
+  _refreshStationLayout() {
+    if (!this.stage?.methods?.length || !this._activeStationOrder.length) return;
+    const aspect = this.stage3d.camera.aspect;
+    const layout = layoutFor(this._activeStationOrder.length, aspect);
+    if (layout.frame.mode === this._layoutMode && Math.abs(aspect - this._layoutAspect) < 0.02) return;
+    this._applyStationLayout(layout);
+  }
+
   _setupStations() {
     // Methods map onto STATIONS, and two methods can share one (Freezer).
     const stationIds = stationsFor(this.stage.methods);
-    const slots = slotsFor(stationIds.length);
-    this._activeSlots = slots;
-    this.kitchen.setActiveSlots(stationIds.length);
-    // Frame only as wide as the stations actually in play.
-    const widest = Math.max(...slots.map((sl) => Math.abs(sl.position.x)));
-    this.stage3d.frameHalfWidth = widest + 2.3;
 
     // Re-deal positions for every label-free stage. Without this, a child could
     // read the labels in Stage 3, memorise the six positions, and clear the
     // label-free stages without ever looking at a machine.
     const order = this.stage.shufflePositions ? this._shuffled(stationIds) : stationIds;
+    const layout = layoutFor(stationIds.length, this.stage3d.camera.aspect);
+    this._activeStationOrder = order;
+    this._layoutMode = null;
 
     for (const [id, s] of this.stations) {
       const idx = order.indexOf(id);
@@ -562,7 +588,6 @@ export class Game {
       s.root.visible = on;
       if (on) {
         this._ensureStationBuilt(id);
-        s.placeAt(slots[idx]);
         s.setLabelsVisible(this.stage.showStationLabels);
         // Stage 4 only. In Stage 5 every preservation is followed by a "why"
         // question, and a clue that states the mechanism would be the answer
@@ -571,16 +596,17 @@ export class Game {
         s.release();
       }
     }
+    this._applyStationLayout(layout);
     this.hud.setFactBookAvailable(this.stage.allowFactBook !== false);
   }
 
   _reshuffleStations() {
     const stationIds = stationsFor(this.stage.methods);
-    const slots = this._activeSlots || slotsFor(stationIds.length);
-    this._shuffled(stationIds).forEach((id, i) => {
-      const s = this.stations.get(id);
-      if (s && !s.busy && slots[i]) s.placeAt(slots[i]);
-    });
+    const order = this._shuffled(stationIds);
+    const layout = layoutFor(stationIds.length, this.stage3d.camera.aspect);
+    this._activeStationOrder = order;
+    this._layoutMode = null;
+    this._applyStationLayout(layout);
     this.hud.flash('↔', { kind: 'info', ms: 700 });
     sfx('ui.open');
   }
@@ -600,6 +626,10 @@ export class Game {
     for (const f of this.foods) f.dispose();
     this.foods.length = 0;
     for (const s of this.stations.values()) { s.enabled = false; s.root.visible = false; s.release(); }
+    this._activeStationOrder = [];
+    this._activeSlots = [];
+    this._layoutMode = null;
+    this._layoutAspect = null;
     this.panel.stop();
   }
 
@@ -1323,6 +1353,10 @@ export class Game {
     const cam = this.stage3d.camera;
     const playing = this.mode === 'playing';
     this.elapsed = (this.elapsed || 0) + dt;
+
+    // A device rotation can cross the wide/narrow layout breakpoint while a
+    // stage is open. Reflow the room without re-dealing station identities.
+    this._refreshStationLayout();
 
     if (playing) {
       const active = this.foods.filter((f) => f.state === 'idle' || f.state === 'held').length;

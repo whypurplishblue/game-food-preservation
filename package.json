@@ -10,6 +10,7 @@
     "test:content": "node tools/check-content.mjs",
     "test:credits": "node tools/check-credits.mjs",
     "test:play": "node tools/probe.mjs",
+    "test:arcade-layout": "node tools/arcadelayout.mjs",
     "shots": "node tools/shoot.mjs",
     "test:notes": "node tools/check-notes.mjs",
     "shots:factbook": "node tools/factbookshot.mjs",

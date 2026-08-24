@@ -48,18 +48,23 @@ const VignetteShader = {
 
 export class Stage3D {
   /**
-   * World half-width that must stay inside the frame at every aspect ratio.
-   * Set per stage from the widest ACTIVE station, so a two-station stage is not
+   * World envelope that must stay inside the frame at every aspect ratio.
+   * Set per stage from the active station layout, so a two-station stage is not
    * framed as if all six were present — that was pushing early levels miles
    * back on portrait screens for no reason.
    */
   static DEFAULT_HALF_WIDTH = 10.9;
+  static DEFAULT_HALF_HEIGHT = 5.8;
 
   constructor(canvas, { quality = 'high' } = {}) {
     this.canvas = canvas;
     this.quality = quality;
     this.clock = new THREE.Clock();
     this.frameHalfWidth = Stage3D.DEFAULT_HALF_WIDTH;
+    this.frameHalfHeight = Stage3D.DEFAULT_HALF_HEIGHT;
+    this.layoutMode = 'arc';
+    this.compactLandscape = false;
+    this._framingName = 'play';
 
     this.renderer = new THREE.WebGLRenderer({
       // High-DPI mobile screens get edge smoothing from pixel density; MSAA on
@@ -207,6 +212,7 @@ export class Stage3D {
    * failure mode is fixable in one place instead of hunting through gameplay code.
    */
   setCameraFraming(name, { instant = true, focus = null } = {}) {
+    this._framingName = name;
     const FRAMINGS = {
       // Wide shot: both counter columns plus the prep table, machines large.
       play:    { pos: [0, 11.3, 14.3],   look: [0, 3.0, -2.5],  fov: 35 },
@@ -241,8 +247,18 @@ export class Stage3D {
 
   /** Smoothly ease toward the active framing; call from the update loop. */
   updateCamera(dt) {
-    const f = this._targetFraming;
+    let f = this._targetFraming;
     if (!f) return;
+    // A phone held sideways has plenty of width but very little height. A
+    // steeper play angle gives the two grid rows real vertical separation
+    // without shrinking their touch zones into thumb-width slivers.
+    if (this._framingName === 'play' && this.compactLandscape && this.layoutMode === 'grid-wide') {
+      f = { pos: [0, 22, 7.0], look: [0, 6.0, -2.5], fov: 35 };
+    } else if (this._framingName === 'play' && this.frameHalfHeight > 6.5) {
+      // The three-column grid needs a steeper angle on narrow tablet layouts
+      // so its three rows remain distinct instead of collapsing into one band.
+      f = { pos: [0, 22, 7.0], look: [0, 4.5, -2.5], fov: 35 };
+    }
     this._tmpPos ||= new THREE.Vector3();
     this._tmpLook ||= new THREE.Vector3();
     this._lookAt ||= new THREE.Vector3(...f.look);
@@ -250,14 +266,16 @@ export class Stage3D {
     // Frame-rate independent exponential ease.
     const k = 1 - Math.pow(0.0012, Math.min(dt, 0.1));
 
-    // Dolly along the view vector so a fixed world half-width always fits,
-    // whatever the aspect ratio. Portrait phones need a much bigger pull-back
-    // than a linear fudge factor gives.
+    // Dolly along the view vector so both dimensions of the active layout fit,
+    // whatever the aspect ratio. Portrait screens need a much bigger pull-back
+    // than a horizontal-only fudge factor gives.
     this._tmpLook.set(...f.look);
     const vHalf = THREE.MathUtils.degToRad(f.fov) * 0.5;
     const hHalf = Math.atan(Math.tan(vHalf) * Math.max(0.35, this.camera.aspect));
     const baseDist = Math.hypot(f.pos[0] - f.look[0], f.pos[1] - f.look[1], f.pos[2] - f.look[2]);
-    const needed = (this.frameHalfWidth || Stage3D.DEFAULT_HALF_WIDTH) / Math.tan(hHalf);
+    const neededWidth = (this.frameHalfWidth || Stage3D.DEFAULT_HALF_WIDTH) / Math.tan(hHalf);
+    const neededHeight = (this.frameHalfHeight || Stage3D.DEFAULT_HALF_HEIGHT) / Math.tan(vHalf);
+    const needed = Math.max(neededWidth, neededHeight);
     const dolly = THREE.MathUtils.clamp(needed / baseDist, 1, 2.4);
     this._tmpPos.set(
       f.look[0] + (f.pos[0] - f.look[0]) * dolly,
@@ -299,6 +317,7 @@ export class Stage3D {
     // Portrait phones: pull the camera back and widen so the whole counter
     // still fits rather than cropping stations off the sides.
     this.portrait = aspect < 1.0;
+    this.compactLandscape = aspect >= 1.55 && h <= 520;
     this.camera.updateProjectionMatrix();
 
     this.renderer.setPixelRatio(this._pixelRatio());

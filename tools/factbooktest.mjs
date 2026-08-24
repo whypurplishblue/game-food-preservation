@@ -954,11 +954,27 @@ await session({ width: 667, height: 375 }, async (page) => {
   check('Pickling pouring bottle stays above the jar',
     !!pouringBottleAboveJar && pouringBottleAboveJar.bottleY > pouringBottleAboveJar.mouthY,
     JSON.stringify(pouringBottleAboveJar));
-  await page.waitForFunction(() => !window.__pp.game.factBook._autoplay, null, { timeout: 7000 });
-  const completedPicklingPlacement = await inspectPicklingPlacement(page, picklingFoodIds[0]);
-  check('Pickling food remains fitted after the animation completes',
-    completedPicklingPlacement.fitWithinInterior && completedPicklingPlacement.verticalCentered,
-    JSON.stringify(completedPicklingPlacement));
+  await page.waitForFunction(() => {
+    const fb = window.__pp.game.factBook;
+    return !fb._autoplay && !fb._mobileActivity?.station?.food;
+  }, null, { timeout: 7000 });
+  const completedPicklingFood = await page.evaluate((foodId) => {
+    const fb = window.__pp.game.factBook;
+    const activity = fb._mobileActivity;
+    const entry = activity?.entries.find((item) => item.fv.id === foodId);
+    return {
+      stationFood: activity?.station?.food?.foodId || null,
+      activeFood: activity?.active?.fv.id || null,
+      foodVisible: !!entry?.food.group.visible,
+      placed: !!entry?.placed,
+      cardPlaced: !!entry?.label.classList.contains('is-placed'),
+    };
+  }, picklingFoodIds[0]);
+  check('Explore 3D removes food after the animation completes',
+    !completedPicklingFood.stationFood && !completedPicklingFood.activeFood &&
+      !completedPicklingFood.foodVisible && !completedPicklingFood.placed &&
+      !completedPicklingFood.cardPlaced,
+    JSON.stringify(completedPicklingFood));
 
   if (picklingFoodIds[1]) {
     await page.click(secondFoodSelector);

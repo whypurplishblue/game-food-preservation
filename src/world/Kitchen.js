@@ -1,7 +1,7 @@
 /**
  * The room. Everything here is set dressing — no gameplay logic.
  *
- * LAYOUT — two columns of three, not one row of six.
+ * LAYOUT — an arc for the small stages, responsive grids for the full kitchen.
  * A single row of six stations across a 16:9 screen forces the camera so far
  * back that every machine becomes a thumbnail. Two columns flanking a central
  * prep table (the arrangement in the concept art) uses the screen shape: the
@@ -28,22 +28,32 @@ import { plastic, metal, matte, glass, roundedBox, cyl, sphere, torus, mesh, blo
  */
 const ARC = { radiusX: 8.8, radiusZ: 5.6, centreZ: -1.8, spreadDeg: 78 };
 export const MAX_SLOTS = 8;
+const GRID_BREAKPOINT = 1.5;
 
-/**
- * The arc grows with the number of machines on it. Six was the whole game until
- * the smokehouse and the cannery arrived; squeezing eight into the six-station
- * arc put them shoulder to shoulder, and the outer pair then clipped the frame.
- * Pushing the radius and the spread out per extra machine keeps the spacing and
- * lets Stage3D's dolly solve for the wider shot.
- */
-function arcFor(n) {
-  const extra = Math.max(0, n - 6);
-  return {
-    radiusX: ARC.radiusX + extra * 0.62,
-    radiusZ: ARC.radiusZ + extra * 0.20,
-    spreadDeg: ARC.spreadDeg + extra * 7.5,
-  };
-}
+export const PREP_CENTRE = new THREE.Vector3(0, 1.5, 1.1);
+export const PREP_RADIUS = 3.05;
+
+// The eight-station room is laid out for screen separation first. The rows stay
+// behind the prep table, while the last narrow row leaves the centre clear so
+// the food still has a visible route into the kitchen.
+const WIDE_GRID = [
+  [-7.4, -8.8], [-2.45, -8.8], [2.45, -8.8], [7.4, -8.8],
+  [-7.0, -2.95], [-2.3, -2.95], [2.3, -2.95], [7.0, -2.95],
+];
+const WIDE_GRID_7 = [
+  [-7.4, -8.8], [-2.45, -8.8], [2.45, -8.8], [7.4, -8.8],
+  [-4.7, -2.95], [0, -2.95], [4.7, -2.95],
+];
+const NARROW_GRID = [
+  [-5.6, -10.6], [0, -10.6], [5.6, -10.6],
+  [-5.6, -6.4], [0, -6.4], [5.6, -6.4],
+  [-5.6, -2.2], [5.6, -2.2],
+];
+const NARROW_GRID_7 = [
+  [-5.6, -10.6], [0, -10.6], [5.6, -10.6],
+  [-5.6, -6.4], [0, -6.4], [5.6, -6.4],
+  [0, -2.2],
+];
 
 const anglesFor = (n, spreadDeg) =>
   [...Array(n)].map((_, i) => (-1 + (2 * i) / (n - 1)) * spreadDeg * Math.PI / 180);
@@ -55,33 +65,23 @@ const anglesFor = (n, spreadDeg) =>
  */
 const SLOT_ORDER = [1, 4, 2, 3, 0, 5];
 
-/** Centre outwards, alternating sides — used when the arc is not the classic six. */
-function centreOut(n) {
-  const out = [];
-  let l = Math.floor((n - 1) / 2), r = l + 1;
-  while (out.length < n) {
-    if (l >= 0) out.push(l--);
-    if (out.length < n && r < n) out.push(r++);
-  }
-  return out;
-}
-
 /**
- * Placements for exactly `count` machines.
+ * Placements for the original six-station arc.
  *
- * Six or fewer keeps the original six-point arc and takes SLOT_ORDER's first N,
- * so every existing stage is pixel-identical to before. Seven or eight lay out
- * a wider arc of their own.
+ * Keeping this separate from the full-kitchen layouts makes the existing early
+ * stages pixel-stable while the denser stages get a layout designed around
+ * touch-screen spacing.
  */
-export function slotsFor(count) {
-  const n = Math.max(6, Math.min(MAX_SLOTS, count));
-  const A = arcFor(n);
+function arcSlots(count) {
+  const n = 6;
+  const A = ARC;
   const angles = anglesFor(n, A.spreadDeg);
-  const order = n === 6 ? SLOT_ORDER : centreOut(n);
-  return order.slice(0, count).map((arcIndex, i) => {
+  return SLOT_ORDER.slice(0, count).map((arcIndex, i) => {
     const t = angles[arcIndex];
     return {
       index: i,
+      row: 0,
+      column: i,
       arcIndex,
       side: Math.sign(t) || 1,
       position: new THREE.Vector3(
@@ -96,10 +96,57 @@ export function slotsFor(count) {
   });
 }
 
-export const STATION_SLOTS = slotsFor(6);
+function gridSlot([x, z], index, columns) {
+  const angle = Math.atan2(x, PREP_CENTRE.z - z);
+  return {
+    index,
+    row: Math.floor(index / columns),
+    column: index % columns,
+    side: Math.sign(x) || 1,
+    position: new THREE.Vector3(x, 1.66, z),
+    // Turn partly toward the prep table without hiding the readable front.
+    rotationY: THREE.MathUtils.clamp(-angle * 0.36, -0.58, 0.58),
+  };
+}
 
-export const PREP_CENTRE = new THREE.Vector3(0, 1.5, 1.1);
-export const PREP_RADIUS = 3.05;
+function frameFor(slots, mode) {
+  const widest = slots.length
+    ? Math.max(...slots.map((slot) => Math.abs(slot.position.x)))
+    : 8.6;
+  return {
+    mode,
+    halfWidth: widest + 2.3,
+    // This is the conservative vertical envelope used by Stage3D's dolly.
+    // The narrow grid has three rows, so it gets the larger bound.
+    halfHeight: mode === 'grid-narrow' ? 7.2 : 5.8,
+  };
+}
+
+/**
+ * Canonical station layout. Every consumer of the room uses this result so
+ * machines, counter islands and camera framing cannot drift apart.
+ */
+export function layoutFor(count, aspect = 16 / 9) {
+  const safeCount = Math.max(0, Math.min(MAX_SLOTS, Math.floor(count || 0)));
+  if (safeCount <= 6) {
+    const slots = arcSlots(safeCount);
+    return { slots, frame: frameFor(slots, 'arc') };
+  }
+
+  const narrow = Number.isFinite(aspect) && aspect < GRID_BREAKPOINT;
+  const grid = narrow
+    ? (safeCount === 7 ? NARROW_GRID_7 : NARROW_GRID)
+    : (safeCount === 7 ? WIDE_GRID_7 : WIDE_GRID);
+  const points = grid.slice(0, safeCount);
+  const slots = points.map((point, index) => gridSlot(point, index, narrow ? 3 : 4));
+  return { slots, frame: frameFor(slots, narrow ? 'grid-narrow' : 'grid-wide') };
+}
+
+export function slotsFor(count, aspect = 16 / 9) {
+  return layoutFor(count, aspect).slots;
+}
+
+export const STATION_SLOTS = slotsFor(6);
 
 export class Kitchen {
   constructor(scene, { quality = 'high' } = {}) {
@@ -242,7 +289,7 @@ export class Kitchen {
     const doorMat = matte(0x94592d, 0.76);
 
     // Built for the maximum, positioned per stage by setActiveSlots().
-    for (const slot of slotsFor(MAX_SLOTS)) {
+    for (const slot of slotsFor(MAX_SLOTS, 16 / 9)) {
       const g = new THREE.Group();
       g.position.set(slot.position.x, 0, slot.position.z);
       g.rotation.y = slot.rotationY;
@@ -291,16 +338,18 @@ export class Kitchen {
   }
 
   /**
-   * Show the islands this stage uses, and move them onto the arc that this many
-   * machines get. The arc widens past six, so the counters have to travel with
-   * the machines or a Stage 8 freezer stands on nothing.
+   * Show the islands this stage uses and apply the exact slots used by the
+   * station roots. The caller may pass a precomputed slot list so the room has
+   * one source of truth for responsive layouts.
    */
-  setActiveSlots(count) {
+  setActiveSlots(slotsOrCount, aspect = 16 / 9) {
     if (!this.islands) return;
-    const slots = slotsFor(count);
+    const slots = Array.isArray(slotsOrCount)
+      ? slotsOrCount
+      : slotsFor(slotsOrCount, aspect);
     this.islands.forEach((g, i) => {
-      g.visible = i < count;
-      if (i < count) {
+      g.visible = i < slots.length;
+      if (i < slots.length) {
         g.position.set(slots[i].position.x, 0, slots[i].position.z);
         g.rotation.y = slots[i].rotationY;
       }

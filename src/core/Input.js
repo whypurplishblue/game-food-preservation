@@ -3,10 +3,9 @@
  * plus a full keyboard route so the game is playable without a pointer at all.
  *
  * Drag model: the food lifts off the counter and follows a horizontal plane at
- * carry height. Snapping is by nearest-station-within-radius rather than exact
- * raycast onto machine geometry — a child dragging with a thumb should not have
- * to hit a small target, and forgiving drop zones are the difference between
- * "responsive" and "fiddly" on a tablet.
+ * carry height. Snapping uses projected station zones rather than exact raycast
+ * geometry — a child dragging with a thumb should not have to hit a small
+ * target, but adjacent machines must never share an ambiguous drop area.
  */
 import * as THREE from 'three';
 
@@ -14,10 +13,14 @@ import * as THREE from 'three';
 // station the player is pointing at.
 const CARRY_Y = 2.5;
 // Drop targeting is done in SCREEN space, as a fraction of the smaller viewport
-// dimension. World-space distance was wrong: the food rides a horizontal plane,
-// so pointing at a machine put the food short of it and the drop silently
-// failed — which reads to a child as "the game ignored me".
-const DROP_SCREEN_FRAC = 0.19;
+// dimension. The nearest-station cap leaves a dead strip between neighboring
+// targets, so an imprecise touch returns the food instead of choosing a wrong
+// machine. The 44px floor keeps the zones usable on touch screens.
+const DROP_SCREEN_FRAC = 0.12;
+const MIN_DROP_PX = 44;
+const MAX_DROP_PX = 104;
+const MAX_ZONE_SHARE_OF_GAP = 0.4;
+const AMBIGUITY_GAP_PX = 8;
 
 export class Input {
   constructor(canvas, stage3d, opts = {}) {
@@ -30,6 +33,7 @@ export class Input {
     this.hitPoint = new THREE.Vector3();
     this.held = null;
     this.hoverStation = null;
+    this._targetZones = [];
     this.enabled = true;
     this.keyboardIndex = 0;
 
@@ -112,21 +116,51 @@ export class Input {
     this._updateHover();
   }
 
-  _updateHover() {
-    const stations = this.opts.getStations();
+  _stationScreenPoint(station, rect) {
+    this._v ||= new THREE.Vector3();
+    this._v.copy(station.root.position).setY(station.root.position.y + 1.0).project(this.stage.camera);
+    return {
+      x: rect.left + (this._v.x * 0.5 + 0.5) * rect.width,
+      y: rect.top + (-this._v.y * 0.5 + 0.5) * rect.height,
+    };
+  }
+
+  /** Screen-space target zones used by hover feedback and the drop decision. */
+  getDropZones() {
     const r = this.canvas.getBoundingClientRect();
-    const limit = Math.min(r.width, r.height) * DROP_SCREEN_FRAC;
+    const minDim = Math.min(r.width, r.height);
+    const baseRadius = Math.max(MIN_DROP_PX, Math.min(MAX_DROP_PX, minDim * DROP_SCREEN_FRAC));
+    const stations = this.opts.getStations().filter((s) => s.enabled && !s.busy);
+    const zones = stations.map((station) => ({
+      station,
+      ...this._stationScreenPoint(station, r),
+      radius: baseRadius,
+    }));
+
+    for (let i = 0; i < zones.length; i++) {
+      let nearest = Infinity;
+      for (let j = 0; j < zones.length; j++) {
+        if (i === j) continue;
+        nearest = Math.min(nearest, Math.hypot(zones[i].x - zones[j].x, zones[i].y - zones[j].y));
+      }
+      if (Number.isFinite(nearest)) zones[i].radius = Math.min(baseRadius, nearest * MAX_ZONE_SHARE_OF_GAP);
+    }
+    return zones;
+  }
+
+  _updateHover() {
+    const zones = this.getDropZones();
+    this._targetZones = zones;
     const px = this._pointerPx?.x ?? 0, py = this._pointerPx?.y ?? 0;
-    let best = null, bestD = limit;
-    for (const s of stations) {
-      if (!s.enabled) continue;
-      // Aim point is the machine's mid-body, which is what the eye tracks.
-      this._v ||= new THREE.Vector3();
-      this._v.copy(s.root.position).setY(s.root.position.y + 1.0).project(this.stage.camera);
-      const sx = r.left + (this._v.x * 0.5 + 0.5) * r.width;
-      const sy = r.top + (-this._v.y * 0.5 + 0.5) * r.height;
-      const d = Math.hypot(sx - px, sy - py);
-      if (d < bestD) { bestD = d; best = s; }
+    const candidates = zones
+      .map((zone) => ({ zone, distance: Math.hypot(zone.x - px, zone.y - py) }))
+      .filter((candidate) => candidate.distance <= candidate.zone.radius)
+      .sort((a, b) => a.distance - b.distance);
+    let best = candidates[0]?.zone.station || null;
+    // This is defensive because the radius cap already makes normal zones
+    // disjoint. It protects against rounding and future layout changes.
+    if (candidates[1] && candidates[1].distance - candidates[0].distance < AMBIGUITY_GAP_PX) {
+      best = null;
     }
     if (best !== this.hoverStation) {
       this.hoverStation?.setHighlight(false);
