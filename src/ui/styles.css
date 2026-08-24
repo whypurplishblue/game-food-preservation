@@ -781,6 +781,7 @@ html, body {
 .pp-title {
   width: min(780px, 100%); text-align: center; display: grid; gap: 12px; justify-items: center;
   animation: quizin .4s cubic-bezier(.34,1.6,.5,1);
+  position: relative; z-index: 1;
 }
 .pp-title__logo { position: relative; display: grid; line-height: .92; margin: 0; }
 .pp-title__logo.is-particle-intro > .pp-title__word1,
@@ -802,6 +803,113 @@ html, body {
 @keyframes title-ripple {
   0% { opacity: .92; transform: translate(-50%, -50%) scale(.02); }
   100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* =================================================== title spoilage loop ==
+   An attract loop, not a penalty for idling: most players press Play within a
+   few seconds, so a slow one-way decay would never be seen. The backdrop walks
+   the three *visible* signs of spoilage (colour, texture, mould) and then
+   sweeps itself clean, on repeat.
+
+   Filtering the backdrop rather than painting an overlay means the kitchen
+   behind the menu is what discolours, so the effect reads as food going bad
+   instead of as a stain on the scrim.
+
+   Cost: the render loop in main.js runs every frame on the menu, so the
+   backdrop changes constantly and this filter chain is re-evaluated every
+   frame while a stage is held -- stepping the stages does not avoid that. It
+   is affordable because blur(6px) was already paying that cost and dominates
+   it; the added colour operations are per-pixel matrix maths on top of a
+   convolution that already runs. Stages still step-and-hold so the filter
+   *values* stay constant between stages rather than being re-interpolated on
+   every frame.
+
+   Everything is scoped to .is-title and driven by data-decay, and _open()
+   rewrites the class list on every screen change, so the state resets itself
+   whenever the player leaves and comes back. */
+/* Spoiling creeps, clearing snaps. A transition takes its duration from the
+   state being *entered*, so the slow ramps live on the decay states and the
+   short one on the base state. Removing data-decay therefore clears in one
+   beat with the RIPPLE_MS wipe, with no extra class to sequence and no
+   dependence on two style changes coalescing. */
+.pp-screens.is-title {
+  transition: -webkit-backdrop-filter .26s ease, backdrop-filter .26s ease;
+}
+.pp-screens.is-title[data-decay] { transition-duration: 1.2s; }
+.pp-screens.is-title[data-decay="1"] {
+  -webkit-backdrop-filter: blur(6px) saturate(.78) hue-rotate(24deg) brightness(.95);
+  backdrop-filter: blur(6px) saturate(.78) hue-rotate(24deg) brightness(.95);
+}
+.pp-screens.is-title[data-decay="2"] {
+  -webkit-backdrop-filter: blur(6px) saturate(.58) hue-rotate(40deg) brightness(.87) sepia(.12);
+  backdrop-filter: blur(6px) saturate(.58) hue-rotate(40deg) brightness(.87) sepia(.12);
+}
+.pp-screens.is-title[data-decay="3"] {
+  -webkit-backdrop-filter: blur(6px) saturate(.42) hue-rotate(54deg) brightness(.78) sepia(.24);
+  backdrop-filter: blur(6px) saturate(.42) hue-rotate(54deg) brightness(.78) sepia(.24);
+}
+
+/* ::before is the mottled sheen (stage 2), ::after the mould blooms (stage 3).
+   Both are masked away from the centre so the menu copy is never touched. */
+.pp-screens.is-title::before,
+.pp-screens.is-title::after {
+  content: ''; position: absolute; inset: 0; z-index: 0;
+  pointer-events: none; opacity: 0;
+  -webkit-mask-image: radial-gradient(ellipse 58% 54% at 50% 50%, transparent 0 58%, #000 100%);
+  mask-image: radial-gradient(ellipse 58% 54% at 50% 50%, transparent 0 58%, #000 100%);
+}
+.pp-screens.is-title::before {
+  transition: opacity .26s ease;
+  background:
+    radial-gradient(70px 54px at 4% 10%, rgba(150,170,112,.46), transparent 70%),
+    radial-gradient(58px 46px at 14% 26%, rgba(126,148,96,.40), transparent 72%),
+    radial-gradient(64px 50px at 3% 62%, rgba(140,160,106,.42), transparent 70%),
+    radial-gradient(76px 58px at 11% 90%, rgba(120,142,96,.44), transparent 72%),
+    radial-gradient(66px 52px at 97% 16%, rgba(146,164,110,.42), transparent 70%),
+    radial-gradient(58px 48px at 88% 34%, rgba(128,150,98,.38), transparent 72%),
+    radial-gradient(72px 56px at 96% 68%, rgba(142,160,108,.42), transparent 70%),
+    radial-gradient(80px 60px at 87% 92%, rgba(124,146,96,.44), transparent 72%),
+    radial-gradient(70px 44px at 46% 4%, rgba(134,154,102,.34), transparent 74%),
+    radial-gradient(78px 46px at 54% 97%, rgba(134,154,102,.34), transparent 74%);
+}
+.pp-screens.is-title[data-decay]::before { transition-duration: 1.4s; }
+.pp-screens.is-title[data-decay="2"]::before,
+.pp-screens.is-title[data-decay="3"]::before { opacity: 1; }
+
+.pp-screens.is-title::after {
+  transform: scale(.84);
+  transition: opacity .26s ease, transform .26s ease;
+  background:
+    radial-gradient(46px 46px at 9% 20%, rgba(58,66,40,.72), rgba(96,112,72,.6) 34%, rgba(178,190,152,.5) 62%, transparent 78%),
+    radial-gradient(32px 32px at 16% 10%, rgba(62,70,44,.62), rgba(170,182,146,.44) 60%, transparent 78%),
+    radial-gradient(40px 40px at 94% 28%, rgba(56,64,40,.64), rgba(166,178,142,.44) 60%, transparent 78%),
+    radial-gradient(52px 52px at 91% 78%, rgba(52,60,36,.72), rgba(92,108,70,.58) 34%, rgba(174,186,148,.48) 62%, transparent 78%),
+    radial-gradient(36px 36px at 84% 90%, rgba(60,68,42,.6), rgba(168,180,144,.42) 60%, transparent 78%),
+    radial-gradient(38px 38px at 6% 84%, rgba(58,66,40,.62), rgba(172,184,146,.44) 60%, transparent 78%);
+}
+.pp-screens.is-title[data-decay]::after { transition-duration: 1.6s; }
+.pp-screens.is-title[data-decay="3"]::after { opacity: 1; transform: scale(1); }
+
+/* The caption names what is happening on screen using the curriculum's own
+   list of the signs of spoilage, so no new copy is invented here. It loops, so
+   it stays aria-hidden: the same content is taught properly in the Fact Book.
+   min-height reserves the line so the menu never shifts as it cycles. */
+.pp-title__decay {
+  margin: 0; min-height: 1.3em;
+  color: rgba(200,214,158,.94); font-weight: 800;
+  font-size: clamp(12px, 1.5vw, 15px); letter-spacing: .04em;
+  text-shadow: 0 2px 4px rgba(0,0,0,.45);
+  opacity: 0; transform: translateY(4px);
+  transition: opacity .5s ease, transform .5s ease;
+}
+.pp-title__decay.is-on { opacity: 1; transform: none; }
+
+/* As the screen worsens the antidote gets louder. */
+.pp-screens.is-title[data-decay="2"] .pp-btn--primary:not(:active) {
+  box-shadow: 0 0 0 4px rgba(123,212,127,.3), 0 0 26px rgba(123,212,127,.42), var(--ui-shadow-sm);
+}
+.pp-screens.is-title[data-decay="3"] .pp-btn--primary:not(:active) {
+  box-shadow: 0 0 0 6px rgba(123,212,127,.38), 0 0 40px rgba(123,212,127,.6), var(--ui-shadow-sm);
 }
 .pp-title__word1 {
   font-size: clamp(34px, min(8vw, 10vh), 84px); font-weight: 900; letter-spacing: -.02em;
@@ -1049,4 +1157,7 @@ html, body {
   .pp-home, .pp-mode-select, .pp-leaderboard { animation-duration: .01ms !important; }
   .pp-quick__mute, .pp-quick__language, .pp-leaderboard__tab { transition: none !important; }
   .pp-title-ripple { display: none; }
+  .pp-screens.is-title::before, .pp-screens.is-title::after,
+  .pp-title__decay { display: none; }
+  .pp-screens.is-title { transition: none !important; }
 }

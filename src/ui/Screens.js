@@ -144,15 +144,28 @@ export class Screens {
           <button class="pp-btn pp-home__utility pp-title__utility" data-act="boards">🏆 ${t('ui.leaderboard')}</button>
           <button class="pp-btn pp-home__utility pp-title__utility" data-act="credits">© ${t('ui.credits')}</button>
         </nav>
+        <p class="pp-title__decay" data-el="decay" aria-hidden="true"></p>
         <p class="pp-home__hint pp-title__hint">${t('a11y.menuKeyboardHelp')}</p>
       </div>`, { cls: 'is-title' });
 
     const play = node.querySelector('[data-act="play"]');
-    requestAnimationFrame(() => this.titleEffects.playIntro(node.querySelector('.pp-title__logo')));
+    requestAnimationFrame(() => {
+      this.titleEffects.playIntro(node.querySelector('.pp-title__logo'));
+      // The first two signs of spoilage are smell and taste, which a screen
+      // cannot show. Only the visible three drive the attract loop.
+      this.titleEffects.startDecay(node, {
+        play,
+        caption: node.querySelector('[data-el="decay"]'),
+        signs: tList('spoilage.signs').slice(2),
+      });
+    });
     play.addEventListener('click', async (event) => {
       if (play.disabled) return;
       play.disabled = true;
       node.inert = true;
+      // Stop the loop first so the ripple reads as the press preserving the
+      // screen rather than landing on top of a half-spoiled one.
+      this.titleEffects.stopDecay();
       sfx('ui.tap');
       const completed = await this.titleEffects.playRipple(play, event);
       if (completed) onPlay?.();

@@ -2,6 +2,14 @@ const INTRO_MS = 800;
 const RIPPLE_MS = 240;
 const MAX_PARTICLES = 680;
 
+// The title screen runs spoilage as an attract loop rather than as a reward for
+// idling: most players press Play within a few seconds, so a slow one-way decay
+// would never be seen. One cycle walks the three *visible* signs of spoilage,
+// sweeps itself clean, then starts again.
+const DECAY_STAGE_MS = [1400, 4600, 7800];
+const DECAY_SWEEP_MS = 11000;
+const DECAY_CYCLE_MS = 12400;
+
 const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 const easeInOut = (t) => t * t * (3 - 2 * t);
 
@@ -12,6 +20,7 @@ export class TitleEffects {
     this._raf = 0;
     this._canvas = null;
     this._ripple = null;
+    this._decay = null;
   }
 
   playIntro(title) {
@@ -133,7 +142,63 @@ export class TitleEffects {
     return new Promise((resolve) => setTimeout(() => resolve(this._ripple === ripple && ripple.isConnected), RIPPLE_MS));
   }
 
+  /**
+   * Attract loop for the title screen: the kitchen behind the menu slowly
+   * spoils through colour -> texture -> mould, then a preserving sweep clears
+   * it and the cycle repeats. `signs` supplies the caption for each stage and
+   * comes from the curriculum copy, so nothing educational is decided here.
+   */
+  startDecay(screen, { play = null, caption = null, signs = [] } = {}) {
+    if (!screen) return;
+    this.stopDecay();
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const state = { screen, timers: [] };
+    this._decay = state;
+
+    const at = (ms, fn) => {
+      state.timers.push(setTimeout(() => {
+        if (this._decay === state && screen.isConnected) fn();
+      }, ms));
+    };
+
+    const setStage = (stage) => {
+      if (stage) screen.dataset.decay = String(stage);
+      else delete screen.dataset.decay;
+      if (!caption) return;
+      const text = stage ? signs[stage - 1] || '' : '';
+      caption.textContent = text;
+      caption.classList.toggle('is-on', Boolean(text));
+    };
+    state.setStage = setStage;
+
+    const cycle = () => {
+      setStage(0);
+      DECAY_STAGE_MS.forEach((ms, index) => at(ms, () => setStage(index + 1)));
+      at(DECAY_SWEEP_MS, () => {
+        // Dropping the stage is what clears the screen; the CSS gives the base
+        // state a short duration so it lands with the ripple.
+        setStage(0);
+        if (play) this.playRipple(play);
+      });
+      at(DECAY_CYCLE_MS, cycle);
+    };
+    cycle();
+  }
+
+  /** Clears the decay stage and stops the loop. Safe to call when not running. */
+  stopDecay() {
+    const state = this._decay;
+    this._decay = null;
+    if (!state) return;
+    for (const timer of state.timers) clearTimeout(timer);
+    state.timers.length = 0;
+    // Clear through setStage so the caption is emptied with the stage flag.
+    if (state.screen?.isConnected) state.setStage?.(0);
+  }
+
   destroy() {
+    this.stopDecay();
     cancelAnimationFrame(this._raf);
     this._raf = 0;
     this._canvas?.remove();
