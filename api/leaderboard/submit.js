@@ -43,7 +43,7 @@ export default async function handler(req, res) {
     writeLog('warn', 'leaderboard submission rejected', req, startedAt, {
       reason: 'invalid_mode', malformedJson,
       mode: typeof mode === 'string' ? mode.slice(0, 20) : null,
-      name: cleanedName,
+      nameLength: cleanedName.length,
     });
     res.status(400).json({ ok: false, error: 'invalid mode' });
     return;
@@ -55,7 +55,7 @@ export default async function handler(req, res) {
   // the first place, regardless of what renders it later.
   if (!cleanedName || hasUnsafeCharacters || !passesNameFilter) {
     writeLog('warn', 'leaderboard submission rejected', req, startedAt, {
-      reason: 'invalid_name', mode, name: cleanedName, nameLength: cleanedName.length,
+      reason: 'invalid_name', mode, nameLength: cleanedName.length,
       emptyName: !cleanedName, hasUnsafeCharacters,
       rejectedByNameFilter: !passesNameFilter,
     });
@@ -64,8 +64,8 @@ export default async function handler(req, res) {
   }
   if (!Number.isFinite(score) || score < 0) {
     writeLog('warn', 'leaderboard submission rejected', req, startedAt, {
-      reason: 'invalid_score', mode, name: cleanedName, scoreType: typeof score,
-      score: Number.isFinite(score) ? score : null,
+      reason: 'invalid_score', mode, nameLength: cleanedName.length,
+      scoreType: typeof score, scoreFinite: Number.isFinite(score),
     });
     res.status(400).json({ ok: false, error: 'invalid score' });
     return;
@@ -78,12 +78,13 @@ export default async function handler(req, res) {
 
     const rank = await kv.zrevrank(key, member);
     writeLog('info', 'leaderboard submission completed', req, startedAt, {
-      mode, name: cleanedName, score, rank: (rank ?? 0) + 1,
+      mode, nameLength: cleanedName.length, rank: (rank ?? 0) + 1,
     });
     res.status(200).json({ ok: true, rank: (rank ?? 0) + 1 });
   } catch (error) {
     writeLog('error', 'leaderboard submission failed', req, startedAt, {
-      mode, name: cleanedName, error: error instanceof Error ? error.message : String(error),
+      mode, nameLength: cleanedName.length,
+      errorType: error instanceof Error ? error.name : typeof error,
     });
     res.status(500).json({ ok: false, error: 'internal error' });
   }

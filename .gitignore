@@ -4,3 +4,16 @@ shots/
 .DS_Store
 artifacts/*
 dist-qa
+
+# Local configuration and credentials. Keep a safe template trackable.
+.env
+.env.*
+!.env.example
+!.env.template
+.claude/
+
+# Local logs and generated QA/temp output.
+*.log
+design-qa.md
+.tmp_head_compare/
+tmp/
